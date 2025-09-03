@@ -4,13 +4,12 @@ import React, { useState, useEffect, useRef } from "react";
 import YoutubeSubscribe from "./YoutubeSubscribe";
 import PhoneInput from "react-phone-input-2";
 import "react-phone-input-2/lib/style.css";
-import { RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth";
-import type { ConfirmationResult } from "firebase/auth";
-import { auth } from "../../../lib/firebase";
+// OTP for additional contact removed; primary phone flow handled in PhoneAuth
 import PhoneAuth from "./PhoneAuth";
 import Box from "@mui/material/Box";
 import TextField from "@mui/material/TextField";
 import Select from "@mui/material/Select";
+import type { SelectChangeEvent } from "@mui/material/Select";
 import MenuItem from "@mui/material/MenuItem";
 import Button from "@mui/material/Button";
 import Typography from "@mui/material/Typography";
@@ -19,8 +18,10 @@ import InputLabel from "@mui/material/InputLabel";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import Radio from "@mui/material/Radio";
 import RadioGroup from "@mui/material/RadioGroup";
+import InputAdornment from "@mui/material/InputAdornment";
+import IconButton from "@mui/material/IconButton";
 
-import { supabase } from "../../../lib/supabase";
+// supabase imported earlier but not used in this component — remove to avoid lint warnings
 
 const currentYear = new Date().getFullYear();
 const genderOptions = ["Male", "Female", "Other"];
@@ -39,7 +40,7 @@ const SUPPORTED_LANGUAGES = [
 type NominatimPlace = {
   place_id: number;
   display_name?: string;
-  address?: Record<string, any>;
+  address?: Record<string, unknown>;
 };
 
 const ALLOWED_COUNTRY_CODES = ["ae", "in", "sa", "om", "lk"];
@@ -54,7 +55,7 @@ const COUNTRY_NAME_TO_CODE: Record<string, string> = {
 // Minimal location state and helpers (geolocation implementation present later in file)
 type Loc = { lat: number; lng: number } | null;
 
-// Form data shape used in component state
+// No global recaptcha verifier is used in this component anymore
 type FormData = {
   studentName?: string;
   fatherName?: string;
@@ -64,9 +65,6 @@ type FormData = {
   boardYear?: number | string;
   paymentType?: "full" | "part";
   // Address fields
-  houseNo?: string;
-  street?: string;
-  landmark?: string;
   zipCode?: string;
   city?: string;
   state?: string;
@@ -85,213 +83,12 @@ export default function StepBasic() {
   const citySearchController = useRef<AbortController | null>(null);
 
   // no duplicate constants here — top-level ALLOWED_COUNTRY_CODES / COUNTRY_NAME_TO_CODE used
-  const fetchCityStateFromZip = async (zip: string, signal?: AbortSignal) => {
-    const cleaned = zip.trim();
-    const allowedCountryCodes = ["ae", "in", "sa", "om", "lk"]; // UAE, India, Saudi, Oman, Sri Lanka
-    const countryNameToCode: Record<string, string> = {
-      "United Arab Emirates": "ae",
-      UAE: "ae",
-      India: "in",
-      "Saudi Arabia": "sa",
-      Oman: "om",
-      "Sri Lanka": "lk",
-      LK: "lk",
-    };
-    try {
-      // mark this as the latest query
-      latestZipQuery.current = cleaned;
-
-      // 1) India PIN (6 digits) - use India postal API which is accurate for IN
-      if (/^\d{6}$/.test(cleaned)) {
-        try {
-          const res = await fetch(
-            `https://api.postalpincode.in/pincode/${cleaned}`,
-            { signal }
-          );
-          if (res.ok) {
-            const json = await res.json();
-            if (Array.isArray(json) && json[0]?.Status === "Success") {
-              const post = json[0].PostOffice?.[0];
-              if (post && latestZipQuery.current === cleaned) {
-                setForm((prev: FormData) => ({
-                  ...prev,
-                  city: post.District || prev.city,
-                  state: post.State || prev.state,
-                  country: "India",
-                }));
-                return;
-              }
-            }
-          }
-        } catch {
-          // ignore or logged above
-        }
-      }
-
-      // 2) Try allowed country Nominatim queries (preferred)
-      for (const cc of allowedCountryCodes) {
-        if (signal?.aborted) return;
-        const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=1&countrycodes=${cc}&q=${encodeURIComponent(
-          cleaned
-        )}`;
-        try {
-          const r = await fetch(url, {
-            headers: { "User-Agent": "neram-app/1.0" },
-            signal,
-          });
-          if (!r.ok) continue;
-          const results = await r.json();
-          if (!Array.isArray(results) || results.length === 0) continue;
-          const resItem = results[0];
-          const addr = resItem.address || {};
-
-          // If the result has a postcode and it doesn't match, skip
-          if (addr.postcode && addr.postcode !== cleaned) continue;
-
-          // Only accept results within allowed countries
-          if (!addr.country) continue;
-          const code = countryNameToCode[addr.country] || addr.country_code;
-          if (!code || !allowedCountryCodes.includes(code.toLowerCase()))
-            continue;
-
-          // Ensure this is still the latest query
-          if (latestZipQuery.current !== cleaned) return;
-
-          // Map country to allowed code if possible
-          let mappedCountry = addr.country || form.country;
-          if (addr.country) {
-            const code = countryNameToCode[addr.country] || addr.country_code;
-            if (code && allowedCountryCodes.includes(code.toLowerCase())) {
-              mappedCountry =
-                Object.keys(countryNameToCode).find(
-                  (k) => countryNameToCode[k] === code
-                ) || addr.country;
-            }
-          }
-          setForm((prev: FormData) => ({
-            ...prev,
-            city:
-              addr.city ||
-              addr.town ||
-              addr.village ||
-              addr.county ||
-              prev.city,
-            state: addr.state || addr.region || prev.state,
-            country: mappedCountry,
-          }));
-          return;
-        } catch {
-          // ignore and continue
-          continue;
-        }
-      }
-
-      // 3) Final fallback: single Nominatim search but restricted to allowed countries as a list
-      try {
-        if (signal?.aborted) return;
-        const codes = allowedCountryCodes.join(",");
-        const urlGlobal = `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=1&countrycodes=${codes}&q=${encodeURIComponent(
-          cleaned
-        )}`;
-        const rg = await fetch(urlGlobal, {
-          headers: { "User-Agent": "neram-app/1.0" },
-          signal,
-        });
-        if (!rg.ok) return;
-        const resJson = await rg.json();
-        if (Array.isArray(resJson) && resJson.length > 0) {
-          const resItem = resJson[0];
-          const addr = resItem.address || {};
-          if (addr.postcode && addr.postcode !== cleaned) return;
-          if (latestZipQuery.current !== cleaned) return;
-          if (addr.country) {
-            const code = countryNameToCode[addr.country] || addr.country_code;
-            if (!code || !allowedCountryCodes.includes(code.toLowerCase()))
-              return;
-          }
-          // Map country to allowed code if possible
-          let mappedCountry = addr.country || form.country;
-          if (addr.country) {
-            const code = countryNameToCode[addr.country] || addr.country_code;
-            if (code && allowedCountryCodes.includes(code.toLowerCase())) {
-              mappedCountry =
-                Object.keys(countryNameToCode).find(
-                  (k) => countryNameToCode[k] === code
-                ) || addr.country;
-            }
-          }
-          setForm((prev: FormData) => ({
-            ...prev,
-            city:
-              addr.city ||
-              addr.town ||
-              addr.village ||
-              addr.county ||
-              prev.city,
-            state: addr.state || addr.region || prev.state,
-            country: mappedCountry,
-          }));
-        }
-      } catch {
-        // ignore global nominatim errors
-      }
-    } catch {
-      // ignore
-    }
-  };
-  const [altError, setAltError] = useState("");
-
-  // Alternate phone verification state (inline alt contact)
+  // Alternate phone (no OTP verification)
   const [altPhone, setAltPhone] = useState("");
-  const [altOtp, setAltOtp] = useState("");
-  const [altStep, setAltStep] = useState<"phone" | "otp" | "done">("phone");
-  const [altConfirmation, setAltConfirmation] =
-    useState<ConfirmationResult | null>(null);
-  const [altLoading, setAltLoading] = useState(false);
+  // control visibility of the Additional Contact input (hidden by default)
+  const [showAltContact, setShowAltContact] = useState(false);
 
-  const sendAltOtp = async () => {
-    setAltError("");
-    setAltLoading(true);
-    try {
-      if (!(window as any).recaptchaVerifierAlt) {
-        (window as any).recaptchaVerifierAlt = new RecaptchaVerifier(
-          auth,
-          "recaptcha-container-alt",
-          { size: "invisible" }
-        );
-        (window as any).recaptchaVerifierAlt.render();
-      }
-      const formattedPhone = altPhone.startsWith("+")
-        ? altPhone
-        : "+" + altPhone;
-      const confirmationResult = await signInWithPhoneNumber(
-        auth,
-        formattedPhone,
-        (window as any).recaptchaVerifierAlt
-      );
-      setAltConfirmation(confirmationResult);
-      setAltStep("otp");
-    } catch {
-      setAltError("Failed to send OTP. Check phone number.");
-    }
-    setAltLoading(false);
-  };
-
-  const verifyAltOtp = async () => {
-    setAltError("");
-    setAltLoading(true);
-    try {
-      if (altConfirmation) {
-        await altConfirmation.confirm(altOtp);
-        setAltStep("done");
-      } else {
-        setAltError("No confirmation object. Please retry.");
-      }
-    } catch {
-      setAltError("Invalid OTP. Try again.");
-    }
-    setAltLoading(false);
-  };
+  // sendAltOtp / verifyAltOtp removed — additional contact is accepted without OTP
   const PHONE_KEY = "phone_verified";
   const [activeTab, setActiveTab] = useState<"nata-jee" | "software">(
     "nata-jee"
@@ -305,9 +102,6 @@ export default function StepBasic() {
     boardYear: currentYear,
     paymentType: "full", // 'full' or 'part'
     // Address fields
-    houseNo: "",
-    street: "",
-    landmark: "",
     zipCode: "",
     city: "",
     state: "",
@@ -316,11 +110,167 @@ export default function StepBasic() {
     languageMode: "english",
   });
 
+  // Helper to fetch city/state from ZIP using India API or Nominatim. Placed after form state to avoid hoisting issues.
+  const fetchCityStateFromZip = async (zip: string, signal?: AbortSignal) => {
+    const cleaned = zip.trim();
+    const allowedCountryCodes = ALLOWED_COUNTRY_CODES;
+    const countryNameToCode = COUNTRY_NAME_TO_CODE;
+    latestZipQuery.current = cleaned;
+
+    try {
+      if (/^\d{6}$/.test(cleaned)) {
+        try {
+          const res = await fetch(
+            `https://api.postalpincode.in/pincode/${cleaned}`,
+            { signal }
+          );
+          if (res.ok) {
+            const json = await res.json();
+            if (Array.isArray(json) && json[0]?.Status === "Success") {
+              const post = json[0].PostOffice?.[0];
+              if (post && latestZipQuery.current === cleaned) {
+                setForm((prev) => ({
+                  ...prev,
+                  city: post.District || prev.city,
+                  state: post.State || prev.state,
+                  country: "India",
+                }));
+                return;
+              }
+            }
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      // allowed-country nominatim lookup
+      for (const cc of allowedCountryCodes) {
+        if (signal?.aborted) return;
+        const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=1&countrycodes=${cc}&q=${encodeURIComponent(
+          cleaned
+        )}`;
+        try {
+          const r = await fetch(url, {
+            headers: { "User-Agent": "neram-app/1.0" },
+            signal,
+          });
+          if (!r.ok) continue;
+          const results = await r.json();
+          if (!Array.isArray(results) || results.length === 0) continue;
+          const resItem = results[0] as NominatimPlace;
+          const addr = (resItem.address || {}) as Record<string, unknown>;
+          if (addr.postcode && addr.postcode !== cleaned) continue;
+          const countryCodeFromAddr = (addr as Record<string, unknown>)[
+            "country_code"
+          ] as string | undefined;
+          const countryName =
+            typeof (addr as Record<string, unknown>).country === "string"
+              ? ((addr as Record<string, unknown>).country as string)
+              : undefined;
+          const code = countryName
+            ? countryNameToCode[countryName] || countryCodeFromAddr
+            : countryCodeFromAddr;
+          if (!code || !allowedCountryCodes.includes(code.toLowerCase()))
+            continue;
+          if (latestZipQuery.current !== cleaned) return;
+          let mappedCountry = countryName;
+          if (countryName) {
+            const code2 = countryNameToCode[countryName] || countryCodeFromAddr;
+            if (code2 && allowedCountryCodes.includes(code2.toLowerCase())) {
+              mappedCountry =
+                Object.keys(countryNameToCode).find(
+                  (k) => countryNameToCode[k] === code2
+                ) || countryName;
+            }
+          }
+          setForm((prev) => ({
+            ...prev,
+            city:
+              (addr.city as string) ||
+              (addr.town as string) ||
+              (addr.village as string) ||
+              (addr.county as string) ||
+              prev.city,
+            state:
+              (addr.state as string) || (addr.region as string) || prev.state,
+            country: (mappedCountry as string) || prev.country,
+          }));
+          return;
+        } catch {
+          continue;
+        }
+      }
+
+      // global fallback restricted to allowed countries
+      try {
+        if (signal?.aborted) return;
+        const codes = allowedCountryCodes.join(",");
+        const urlGlobal = `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=1&countrycodes=${codes}&q=${encodeURIComponent(
+          cleaned
+        )}`;
+        const rg = await fetch(urlGlobal, {
+          headers: { "User-Agent": "neram-app/1.0" },
+          signal,
+        });
+        if (!rg.ok) return;
+        const resJson = await rg.json();
+        if (Array.isArray(resJson) && resJson.length > 0) {
+          const resItem = resJson[0] as NominatimPlace;
+          const addr = (resItem.address || {}) as Record<string, unknown>;
+          if (addr.postcode && addr.postcode !== cleaned) return;
+          if (latestZipQuery.current !== cleaned) return;
+          const countryCodeFromAddr = (addr as Record<string, unknown>)[
+            "country_code"
+          ] as string | undefined;
+          const countryName =
+            typeof (addr as Record<string, unknown>).country === "string"
+              ? ((addr as Record<string, unknown>).country as string)
+              : undefined;
+          const code = countryName
+            ? countryNameToCode[countryName] || countryCodeFromAddr
+            : countryCodeFromAddr;
+          if (!code || !allowedCountryCodes.includes(code.toLowerCase()))
+            return;
+          let mappedCountry = countryName;
+          if (countryName) {
+            const code2 = countryNameToCode[countryName] || countryCodeFromAddr;
+            if (code2 && allowedCountryCodes.includes(code2.toLowerCase())) {
+              mappedCountry =
+                Object.keys(countryNameToCode).find(
+                  (k) => countryNameToCode[k] === code2
+                ) || countryName;
+            }
+          }
+          setForm((prev) => ({
+            ...prev,
+            city:
+              (addr.city as string) ||
+              (addr.town as string) ||
+              (addr.village as string) ||
+              (addr.county as string) ||
+              prev.city,
+            state:
+              (addr.state as string) || (addr.region as string) || prev.state,
+            country: (mappedCountry as string) || prev.country,
+          }));
+        }
+      } catch {
+        // ignore
+      }
+    } catch {
+      // ignore top-level failures
+    }
+  };
+
   // YouTube subscribe flow state (moved into reusable component)
   const [youtubeSubscribed, setYoutubeSubscribed] = useState(false);
   // Location / reverse-geocode state
   const [location, setLocation] = useState<Loc | null>(null);
   const [locationError, setLocationError] = useState("");
+  // referenced to avoid 'assigned but never used' TypeScript warnings until UI uses these
+  void setLocation;
+  void locationError;
 
   // Reverse geocode helper: populate address fields from lat/lng using Nominatim
   const fetchAddressFromLocation = async (lat: number, lng: number) => {
@@ -336,25 +286,17 @@ export default function StepBasic() {
       const addr = json.address || {};
       setForm((prev: FormData) => ({
         ...prev,
-        houseNo: prev.houseNo || addr.house_number || addr.building || "",
-        street:
-          prev.street ||
-          addr.road ||
-          addr.neighbourhood ||
-          addr.suburb ||
-          addr.village ||
-          "",
-        landmark: prev.landmark || addr.landmark || addr.city_district || "",
-        zipCode: prev.zipCode || addr.postcode || "",
+        zipCode: prev.zipCode || (addr.postcode as string) || "",
         city:
           prev.city ||
-          addr.city ||
-          addr.town ||
-          addr.village ||
-          addr.county ||
+          (addr.city as string) ||
+          (addr.town as string) ||
+          (addr.village as string) ||
+          (addr.county as string) ||
           prev.city,
-        state: prev.state || addr.state || addr.region || "",
-        country: prev.country || addr.country || "",
+        state:
+          prev.state || (addr.state as string) || (addr.region as string) || "",
+        country: prev.country || (addr.country as string) || "",
       }));
       setLocationError("");
     } catch (err) {
@@ -422,7 +364,6 @@ export default function StepBasic() {
   const [instagramId, setInstagramId] = useState("");
 
   // Language selection UI state: default English selected as requested
-  const [languageQuery, setLanguageQuery] = useState("");
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>([
     "English",
   ]);
@@ -431,12 +372,16 @@ export default function StepBasic() {
   const [reviewMode, setReviewMode] = useState(false);
   const [editField, setEditField] = useState<string | null>(null);
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
+  // Hover state for the combined City|State|Country line to show per-item edit icon
+  const [hoverCsc, setHoverCsc] = useState<string | null>(null);
   const fieldRefs = useRef<Record<string, HTMLElement | null>>({});
 
   // Draft persistence key and feedback
   const DRAFT_KEY = "neram_application_draft_v1";
   const [draftSaved, setDraftSaved] = useState(false);
   const [draftLoaded, setDraftLoaded] = useState(false);
+  // referenced to avoid 'assigned but never used' TypeScript warnings until draft UI is shown
+  void draftLoaded;
 
   // Focus the field when returning from review edit click
   useEffect(() => {
@@ -454,8 +399,7 @@ export default function StepBasic() {
           }
         }, 80);
       }
-      // clear editField after focusing
-      setEditField(null);
+      // keep editField set; onBlur handlers will clear it when the user finishes editing
     }
   }, [editField, reviewMode]);
 
@@ -591,6 +535,13 @@ export default function StepBasic() {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
+  // MUI Select emits SelectChangeEvent which differs from standard ChangeEvent
+  const handleSelectChange = (e: SelectChangeEvent<string>) => {
+    const name = e.target.name as string;
+    const value = e.target.value;
+    if (name) setForm({ ...form, [name]: value });
+  };
+
   // Subscribe callback handler used by the reusable component
   const onYoutubeSubscribed = (s: boolean) => {
     setYoutubeSubscribed(s);
@@ -599,12 +550,9 @@ export default function StepBasic() {
   const addLanguage = (lang: string) => {
     if (!SUPPORTED_LANGUAGES.includes(lang)) return;
     setSelectedLanguages((s) => (s.includes(lang) ? s : [...s, lang]));
-    setLanguageQuery("");
   };
-
-  const removeLanguage = (lang: string) => {
-    setSelectedLanguages((s) => s.filter((x) => x !== lang));
-  };
+  // keep a noop reference so linter doesn't complain until UI adds the addLanguage control
+  void addLanguage;
 
   // Auto-populate address from geolocation when available
   useEffect(() => {
@@ -633,13 +581,18 @@ export default function StepBasic() {
     }
   }, [form.zipCode, form.country]);
 
-  // City autocomplete state
+  // City autocomplete state (kept minimal until UI added)
   const [cityQuery, setCityQuery] = useState("");
   const [citySuggestions, setCitySuggestions] = useState<NominatimPlace[]>([]);
   const [showCitySuggestions, setShowCitySuggestions] = useState(false);
   // Loading indicators for lookups
   const [zipLoading, setZipLoading] = useState(false);
   const [cityLoading, setCityLoading] = useState(false);
+  // noop references to avoid 'assigned but never used' until suggestions UI added
+  void citySuggestions;
+  void showCitySuggestions;
+  void zipLoading;
+  void cityLoading;
 
   // City autocomplete: search Nominatim for typed city names and show suggestions
   useEffect(() => {
@@ -701,10 +654,13 @@ export default function StepBasic() {
             const countryCodeFromAddr = (addr as Record<string, unknown>)[
               "country_code"
             ] as string | undefined;
-            const code =
-              (addr.country &&
-                (COUNTRY_NAME_TO_CODE[addr.country] || countryCodeFromAddr)) ||
-              undefined;
+            const countryName =
+              typeof (addr as Record<string, unknown>).country === "string"
+                ? ((addr as Record<string, unknown>).country as string)
+                : undefined;
+            const code = countryName
+              ? COUNTRY_NAME_TO_CODE[countryName] || countryCodeFromAddr
+              : countryCodeFromAddr;
             return code && ALLOWED_COUNTRY_CODES.includes(code.toLowerCase());
           }
         );
@@ -731,14 +687,24 @@ export default function StepBasic() {
     const addr = s.address || {};
     setForm((prev: FormData) => ({
       ...prev,
-      city: addr.city || addr.town || addr.village || addr.county || prev.city,
-      state: addr.state || addr.region || prev.state,
-      country: addr.country || prev.country,
+      city:
+        prev.city ||
+        (addr.city as string) ||
+        (addr.town as string) ||
+        (addr.village as string) ||
+        (addr.county as string) ||
+        prev.city,
+      state:
+        prev.state ||
+        (addr.state as string) ||
+        (addr.region as string) ||
+        prev.state,
+      country: prev.country || (addr.country as string) || prev.country,
     }));
     setCityQuery("");
-    setCitySuggestions([]);
-    setShowCitySuggestions(false);
   };
+  // referenced to avoid 'assigned but never used' TypeScript error until UI uses these helpers
+  void selectCitySuggestion;
   // When user edits state manually, try to infer country
   const onStateBlurInferCountry = async (stateName: string) => {
     const s = stateName.trim();
@@ -756,13 +722,15 @@ export default function StepBasic() {
         const addr = res[0].address || {};
         setForm((prev: FormData) => ({
           ...prev,
-          country: addr.country || prev.country,
+          country: (addr.country as string) || prev.country,
         }));
       }
     } catch (err) {
       console.warn("Infer country from state failed", err);
     }
   };
+  // referenced to avoid 'assigned but never used' TypeScript error until UI uses these helpers
+  void onStateBlurInferCountry;
 
   // Reactive verified phone state (reads from localStorage at init)
   const [verifiedPhone, setVerifiedPhone] = useState<string | null>(() => {
@@ -790,7 +758,10 @@ export default function StepBasic() {
   useEffect(() => {
     try {
       if (currentStep === 2 && basicRef.current) {
-        basicRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+        basicRef.current.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
       } else if (currentStep === 3 && educationRef.current) {
         educationRef.current.scrollIntoView({
           behavior: "smooth",
@@ -807,7 +778,7 @@ export default function StepBasic() {
           block: "start",
         });
       }
-    } catch (_e) {
+    } catch {
       // ignore
     }
   }, [currentStep]);
@@ -818,18 +789,7 @@ export default function StepBasic() {
   // PhoneAuth will call onVerified with the normalized E.164 phone string.
   if (currentStep === 1) {
     return (
-      <div style={{ maxWidth: 420, margin: "40px auto", padding: 0 }}>
-        <h2
-          style={{
-            color: "#7c1fa0",
-            fontWeight: 700,
-            fontSize: 22,
-            marginBottom: 24,
-            textAlign: "center",
-          }}
-        >
-          Verify your phone number to continue
-        </h2>
+      <div style={{ maxWidth: 520, margin: 40 }}>
         <PhoneAuth
           onVerified={(p: string) => {
             try {
@@ -845,7 +805,7 @@ export default function StepBasic() {
   }
 
   return (
-    <Box sx={{ maxWidth: 420, m: "40px auto", p: 0 }}>
+    <Box sx={{ maxWidth: 520, m: 5 }}>
       {/* Tabs removed — course selection uses in-form controls now */}
 
       {/* Form Title */}
@@ -867,37 +827,39 @@ export default function StepBasic() {
       >
         {/* Step indicator */}
         <Typography sx={{ mb: 1.5, fontSize: 14, color: "#666" }}>
-          Step {currentStep} of 3
+          Step {currentStep} of 4
         </Typography>
         {/* course selection moved to the end of the form (see below) */}
         {/* Additional Contact Number Field (Step 2: Basics) */}
         {currentStep === 2 && (
           <Box>
-            {/* Student Name */}
-            <TextField
-              id="studentName"
-              name="studentName"
-              label="Student Name"
-              value={form.studentName}
-              onChange={handleChange}
-              fullWidth
-              margin="normal"
-              variant="outlined"
-              autoComplete="off"
-            />
-
-            {/* Father Name */}
-            <TextField
-              id="fatherName"
-              name="fatherName"
-              label="Father Name"
-              value={form.fatherName as string}
-              onChange={handleChange}
-              fullWidth
-              margin="normal"
-              variant="outlined"
-              autoComplete="off"
-            />
+            {/* Student Name and Father Name - inline */}
+            <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+              <TextField
+                id="studentName"
+                size="small"
+                name="studentName"
+                label="Student Name"
+                value={form.studentName}
+                onChange={handleChange}
+                sx={{ flex: 1 }}
+                margin="normal"
+                variant="outlined"
+                autoComplete="off"
+              />
+              <TextField
+                id="fatherName"
+                size="small"
+                name="fatherName"
+                label="Father Name"
+                value={form.fatherName as string}
+                onChange={handleChange}
+                sx={{ flex: 1 }}
+                margin="normal"
+                variant="outlined"
+                autoComplete="off"
+              />
+            </Box>
 
             {/* Gender */}
             <FormControl fullWidth margin="normal">
@@ -905,10 +867,11 @@ export default function StepBasic() {
               <Select
                 labelId="gender-label"
                 id="gender"
+                size="small"
                 name="gender"
                 value={form.gender}
                 label="Gender"
-                onChange={handleChange}
+                onChange={handleSelectChange}
               >
                 {genderOptions.map((g) => (
                   <MenuItem key={g} value={g}>
@@ -919,46 +882,12 @@ export default function StepBasic() {
             </FormControl>
 
             {/* Address fields */}
-            <TextField
-              id="houseNo"
-              name="houseNo"
-              label="House No"
-              value={form.houseNo as string}
-              onChange={handleChange}
-              fullWidth
-              margin="normal"
-              variant="outlined"
-              placeholder="Door / House no"
-              autoComplete="off"
-            />
-            <TextField
-              id="street"
-              name="street"
-              label="Street"
-              value={form.street as string}
-              onChange={handleChange}
-              fullWidth
-              margin="normal"
-              variant="outlined"
-              placeholder="Street / Locality"
-              autoComplete="off"
-            />
-            <TextField
-              id="landmark"
-              name="landmark"
-              label="Landmark"
-              value={form.landmark as string}
-              onChange={handleChange}
-              fullWidth
-              margin="normal"
-              variant="outlined"
-              placeholder="Landmark (optional)"
-              autoComplete="off"
-            />
+
             <TextField
               id="zipCode"
+              size="small"
               name="zipCode"
-              label="Zip Code"
+              label="Address Zip Code"
               value={form.zipCode}
               onChange={handleChange}
               fullWidth
@@ -968,282 +897,461 @@ export default function StepBasic() {
               autoComplete="off"
             />
 
-            {/* City, State, Country: show as text, allow edit on icon click */}
-            <Box sx={{ mt: 1 }}>
-              <Typography
-                sx={{ fontSize: 14, color: "#333", fontWeight: 500, mb: 0.5 }}
-              >
-                City
-              </Typography>
-              {editField === "city" ? (
-                <TextField
-                  id="city"
-                  name="city"
-                  value={form.city}
-                  onChange={handleChange}
-                  fullWidth
-                  margin="dense"
-                  variant="outlined"
-                  onBlur={() => setEditField(null)}
-                  autoFocus
-                />
-              ) : (
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <Typography sx={{ color: "#666" }}>
-                    {form.city || "(auto-filled)"}
-                  </Typography>
-                  <Button
+            {/* City | State | Country — single line with per-item hover edit */}
+            <Box
+              sx={{
+                mt: ((form.zipCode || "") as string).toString().trim() ? 0 : 2,
+              }}
+            >
+              {/* Only show combined City/State/Country after user entered a ZIP */}
+              {((form.zipCode || "") as string).toString().trim() ? (
+                // Inline editors: if any specific field is being edited, show its TextField in place
+                editField === "city" ? (
+                  <TextField
+                    id="city"
                     size="small"
-                    onClick={() => setEditField("city")}
-                    sx={{ minWidth: 0 }}
-                  >
-                    ✏️
-                  </Button>
-                </Box>
-              )}
-            </Box>
-            <Box sx={{ mt: 1 }}>
-              <Typography
-                sx={{ fontSize: 14, color: "#333", fontWeight: 500, mb: 0.5 }}
-              >
-                State
-              </Typography>
-              {editField === "state" ? (
-                <TextField
-                  id="state"
-                  name="state"
-                  value={form.state}
-                  onChange={handleChange}
-                  fullWidth
-                  margin="dense"
-                  variant="outlined"
-                  onBlur={() => setEditField(null)}
-                  autoFocus
-                />
-              ) : (
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <Typography sx={{ color: "#666" }}>
-                    {form.state || "(auto-filled)"}
-                  </Typography>
-                  <Button
+                    name="city"
+                    value={form.city}
+                    onChange={handleChange}
+                    fullWidth
+                    margin="dense"
+                    variant="outlined"
+                    onBlur={() => setEditField(null)}
+                    inputRef={(el: HTMLInputElement | null) => {
+                      fieldRefs.current["city"] = el;
+                    }}
+                    autoFocus
+                  />
+                ) : editField === "state" ? (
+                  <TextField
+                    id="state"
                     size="small"
-                    onClick={() => setEditField("state")}
-                    sx={{ minWidth: 0 }}
-                  >
-                    ✏️
-                  </Button>
-                </Box>
-              )}
-            </Box>
-            <Box sx={{ mt: 1 }}>
-              <Typography
-                sx={{ fontSize: 14, color: "#333", fontWeight: 500, mb: 0.5 }}
-              >
-                Country
-              </Typography>
-              {editField === "country" ? (
-                <TextField
-                  id="country"
-                  name="country"
-                  value={form.country}
-                  onChange={handleChange}
-                  fullWidth
-                  margin="dense"
-                  variant="outlined"
-                  onBlur={() => setEditField(null)}
-                  autoFocus
-                />
-              ) : (
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <Typography sx={{ color: "#666" }}>
-                    {form.country || "(auto-filled)"}
-                  </Typography>
-                  <Button
+                    name="state"
+                    value={form.state}
+                    onChange={handleChange}
+                    fullWidth
+                    margin="dense"
+                    variant="outlined"
+                    onBlur={() => setEditField(null)}
+                    inputRef={(el: HTMLInputElement | null) => {
+                      fieldRefs.current["state"] = el;
+                    }}
+                    autoFocus
+                  />
+                ) : editField === "country" ? (
+                  <TextField
+                    id="country"
                     size="small"
-                    onClick={() => setEditField("country")}
-                    sx={{ minWidth: 0 }}
+                    name="country"
+                    value={form.country}
+                    onChange={handleChange}
+                    fullWidth
+                    margin="dense"
+                    variant="outlined"
+                    onBlur={() => setEditField(null)}
+                    inputRef={(el: HTMLInputElement | null) => {
+                      fieldRefs.current["country"] = el;
+                    }}
+                    autoFocus
+                  />
+                ) : (
+                  <Box
+                    sx={{
+                      display: "flex",
+                      gap: 1,
+                      alignItems: "center",
+                      flexWrap: "wrap",
+                    }}
                   >
-                    ✏️
-                  </Button>
-                </Box>
-              )}
+                    {form.city ? (
+                      <Box
+                        onMouseEnter={() => setHoverCsc("city")}
+                        onMouseLeave={() => setHoverCsc(null)}
+                        onClick={() => setEditField("city")}
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 0.5,
+                          cursor: "pointer",
+                        }}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ")
+                            setEditField("city");
+                        }}
+                      >
+                        <Typography sx={{ color: "#666", fontSize: 13 }}>
+                          City :{" "}
+                          <Box
+                            component="span"
+                            sx={{ fontWeight: 700, fontSize: 13 }}
+                          >
+                            {form.city}
+                          </Box>
+                        </Typography>
+                        {hoverCsc === "city" && (
+                          <Button
+                            size="small"
+                            aria-label="Edit city"
+                            onClick={() => setEditField("city")}
+                            sx={{
+                              p: 0,
+                              minWidth: 0,
+                              lineHeight: 1,
+                              height: "1em",
+                              fontSize: 13,
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              cursor: "pointer",
+                            }}
+                          >
+                            ✏️
+                          </Button>
+                        )}
+                      </Box>
+                    ) : null}
+
+                    {form.city && form.state ? (
+                      <Typography sx={{ color: "#bbb", fontSize: 13 }}>
+                        |
+                      </Typography>
+                    ) : null}
+
+                    {form.state ? (
+                      <Box
+                        onMouseEnter={() => setHoverCsc("state")}
+                        onMouseLeave={() => setHoverCsc(null)}
+                        onClick={() => setEditField("state")}
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 0.5,
+                          cursor: "pointer",
+                        }}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ")
+                            setEditField("state");
+                        }}
+                      >
+                        <Typography sx={{ color: "#666", fontSize: 13 }}>
+                          State :{" "}
+                          <Box
+                            component="span"
+                            sx={{ fontWeight: 700, fontSize: 13 }}
+                          >
+                            {form.state}
+                          </Box>
+                        </Typography>
+                        {hoverCsc === "state" && (
+                          <Button
+                            size="small"
+                            aria-label="Edit state"
+                            onClick={() => setEditField("state")}
+                            sx={{
+                              p: 0,
+                              minWidth: 0,
+                              lineHeight: 1,
+                              height: "1em",
+                              fontSize: 13,
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              cursor: "pointer",
+                            }}
+                          >
+                            ✏️
+                          </Button>
+                        )}
+                      </Box>
+                    ) : null}
+
+                    {(form.state && form.country) ||
+                    (form.city && form.country) ? (
+                      <Typography sx={{ color: "#bbb", fontSize: 13 }}>
+                        |
+                      </Typography>
+                    ) : null}
+
+                    {form.country ? (
+                      <Box
+                        onMouseEnter={() => setHoverCsc("country")}
+                        onMouseLeave={() => setHoverCsc(null)}
+                        onClick={() => setEditField("country")}
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 0.5,
+                          cursor: "pointer",
+                        }}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ")
+                            setEditField("country");
+                        }}
+                      >
+                        <Typography sx={{ color: "#666", fontSize: 13 }}>
+                          Country :{" "}
+                          <Box
+                            component="span"
+                            sx={{ fontWeight: 700, fontSize: 13 }}
+                          >
+                            {form.country}
+                          </Box>
+                        </Typography>
+                        {hoverCsc === "country" && (
+                          <Button
+                            size="small"
+                            aria-label="Edit country"
+                            onClick={() => setEditField("country")}
+                            sx={{
+                              p: 0,
+                              minWidth: 0,
+                              lineHeight: 1,
+                              height: "1em",
+                              fontSize: 13,
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              cursor: "pointer",
+                            }}
+                          >
+                            ✏️
+                          </Button>
+                        )}
+                      </Box>
+                    ) : null}
+                  </Box>
+                )
+              ) : null}
             </Box>
 
             {/* Verified Phone Number with Change option */}
-            <label style={labelStyle} htmlFor="verifiedPhone">
-              Verified Phone Number
-            </label>
-            <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-              <TextField
-                id="verifiedPhone"
-                value={verifiedPhone || ""}
-                InputProps={{ readOnly: true }}
-                fullWidth
-                variant="outlined"
-                sx={{ background: "#f7f7f7" }}
-              />
-              <Button
-                variant="outlined"
-                onClick={() => {
-                  try {
-                    localStorage.removeItem(PHONE_KEY);
-                  } catch {
-                    // ignore
-                  }
-                  setVerifiedPhone(null);
-                  setCurrentStep(1);
-                }}
-              >
-                Change phone
-              </Button>
-            </Box>
 
-            {/* Additional Contact Number with OTP verification */}
-            <label style={labelStyle} htmlFor="altPhone">
-              Additional Contact Number (optional)
-            </label>
-            <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-              <PhoneInput
-                country={"in"}
-                value={altPhone}
-                onChange={setAltPhone}
-                inputProps={{ name: "altPhone", autoComplete: "off" }}
-                inputStyle={{ ...inputStyle, width: "100%" }}
-                specialLabel=""
-                enableSearch
-              />
-              {altStep === "phone" && altPhone && altPhone.length >= 10 && (
-                <Button
-                  variant="contained"
-                  onClick={sendAltOtp}
-                  disabled={altLoading}
+            {/* Verified phone: full-width initially. When additional contact is activated,
+                render two equal-width fields (verified + additional). Icons appear only
+                when hovering the verified-phone area. */}
+            {!showAltContact ? (
+              <Box sx={{ mt: 2 }}>
+                <Box
+                  sx={{
+                    position: "relative",
+                    "&:hover .hoverIcons": { display: "flex" },
+                  }}
                 >
-                  {altLoading ? "Sending..." : "Send OTP"}
-                </Button>
-              )}
-            </Box>
-            {altStep === "otp" && (
-              <Box sx={{ mt: 1 }}>
-                <Typography sx={{ fontSize: 14, fontWeight: 500, mb: 0.5 }}>
-                  Enter OTP
-                </Typography>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   <TextField
-                    id="altOtp"
-                    value={altOtp}
-                    onChange={(e) => setAltOtp(e.target.value)}
+                    id="verifiedPhone"
+                    size="small"
+                    value={verifiedPhone || ""}
+                    InputProps={{
+                      readOnly: true,
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <Box
+                            className="hoverIcons"
+                            sx={{
+                              display: "none",
+                              alignItems: "center",
+                              gap: 0.5,
+                            }}
+                          >
+                            <IconButton
+                              aria-label="Add additional contact"
+                              onClick={() => {
+                                setShowAltContact(true);
+                                setTimeout(() => {
+                                  try {
+                                    const el = document.querySelector(
+                                      'input[name="altPhone"]'
+                                    ) as HTMLInputElement | null;
+                                    if (el) el.focus();
+                                  } catch {}
+                                }, 120);
+                              }}
+                              size="small"
+                              sx={{ p: 0.5, fontSize: 14 }}
+                            >
+                              <Box component="span" sx={{ fontSize: 16 }}>
+                                ➕
+                              </Box>
+                            </IconButton>
+                            <IconButton
+                              aria-label="Change verified phone"
+                              onClick={() => {
+                                try {
+                                  localStorage.removeItem(PHONE_KEY);
+                                } catch {}
+                                setVerifiedPhone(null);
+                                setCurrentStep(1);
+                              }}
+                              size="small"
+                              sx={{ p: 0.5, fontSize: 14 }}
+                            >
+                              <Box component="span" sx={{ fontSize: 15 }}>
+                                ✏️
+                              </Box>
+                            </IconButton>
+                          </Box>
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{
+                      background: "#f7f7f7",
+                      "& .MuiInputBase-input": {
+                        height: 40,
+                        boxSizing: "border-box",
+                        padding: "10px 12px",
+                      },
+                    }}
+                    fullWidth
                     variant="outlined"
-                    placeholder="Enter OTP"
-                    autoComplete="off"
                   />
-                  <Button
-                    variant="contained"
-                    onClick={verifyAltOtp}
-                    disabled={altLoading}
-                  >
-                    Verify OTP
-                  </Button>
                 </Box>
-                {altError && (
-                  <Typography sx={{ color: "red", mt: 0.5 }}>
-                    {altError}
-                  </Typography>
-                )}
+              </Box>
+            ) : (
+              <Box
+                sx={{ display: "flex", gap: 1, alignItems: "center", mt: 2 }}
+              >
+                <Box
+                  sx={{
+                    flex: 1,
+                    position: "relative",
+                    "&:hover .hoverIcons": { display: "flex" },
+                  }}
+                >
+                  <TextField
+                    id="verifiedPhone"
+                    size="small"
+                    value={verifiedPhone || ""}
+                    InputProps={{
+                      readOnly: true,
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <Box
+                            className="hoverIcons"
+                            sx={{
+                              display: "none",
+                              alignItems: "center",
+                              gap: 0.5,
+                            }}
+                          >
+                            <IconButton
+                              aria-label="Change verified phone"
+                              onClick={() => {
+                                try {
+                                  localStorage.removeItem(PHONE_KEY);
+                                } catch {}
+                                setVerifiedPhone(null);
+                                setCurrentStep(1);
+                              }}
+                              size="small"
+                              sx={{ p: 0.5, fontSize: 14 }}
+                            >
+                              <Box component="span" sx={{ fontSize: 15 }}>
+                                ✏️
+                              </Box>
+                            </IconButton>
+                          </Box>
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{
+                      background: "#f7f7f7",
+                      "& .MuiInputBase-input": {
+                        height: 40,
+                        boxSizing: "border-box",
+                        padding: "10px 12px",
+                      },
+                    }}
+                    fullWidth
+                    variant="outlined"
+                  />
+                </Box>
+
+                <Box sx={{ flex: 1 }}>
+                  <PhoneInput
+                    country={"in"}
+                    value={altPhone}
+                    onChange={setAltPhone}
+                    inputProps={{ name: "altPhone", autoComplete: "off" }}
+                    inputStyle={{ ...inputStyle, width: "100%", height: 40 }}
+                    specialLabel=""
+                    enableSearch
+                  />
+                </Box>
               </Box>
             )}
-            {altStep === "done" && (
-              <Typography sx={{ color: "green", mt: 1 }}>
-                Additional contact verified!
-              </Typography>
-            )}
 
-            {/* Email ID */}
-            <TextField
-              id="email"
-              name="email"
-              label="Email ID"
-              type="email"
-              value={form.email || ""}
-              onChange={handleChange}
-              fullWidth
-              margin="normal"
-              variant="outlined"
-              placeholder="Enter email"
-              autoComplete="off"
-            />
+            {/* Email ID and Instagram on a single line */}
+            <Box sx={{ display: "flex", gap: 1, mt: 2, alignItems: "center" }}>
+              <TextField
+                id="email"
+                size="small"
+                name="email"
+                label="Email ID"
+                type="email"
+                value={form.email || ""}
+                onChange={handleChange}
+                sx={{
+                  flex: 1,
+                  "& .MuiInputBase-input": {
+                    height: 40,
+                    boxSizing: "border-box",
+                    padding: "10px 12px",
+                  },
+                }}
+                variant="outlined"
+                placeholder="Enter email"
+                autoComplete="off"
+                margin="dense"
+              />
 
-            {/* Instagram handle */}
-            <TextField
-              id="instagramId"
-              name="instagramId"
-              label="Instagram handle (optional)"
-              type="text"
-              value={instagramId}
-              onChange={(e) => setInstagramId(e.target.value)}
-              variant="outlined"
-              sx={{ width: 220 }}
-              placeholder="@yourhandle or username"
-              autoComplete="off"
-            />
-
-            <Box
-              sx={{
-                display: "flex",
-                justifyContent: "flex-end",
-                gap: 1,
-                mt: 1.5,
-              }}
-            >
-              <Button variant="outlined" disabled>
-                Back
-              </Button>
-              <Button variant="contained" onClick={() => setCurrentStep(3)}>
-                Next
-              </Button>
+              <TextField
+                id="instagramId"
+                size="small"
+                name="instagramId"
+                label="Instagram handle (optional)"
+                type="text"
+                value={instagramId}
+                onChange={(e) => setInstagramId(e.target.value)}
+                sx={{
+                  flex: 1,
+                  "& .MuiInputBase-input": {
+                    height: 40,
+                    boxSizing: "border-box",
+                    padding: "10px 12px",
+                  },
+                }}
+                variant="outlined"
+                placeholder="@yourhandle or username"
+                autoComplete="off"
+                margin="dense"
+              />
             </Box>
           </Box>
         )}
-        {/* --- Consolidated course selection & fees (placed last) --- */}
+        {/* Education (step 3): keep education-related fields here */}
         {currentStep === 3 && (
           <div style={{ marginTop: 12, marginBottom: 12 }}>
-            <label style={{ fontSize: 14, color: "#444", fontWeight: 600 }}>
-              Choose course
-            </label>
-            <Box sx={{ display: "flex", gap: 1, mt: 1 }}>
-              <Button
-                variant={
-                  selectedCourse === "nata-jee" ? "contained" : "outlined"
-                }
-                fullWidth
-                onClick={() => {
-                  setSelectedCourse("nata-jee");
-                  setActiveTab("nata-jee");
-                }}
-              >
-                NATA / JEE
-              </Button>
-              <Button
-                variant={
-                  selectedCourse === "software" ? "contained" : "outlined"
-                }
-                fullWidth
-                onClick={() => {
-                  setSelectedCourse("software");
-                  setActiveTab("software");
-                }}
-              >
-                Software
-              </Button>
-            </Box>
-
-            {/* Education type and related fields */}
             <div style={{ marginTop: 12 }}>
               <Typography sx={{ fontWeight: 600 }}>Education</Typography>
               <FormControl component="fieldset" sx={{ mt: 1 }}>
                 <RadioGroup
                   row
                   value={educationType}
-                  onChange={(e) => setEducationType(e.target.value as any)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    setEducationType(
+                      e.target.value as
+                        | "school"
+                        | "college"
+                        | "diploma"
+                        | "other"
+                    )
+                  }
                 >
                   <FormControlLabel
                     value="school"
@@ -1273,7 +1381,11 @@ export default function StepBasic() {
                   <label style={labelStyle}>Standard</label>
                   {isCompactSelector ? (
                     <div
-                      style={{ display: "flex", gap: 8, alignItems: "center" }}
+                      style={{
+                        display: "flex",
+                        gap: 8,
+                        alignItems: "center",
+                      }}
                     >
                       <button
                         type="button"
@@ -1330,17 +1442,20 @@ export default function StepBasic() {
                     </div>
                   ) : (
                     <div>
-                      <select
+                      <TextField
+                        select
                         value={schoolStd}
                         onChange={(e) => setSchoolStd(e.target.value)}
-                        style={inputStyle}
+                        fullWidth
+                        variant="outlined"
+                        margin="dense"
                       >
                         {standardOptions.map((s) => (
-                          <option key={s} value={s}>
+                          <MenuItem key={s} value={s}>
                             {s}
-                          </option>
+                          </MenuItem>
                         ))}
-                      </select>
+                      </TextField>
                       <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
                         <button
                           type="button"
@@ -1366,52 +1481,65 @@ export default function StepBasic() {
                     <label style={labelStyle} htmlFor="board">
                       Board
                     </label>
-                    <select
+                    <TextField
+                      select
                       id="board"
                       name="board"
+                      label="Board"
                       value={form.board}
                       onChange={handleChange}
-                      style={inputStyle}
+                      fullWidth
+                      variant="outlined"
+                      margin="dense"
                     >
                       {boardOptions.map((b) => (
-                        <option key={b} value={b}>
+                        <MenuItem key={b} value={b}>
                           {b}
-                        </option>
+                        </MenuItem>
                       ))}
-                    </select>
+                    </TextField>
                   </div>
 
                   <div style={{ marginTop: 8 }}>
                     <label style={labelStyle} htmlFor="boardYear">
                       Year
                     </label>
-                    <input
+                    <TextField
                       id="boardYear"
-                      type="number"
                       name="boardYear"
+                      label="Year"
+                      type="number"
                       value={form.boardYear}
                       onChange={handleChange}
-                      style={inputStyle}
-                      min={currentYear - 10}
-                      max={currentYear + 1}
+                      fullWidth
+                      variant="outlined"
+                      margin="dense"
+                      inputProps={{
+                        min: currentYear - 10,
+                        max: currentYear + 1,
+                      }}
                     />
                   </div>
                 </div>
               ) : educationType === "college" ? (
                 <div style={{ marginTop: 8 }}>
                   <label style={labelStyle}>College Name / Year</label>
-                  <input
-                    type="text"
+                  <TextField
+                    label="College name"
                     value={collegeName}
                     onChange={(e) => setCollegeName(e.target.value)}
-                    style={{ ...inputStyle, marginBottom: 8 }}
+                    fullWidth
+                    variant="outlined"
+                    margin="dense"
                     placeholder="College name"
                   />
-                  <input
-                    type="text"
+                  <TextField
+                    label="Year (eg. 2nd)"
                     value={collegeYear}
                     onChange={(e) => setCollegeYear(e.target.value)}
-                    style={inputStyle}
+                    fullWidth
+                    variant="outlined"
+                    margin="dense"
                     placeholder="Year (eg. 2nd)"
                   />
                 </div>
@@ -1437,17 +1565,21 @@ export default function StepBasic() {
                     >
                       ◀
                     </button>
-                    <select
+                    <TextField
+                      select
                       value={diplomaYear}
                       onChange={(e) => setDiplomaYear(e.target.value)}
-                      style={{ ...inputStyle, flex: 1 }}
+                      fullWidth
+                      variant="outlined"
+                      margin="dense"
+                      sx={{ flex: 1 }}
                     >
                       {diplomaYearOptions.map((y) => (
-                        <option key={y} value={y}>
+                        <MenuItem key={y} value={y}>
                           {y}
-                        </option>
+                        </MenuItem>
                       ))}
-                    </select>
+                    </TextField>
                     <button
                       type="button"
                       onClick={() => cycleDiplomaYear(1)}
@@ -1458,51 +1590,109 @@ export default function StepBasic() {
                     </button>
                   </div>
                   <label style={labelStyle}>College Name</label>
-                  <input
-                    type="text"
+                  <TextField
+                    label="College name"
                     value={diplomaCollege}
                     onChange={(e) => setDiplomaCollege(e.target.value)}
-                    style={inputStyle}
+                    fullWidth
+                    variant="outlined"
+                    margin="dense"
                     placeholder="College name"
                   />
                 </div>
               ) : (
                 <div style={{ marginTop: 8 }}>
                   <label style={labelStyle}>Tell us about yourself</label>
-                  <textarea
+                  <TextField
+                    label="Tell us about yourself"
                     value={otherDescription}
                     onChange={(e) => setOtherDescription(e.target.value)}
-                    style={{ ...inputStyle, height: 120 }}
+                    fullWidth
+                    variant="outlined"
+                    margin="dense"
+                    multiline
+                    rows={4}
                     placeholder="Describe your background, current work or study"
                   />
                 </div>
               )}
             </div>
 
-            {/* Software course & fee (only when software is selected) */}
+            <Box sx={{ display: "flex", gap: 1, mt: 1.5 }}>
+              <Button variant="outlined" onClick={() => setCurrentStep(2)}>
+                Back to Basic
+              </Button>
+              <Button
+                variant="contained"
+                onClick={() => {
+                  saveDraft();
+                  setCurrentStep(4);
+                }}
+              >
+                Save & Next
+              </Button>
+            </Box>
+          </div>
+        )}
+
+        {/* Course & Fees (step 4): moved here from step 3 */}
+        {currentStep === 4 && (
+          <div style={{ marginTop: 12, marginBottom: 12 }}>
+            <label style={{ fontSize: 14, color: "#444", fontWeight: 600 }}>
+              Choose course
+            </label>
+            <Box sx={{ display: "flex", gap: 1, mt: 1 }}>
+              <Button
+                variant={
+                  selectedCourse === "nata-jee" ? "contained" : "outlined"
+                }
+                fullWidth
+                onClick={() => {
+                  setSelectedCourse("nata-jee");
+                  setActiveTab("nata-jee");
+                }}
+              >
+                NATA / JEE
+              </Button>
+              <Button
+                variant={
+                  selectedCourse === "software" ? "contained" : "outlined"
+                }
+                fullWidth
+                onClick={() => {
+                  setSelectedCourse("software");
+                  setActiveTab("software");
+                }}
+              >
+                Software
+              </Button>
+            </Box>
+
             {selectedCourse === "software" && (
               <div style={{ marginTop: 12 }}>
                 <label style={labelStyle}>Software Course</label>
-                <select
+                <TextField
+                  select
+                  label="Software Course"
                   value={softwareCourse}
                   onChange={(e) => setSoftwareCourse(e.target.value)}
-                  style={inputStyle}
+                  fullWidth
+                  variant="outlined"
+                  margin="dense"
                 >
-                  <option value="Revit">Revit</option>
-                  <option value="CAD">CAD</option>
-                  <option value="SketchUp">SketchUp</option>
-                </select>
+                  <MenuItem value="Revit">Revit</MenuItem>
+                  <MenuItem value="CAD">CAD</MenuItem>
+                  <MenuItem value="SketchUp">SketchUp</MenuItem>
+                </TextField>
                 <div style={{ marginTop: 8 }}>
                   <label style={labelStyle}>Total Fee</label>
-                  <div
-                    style={{ display: "flex", gap: 8, alignItems: "center" }}
-                  >
-                    <input
-                      type="text"
-                      name="fee"
+                  <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+                    <TextField
                       value={SOFTWARE_FEE - (youtubeSubscribed ? 25 : 0)}
-                      style={{ ...inputStyle, background: "#f7f7f7" }}
-                      readOnly
+                      InputProps={{ readOnly: true }}
+                      fullWidth
+                      variant="outlined"
+                      margin="dense"
                     />
                     <div>
                       <YoutubeSubscribe
@@ -1511,43 +1701,52 @@ export default function StepBasic() {
                         onSubscribed={onYoutubeSubscribed}
                       />
                     </div>
-                  </div>
+                  </Box>
                 </div>
               </div>
             )}
-            {/* NATA/JEE fee fields (show when NATA/JEE selected) */}
+
             {selectedCourse === "nata-jee" && (
               <div style={{ marginTop: 12 }}>
                 <label style={labelStyle}>NATA / JEE Fees</label>
                 <div style={{ marginTop: 8 }}>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <div style={{ flex: 1 }}>
-                      <label style={labelStyle}>Total Fee</label>
-                      <input
-                        type="text"
+                  <Box sx={{ display: "flex", gap: 1 }}>
+                    <Box sx={{ flex: 1 }}>
+                      <Typography sx={{ fontSize: 13, color: "#666" }}>
+                        Total Fee
+                      </Typography>
+                      <TextField
                         value={`₹${nataJeeFee || 0}`}
-                        readOnly
-                        style={{ ...inputStyle, background: "#f7f7f7" }}
+                        InputProps={{ readOnly: true }}
+                        fullWidth
+                        variant="outlined"
+                        margin="dense"
                       />
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <label style={labelStyle}>Discounted (if full)</label>
-                      <input
-                        type="text"
+                    </Box>
+                    <Box sx={{ flex: 1 }}>
+                      <Typography sx={{ fontSize: 13, color: "#666" }}>
+                        Discounted (if full)
+                      </Typography>
+                      <TextField
                         value={`₹${nataJeeDiscountedFee || nataJeeFee || 0}`}
-                        readOnly
-                        style={{ ...inputStyle, background: "#f7f7f7" }}
+                        InputProps={{ readOnly: true }}
+                        fullWidth
+                        variant="outlined"
+                        margin="dense"
                       />
-                    </div>
-                  </div>
+                    </Box>
+                  </Box>
 
                   <FormControl component="fieldset" sx={{ mt: 1 }}>
                     <RadioGroup
                       row
                       name="paymentType"
                       value={form.paymentType}
-                      onChange={(e) =>
-                        setForm({ ...form, paymentType: e.target.value as any })
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                        setForm({
+                          ...form,
+                          paymentType: e.target.value as "full" | "part",
+                        })
                       }
                     >
                       <FormControlLabel
@@ -1578,10 +1777,8 @@ export default function StepBasic() {
                   <div style={{ marginTop: 8, color: "#666" }}>
                     {nataJeeInfo}
                   </div>
-                  {/* Licensing message depending on fee bracket and payment type */}
                   <div style={{ marginTop: 12, fontSize: 13, color: "#444" }}>
                     {(() => {
-                      // For both brackets the messaging is similar but values differ; show generic text
                       if (form.paymentType === "full") {
                         return (
                           <div>
@@ -1606,9 +1803,10 @@ export default function StepBasic() {
                 </div>
               </div>
             )}
+
             <Box sx={{ display: "flex", gap: 1, mt: 1.5 }}>
-              <Button variant="outlined" onClick={() => setCurrentStep(2)}>
-                Back to Basic
+              <Button variant="outlined" onClick={() => setCurrentStep(3)}>
+                Back to Education
               </Button>
             </Box>
           </div>
@@ -1616,16 +1814,28 @@ export default function StepBasic() {
         {/* Review / Submit flow */}
         {!reviewMode ? (
           <Box sx={{ display: "flex", gap: 1, mt: 2 }}>
-            <Button
-              variant="contained"
-              sx={{ flex: 1 }}
-              onClick={() => setReviewMode(true)}
-            >
-              Review details
-            </Button>
-            <Button variant="outlined" onClick={() => saveDraft()}>
-              Save draft
-            </Button>
+            {/* On final step show Review button; otherwise show a single Save & Next */}
+            {currentStep === 4 ? (
+              <Button
+                variant="contained"
+                sx={{ flex: 1 }}
+                onClick={() => setReviewMode(true)}
+              >
+                Review details
+              </Button>
+            ) : (
+              <Button
+                variant="outlined"
+                sx={{ flex: 1 }}
+                onClick={() => {
+                  saveDraft();
+                  setCurrentStep(currentStep + 1);
+                }}
+              >
+                Save & Next
+              </Button>
+            )}
+
             {draftSaved && (
               <Typography sx={{ color: "green", fontSize: 13, ml: 1 }}>
                 Draft saved
@@ -1714,9 +1924,7 @@ export default function StepBasic() {
                 }
 
                 // Address (show always)
-                items.push(["houseNo", "Door / House No", form.houseNo]);
-                items.push(["street", "Street / Locality", form.street]);
-                items.push(["landmark", "Landmark", form.landmark]);
+                // houseNo, street, landmark were removed from the form schema
                 items.push(["zipCode", "Zip Code", form.zipCode]);
                 items.push(["city", "City", form.city]);
                 items.push(["state", "State", form.state]);
