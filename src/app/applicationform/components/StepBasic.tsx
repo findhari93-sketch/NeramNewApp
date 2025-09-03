@@ -8,6 +8,17 @@ import { RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth";
 import type { ConfirmationResult } from "firebase/auth";
 import { auth } from "../../../lib/firebase";
 import PhoneAuth from "./PhoneAuth";
+import Box from "@mui/material/Box";
+import TextField from "@mui/material/TextField";
+import Select from "@mui/material/Select";
+import MenuItem from "@mui/material/MenuItem";
+import Button from "@mui/material/Button";
+import Typography from "@mui/material/Typography";
+import FormControl from "@mui/material/FormControl";
+import InputLabel from "@mui/material/InputLabel";
+import FormControlLabel from "@mui/material/FormControlLabel";
+import Radio from "@mui/material/Radio";
+import RadioGroup from "@mui/material/RadioGroup";
 
 import { supabase } from "../../../lib/supabase";
 
@@ -438,8 +449,8 @@ export default function StepBasic() {
             if (el.scrollIntoView)
               el.scrollIntoView({ behavior: "smooth", block: "center" });
             el.focus();
-          } catch (_e) {
-            // ignore
+          } catch {
+            // Do nothing. undefined will be returned.
           }
         }, 80);
       }
@@ -513,8 +524,8 @@ export default function StepBasic() {
       localStorage.setItem(DRAFT_KEY, JSON.stringify(payload));
       setDraftSaved(true);
       setTimeout(() => setDraftSaved(false), 1800);
-    } catch (e) {
-      console.warn("Failed to save draft", e);
+    } catch {
+      console.warn("Failed to save draft");
     }
   };
 
@@ -573,7 +584,9 @@ export default function StepBasic() {
   };
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >
   ) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
@@ -697,9 +710,9 @@ export default function StepBasic() {
         );
         setCitySuggestions(filtered);
         setShowCitySuggestions(true);
-      } catch (e) {
-        if (e instanceof DOMException && e.name === "AbortError") return;
-        console.warn("City search failed", e);
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        console.warn("City search failed", err);
       } finally {
         // only clear loading if this controller is still the active one
         if (citySearchController.current === controller) {
@@ -746,8 +759,8 @@ export default function StepBasic() {
           country: addr.country || prev.country,
         }));
       }
-    } catch (e) {
-      console.warn("Infer country from state failed", e);
+    } catch (err) {
+      console.warn("Infer country from state failed", err);
     }
   };
 
@@ -832,23 +845,18 @@ export default function StepBasic() {
   }
 
   return (
-    <div style={{ maxWidth: 420, margin: "40px auto", padding: 0 }}>
+    <Box sx={{ maxWidth: 420, m: "40px auto", p: 0 }}>
       {/* Tabs removed — course selection uses in-form controls now */}
 
       {/* Form Title */}
-      <h2
-        style={{
-          color: "#7c1fa0",
-          fontWeight: 700,
-          fontSize: 22,
-          marginBottom: 24,
-          textAlign: "center",
-        }}
+      <Typography
+        variant="h5"
+        sx={{ color: "#7c1fa0", fontWeight: 700, mb: 3, textAlign: "center" }}
       >
         {activeTab === "nata-jee"
           ? "NATA/JEE Coaching Application Form"
           : "Software Class Application Form"}
-      </h2>
+      </Typography>
 
       {/* Application Form */}
       <form
@@ -858,279 +866,243 @@ export default function StepBasic() {
         }}
       >
         {/* Step indicator */}
-        <div style={{ marginBottom: 12, fontSize: 14, color: "#666" }}>
+        <Typography sx={{ mb: 1.5, fontSize: 14, color: "#666" }}>
           Step {currentStep} of 3
-        </div>
+        </Typography>
         {/* course selection moved to the end of the form (see below) */}
         {/* Additional Contact Number Field (Step 2: Basics) */}
         {currentStep === 2 && (
-          <div>
+          <Box>
             {/* Student Name */}
-            <label style={labelStyle} htmlFor="studentName">
-              Student Name
-            </label>
-            <input
+            <TextField
               id="studentName"
-              type="text"
               name="studentName"
+              label="Student Name"
               value={form.studentName}
               onChange={handleChange}
-              style={inputStyle}
-              placeholder="Enter student name"
+              fullWidth
+              margin="normal"
+              variant="outlined"
               autoComplete="off"
             />
 
-            {/* Back/Next buttons for Step 2 */}
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "flex-end",
-                gap: 8,
-                marginTop: 12,
-              }}
-            >
-              <button
-                type="button"
-                onClick={() => {
-                  setAltPhone("");
-                  setAltOtp("");
-                  setAltStep("phone");
-                  setAltConfirmation(null);
-                }}
-                style={{
-                  padding: "10px 14px",
-                  background: "#fff",
-                  border: "1px solid #ddd",
-                  borderRadius: 4,
-                }}
-              >
-                Back
-              </button>
-              <button
-                type="button"
-                onClick={() => setCurrentStep(3)}
-                style={{
-                  padding: "10px 14px",
-                  background: "#7c1fa0",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: 4,
-                }}
-              >
-                Next
-              </button>
-            </div>
+            {/* Father Name */}
+            <TextField
+              id="fatherName"
+              name="fatherName"
+              label="Father Name"
+              value={form.fatherName as string}
+              onChange={handleChange}
+              fullWidth
+              margin="normal"
+              variant="outlined"
+              autoComplete="off"
+            />
 
             {/* Gender */}
-            <label style={labelStyle} htmlFor="gender">
-              Gender
-            </label>
-            <select
-              id="gender"
-              name="gender"
-              value={form.gender}
-              onChange={handleChange}
-              style={inputStyle}
-            >
-              {genderOptions.map((g) => (
-                <option key={g} value={g}>
-                  {g}
-                </option>
-              ))}
-            </select>
+            <FormControl fullWidth margin="normal">
+              <InputLabel id="gender-label">Gender</InputLabel>
+              <Select
+                labelId="gender-label"
+                id="gender"
+                name="gender"
+                value={form.gender}
+                label="Gender"
+                onChange={handleChange}
+              >
+                {genderOptions.map((g) => (
+                  <MenuItem key={g} value={g}>
+                    {g}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
 
             {/* Address fields */}
-            <label style={labelStyle} htmlFor="houseNo">
-              House No
-            </label>
-            <input
+            <TextField
               id="houseNo"
-              type="text"
               name="houseNo"
+              label="House No"
               value={form.houseNo as string}
               onChange={handleChange}
-              style={inputStyle}
+              fullWidth
+              margin="normal"
+              variant="outlined"
               placeholder="Door / House no"
               autoComplete="off"
             />
-            <label style={labelStyle} htmlFor="street">
-              Street
-            </label>
-            <input
+            <TextField
               id="street"
-              type="text"
               name="street"
+              label="Street"
               value={form.street as string}
               onChange={handleChange}
-              style={inputStyle}
+              fullWidth
+              margin="normal"
+              variant="outlined"
               placeholder="Street / Locality"
               autoComplete="off"
             />
-            <label style={labelStyle} htmlFor="landmark">
-              Landmark
-            </label>
-            <input
+            <TextField
               id="landmark"
-              type="text"
               name="landmark"
+              label="Landmark"
               value={form.landmark as string}
               onChange={handleChange}
-              style={inputStyle}
+              fullWidth
+              margin="normal"
+              variant="outlined"
               placeholder="Landmark (optional)"
               autoComplete="off"
             />
-            <label style={labelStyle} htmlFor="zipCode">
-              Zip Code
-            </label>
-            <input
+            <TextField
               id="zipCode"
-              type="text"
               name="zipCode"
+              label="Zip Code"
               value={form.zipCode}
               onChange={handleChange}
-              style={inputStyle}
+              fullWidth
+              margin="normal"
+              variant="outlined"
               placeholder="Postal / ZIP code"
               autoComplete="off"
             />
 
             {/* City, State, Country: show as text, allow edit on icon click */}
-            <div style={{ marginTop: 12 }}>
-              <label style={labelStyle}>City</label>
-              <span style={{ marginRight: 8 }}>
-                {editField === "city" ? (
-                  <input
-                    id="city"
-                    type="text"
-                    name="city"
-                    value={form.city}
-                    onChange={handleChange}
-                    style={inputStyle}
-                    onBlur={() => setEditField(null)}
-                    autoFocus
-                  />
-                ) : (
-                  <>
+            <Box sx={{ mt: 1 }}>
+              <Typography
+                sx={{ fontSize: 14, color: "#333", fontWeight: 500, mb: 0.5 }}
+              >
+                City
+              </Typography>
+              {editField === "city" ? (
+                <TextField
+                  id="city"
+                  name="city"
+                  value={form.city}
+                  onChange={handleChange}
+                  fullWidth
+                  margin="dense"
+                  variant="outlined"
+                  onBlur={() => setEditField(null)}
+                  autoFocus
+                />
+              ) : (
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <Typography sx={{ color: "#666" }}>
                     {form.city || "(auto-filled)"}
-                    <span
-                      style={{
-                        cursor: "pointer",
-                        marginLeft: 6,
-                        color: "#888",
-                      }}
-                      onClick={() => setEditField("city")}
-                      title="Edit City"
-                    >
-                      ✏️
-                    </span>
-                  </>
-                )}
-              </span>
-            </div>
-            <div style={{ marginTop: 12 }}>
-              <label style={labelStyle}>State</label>
-              <span style={{ marginRight: 8 }}>
-                {editField === "state" ? (
-                  <input
-                    id="state"
-                    type="text"
-                    name="state"
-                    value={form.state}
-                    onChange={handleChange}
-                    style={inputStyle}
-                    onBlur={() => setEditField(null)}
-                    autoFocus
-                  />
-                ) : (
-                  <>
+                  </Typography>
+                  <Button
+                    size="small"
+                    onClick={() => setEditField("city")}
+                    sx={{ minWidth: 0 }}
+                  >
+                    ✏️
+                  </Button>
+                </Box>
+              )}
+            </Box>
+            <Box sx={{ mt: 1 }}>
+              <Typography
+                sx={{ fontSize: 14, color: "#333", fontWeight: 500, mb: 0.5 }}
+              >
+                State
+              </Typography>
+              {editField === "state" ? (
+                <TextField
+                  id="state"
+                  name="state"
+                  value={form.state}
+                  onChange={handleChange}
+                  fullWidth
+                  margin="dense"
+                  variant="outlined"
+                  onBlur={() => setEditField(null)}
+                  autoFocus
+                />
+              ) : (
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <Typography sx={{ color: "#666" }}>
                     {form.state || "(auto-filled)"}
-                    <span
-                      style={{
-                        cursor: "pointer",
-                        marginLeft: 6,
-                        color: "#888",
-                      }}
-                      onClick={() => setEditField("state")}
-                      title="Edit State"
-                    >
-                      ✏️
-                    </span>
-                  </>
-                )}
-              </span>
-            </div>
-            <div style={{ marginTop: 12 }}>
-              <label style={labelStyle}>Country</label>
-              <span style={{ marginRight: 8 }}>
-                {editField === "country" ? (
-                  <input
-                    id="country"
-                    type="text"
-                    name="country"
-                    value={form.country}
-                    onChange={handleChange}
-                    style={inputStyle}
-                    onBlur={() => setEditField(null)}
-                    autoFocus
-                  />
-                ) : (
-                  <>
+                  </Typography>
+                  <Button
+                    size="small"
+                    onClick={() => setEditField("state")}
+                    sx={{ minWidth: 0 }}
+                  >
+                    ✏️
+                  </Button>
+                </Box>
+              )}
+            </Box>
+            <Box sx={{ mt: 1 }}>
+              <Typography
+                sx={{ fontSize: 14, color: "#333", fontWeight: 500, mb: 0.5 }}
+              >
+                Country
+              </Typography>
+              {editField === "country" ? (
+                <TextField
+                  id="country"
+                  name="country"
+                  value={form.country}
+                  onChange={handleChange}
+                  fullWidth
+                  margin="dense"
+                  variant="outlined"
+                  onBlur={() => setEditField(null)}
+                  autoFocus
+                />
+              ) : (
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <Typography sx={{ color: "#666" }}>
                     {form.country || "(auto-filled)"}
-                    <span
-                      style={{
-                        cursor: "pointer",
-                        marginLeft: 6,
-                        color: "#888",
-                      }}
-                      onClick={() => setEditField("country")}
-                      title="Edit Country"
-                    >
-                      ✏️
-                    </span>
-                  </>
-                )}
-              </span>
-            </div>
+                  </Typography>
+                  <Button
+                    size="small"
+                    onClick={() => setEditField("country")}
+                    sx={{ minWidth: 0 }}
+                  >
+                    ✏️
+                  </Button>
+                </Box>
+              )}
+            </Box>
 
             {/* Verified Phone Number with Change option */}
             <label style={labelStyle} htmlFor="verifiedPhone">
               Verified Phone Number
             </label>
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <input
+            <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+              <TextField
                 id="verifiedPhone"
-                type="text"
                 value={verifiedPhone || ""}
-                style={{ ...inputStyle, background: "#f7f7f7" }}
-                readOnly
+                InputProps={{ readOnly: true }}
+                fullWidth
+                variant="outlined"
+                sx={{ background: "#f7f7f7" }}
               />
-              <button
-                type="button"
+              <Button
+                variant="outlined"
                 onClick={() => {
                   try {
                     localStorage.removeItem(PHONE_KEY);
-                  } catch (e) {
+                  } catch {
                     // ignore
                   }
                   setVerifiedPhone(null);
                   setCurrentStep(1);
                 }}
-                style={{
-                  padding: "8px 10px",
-                  background: "#fff",
-                  border: "1px solid #ddd",
-                  borderRadius: 6,
-                  cursor: "pointer",
-                }}
               >
                 Change phone
-              </button>
-            </div>
+              </Button>
+            </Box>
 
             {/* Additional Contact Number with OTP verification */}
             <label style={labelStyle} htmlFor="altPhone">
               Additional Contact Number (optional)
             </label>
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
               <PhoneInput
                 country={"in"}
                 value={altPhone}
@@ -1141,129 +1113,95 @@ export default function StepBasic() {
                 enableSearch
               />
               {altStep === "phone" && altPhone && altPhone.length >= 10 && (
-                <button
-                  type="button"
+                <Button
+                  variant="contained"
                   onClick={sendAltOtp}
-                  style={{
-                    padding: "8px 12px",
-                    background: "#7c1fa0",
-                    color: "#fff",
-                    border: "none",
-                    borderRadius: 4,
-                    cursor: "pointer",
-                  }}
                   disabled={altLoading}
                 >
                   {altLoading ? "Sending..." : "Send OTP"}
-                </button>
+                </Button>
               )}
-            </div>
+            </Box>
             {altStep === "otp" && (
-              <div style={{ marginTop: 8 }}>
-                <label style={labelStyle} htmlFor="altOtp">
+              <Box sx={{ mt: 1 }}>
+                <Typography sx={{ fontSize: 14, fontWeight: 500, mb: 0.5 }}>
                   Enter OTP
-                </label>
-                <input
-                  id="altOtp"
-                  type="text"
-                  value={altOtp}
-                  onChange={(e) => setAltOtp(e.target.value)}
-                  style={inputStyle}
-                  placeholder="Enter OTP"
-                  autoComplete="off"
-                />
-                <button
-                  type="button"
-                  onClick={verifyAltOtp}
-                  style={{
-                    padding: "8px 12px",
-                    background: "#7c1fa0",
-                    color: "#fff",
-                    border: "none",
-                    borderRadius: 4,
-                    cursor: "pointer",
-                    marginLeft: 8,
-                  }}
-                  disabled={altLoading}
-                >
-                  Verify OTP
-                </button>
+                </Typography>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <TextField
+                    id="altOtp"
+                    value={altOtp}
+                    onChange={(e) => setAltOtp(e.target.value)}
+                    variant="outlined"
+                    placeholder="Enter OTP"
+                    autoComplete="off"
+                  />
+                  <Button
+                    variant="contained"
+                    onClick={verifyAltOtp}
+                    disabled={altLoading}
+                  >
+                    Verify OTP
+                  </Button>
+                </Box>
                 {altError && (
-                  <div style={{ color: "red", marginTop: 4 }}>{altError}</div>
+                  <Typography sx={{ color: "red", mt: 0.5 }}>
+                    {altError}
+                  </Typography>
                 )}
-              </div>
+              </Box>
             )}
             {altStep === "done" && (
-              <div style={{ color: "green", marginTop: 4 }}>
+              <Typography sx={{ color: "green", mt: 1 }}>
                 Additional contact verified!
-              </div>
+              </Typography>
             )}
 
             {/* Email ID */}
-            <label style={labelStyle} htmlFor="email">
-              Email ID
-            </label>
-            <input
+            <TextField
               id="email"
-              type="email"
               name="email"
+              label="Email ID"
+              type="email"
               value={form.email || ""}
               onChange={handleChange}
-              style={inputStyle}
+              fullWidth
+              margin="normal"
+              variant="outlined"
               placeholder="Enter email"
               autoComplete="off"
             />
 
             {/* Instagram handle */}
-            <label style={labelStyle} htmlFor="instagramId">
-              Instagram handle (optional)
-            </label>
-            <input
+            <TextField
               id="instagramId"
-              type="text"
               name="instagramId"
+              label="Instagram handle (optional)"
+              type="text"
               value={instagramId}
               onChange={(e) => setInstagramId(e.target.value)}
-              style={{ ...inputStyle, width: 220 }}
+              variant="outlined"
+              sx={{ width: 220 }}
               placeholder="@yourhandle or username"
               autoComplete="off"
             />
 
-            <div
-              style={{
+            <Box
+              sx={{
                 display: "flex",
                 justifyContent: "flex-end",
-                gap: 8,
-                marginTop: 12,
+                gap: 1,
+                mt: 1.5,
               }}
             >
-              <button
-                type="button"
-                disabled
-                style={{
-                  padding: "10px 14px",
-                  background: "#fff",
-                  border: "1px solid #ddd",
-                  borderRadius: 4,
-                }}
-              >
+              <Button variant="outlined" disabled>
                 Back
-              </button>
-              <button
-                type="button"
-                onClick={() => setCurrentStep(3)}
-                style={{
-                  padding: "10px 14px",
-                  background: "#7c1fa0",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: 4,
-                }}
-              >
+              </Button>
+              <Button variant="contained" onClick={() => setCurrentStep(3)}>
                 Next
-              </button>
-            </div>
-          </div>
+              </Button>
+            </Box>
+          </Box>
         )}
         {/* --- Consolidated course selection & fees (placed last) --- */}
         {currentStep === 3 && (
@@ -1271,104 +1209,64 @@ export default function StepBasic() {
             <label style={{ fontSize: 14, color: "#444", fontWeight: 600 }}>
               Choose course
             </label>
-            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-              <button
-                type="button"
+            <Box sx={{ display: "flex", gap: 1, mt: 1 }}>
+              <Button
+                variant={
+                  selectedCourse === "nata-jee" ? "contained" : "outlined"
+                }
+                fullWidth
                 onClick={() => {
                   setSelectedCourse("nata-jee");
                   setActiveTab("nata-jee");
                 }}
-                style={{
-                  flex: 1,
-                  padding: "8px 10px",
-                  borderRadius: 6,
-                  border:
-                    selectedCourse === "nata-jee"
-                      ? "2px solid #7c1fa0"
-                      : "1px solid #ddd",
-                  background:
-                    selectedCourse === "nata-jee" ? "#f8eef9" : "#fff",
-                  cursor: "pointer",
-                }}
               >
                 NATA / JEE
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant={
+                  selectedCourse === "software" ? "contained" : "outlined"
+                }
+                fullWidth
                 onClick={() => {
                   setSelectedCourse("software");
                   setActiveTab("software");
                 }}
-                style={{
-                  flex: 1,
-                  padding: "8px 10px",
-                  borderRadius: 6,
-                  border:
-                    selectedCourse === "software"
-                      ? "2px solid #7c1fa0"
-                      : "1px solid #ddd",
-                  background:
-                    selectedCourse === "software" ? "#f8eef9" : "#fff",
-                  cursor: "pointer",
-                }}
               >
                 Software
-              </button>
-            </div>
+              </Button>
+            </Box>
 
             {/* Education type and related fields */}
             <div style={{ marginTop: 12 }}>
-              <label style={labelStyle}>Education</label>
-              <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
-                <label
-                  style={{ display: "flex", alignItems: "center", gap: 6 }}
+              <Typography sx={{ fontWeight: 600 }}>Education</Typography>
+              <FormControl component="fieldset" sx={{ mt: 1 }}>
+                <RadioGroup
+                  row
+                  value={educationType}
+                  onChange={(e) => setEducationType(e.target.value as any)}
                 >
-                  <input
-                    type="radio"
-                    name="educationType"
+                  <FormControlLabel
                     value="school"
-                    checked={educationType === "school"}
-                    onChange={() => setEducationType("school")}
+                    control={<Radio />}
+                    label="School"
                   />
-                  School
-                </label>
-                <label
-                  style={{ display: "flex", alignItems: "center", gap: 6 }}
-                >
-                  <input
-                    type="radio"
-                    name="educationType"
+                  <FormControlLabel
                     value="diploma"
-                    checked={educationType === "diploma"}
-                    onChange={() => setEducationType("diploma")}
+                    control={<Radio />}
+                    label="Diploma"
                   />
-                  Diploma
-                </label>
-                <label
-                  style={{ display: "flex", alignItems: "center", gap: 6 }}
-                >
-                  <input
-                    type="radio"
-                    name="educationType"
+                  <FormControlLabel
                     value="college"
-                    checked={educationType === "college"}
-                    onChange={() => setEducationType("college")}
+                    control={<Radio />}
+                    label="College"
                   />
-                  College
-                </label>
-                <label
-                  style={{ display: "flex", alignItems: "center", gap: 6 }}
-                >
-                  <input
-                    type="radio"
-                    name="educationType"
+                  <FormControlLabel
                     value="other"
-                    checked={educationType === "other"}
-                    onChange={() => setEducationType("other")}
+                    control={<Radio />}
+                    label="Other"
                   />
-                  Other
-                </label>
-              </div>
+                </RadioGroup>
+              </FormControl>
 
               {educationType === "school" ? (
                 <div style={{ marginTop: 8 }}>
@@ -1643,32 +1541,27 @@ export default function StepBasic() {
                     </div>
                   </div>
 
-                  <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
-                    <label
-                      style={{ display: "flex", alignItems: "center", gap: 6 }}
+                  <FormControl component="fieldset" sx={{ mt: 1 }}>
+                    <RadioGroup
+                      row
+                      name="paymentType"
+                      value={form.paymentType}
+                      onChange={(e) =>
+                        setForm({ ...form, paymentType: e.target.value as any })
+                      }
                     >
-                      <input
-                        type="radio"
-                        name="paymentType"
+                      <FormControlLabel
                         value="full"
-                        checked={form.paymentType === "full"}
-                        onChange={handleChange}
+                        control={<Radio />}
+                        label="Full"
                       />
-                      Full
-                    </label>
-                    <label
-                      style={{ display: "flex", alignItems: "center", gap: 6 }}
-                    >
-                      <input
-                        type="radio"
-                        name="paymentType"
+                      <FormControlLabel
                         value="part"
-                        checked={form.paymentType === "part"}
-                        onChange={handleChange}
+                        control={<Radio />}
+                        label="Part"
                       />
-                      Part
-                    </label>
-                  </div>
+                    </RadioGroup>
+                  </FormControl>
 
                   {form.paymentType === "part" && (
                     <div style={{ marginTop: 8 }}>
@@ -1713,75 +1606,43 @@ export default function StepBasic() {
                 </div>
               </div>
             )}
-            <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-              <button
-                type="button"
-                onClick={() => setCurrentStep(2)}
-                style={{
-                  padding: "10px 14px",
-                  background: "#fff",
-                  color: "#333",
-                  border: "1px solid #ddd",
-                  borderRadius: 4,
-                }}
-              >
+            <Box sx={{ display: "flex", gap: 1, mt: 1.5 }}>
+              <Button variant="outlined" onClick={() => setCurrentStep(2)}>
                 Back to Basic
-              </button>
-            </div>
+              </Button>
+            </Box>
           </div>
         )}
         {/* Review / Submit flow */}
         {!reviewMode ? (
-          <div style={{ display: "flex", gap: 8, marginTop: 18 }}>
-            <button
-              type="button"
+          <Box sx={{ display: "flex", gap: 1, mt: 2 }}>
+            <Button
+              variant="contained"
+              sx={{ flex: 1 }}
               onClick={() => setReviewMode(true)}
-              style={{
-                flex: 1,
-                padding: "12px 16px",
-                background: "#7c1fa0",
-                color: "#fff",
-                border: "none",
-                borderRadius: 4,
-                fontSize: 16,
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
             >
               Review details
-            </button>
-            <button
-              type="button"
-              onClick={() => saveDraft()}
-              style={{
-                padding: "12px 16px",
-                background: "#fff",
-                color: "#333",
-                border: "1px solid #ddd",
-                borderRadius: 4,
-                fontSize: 16,
-                cursor: "pointer",
-              }}
-            >
+            </Button>
+            <Button variant="outlined" onClick={() => saveDraft()}>
               Save draft
-            </button>
+            </Button>
             {draftSaved && (
-              <div style={{ color: "green", fontSize: 13, marginLeft: 8 }}>
+              <Typography sx={{ color: "green", fontSize: 13, ml: 1 }}>
                 Draft saved
-              </div>
+              </Typography>
             )}
-          </div>
+          </Box>
         ) : (
-          <div style={{ marginTop: 18 }}>
-            <div style={{ marginBottom: 12, fontWeight: 600, fontSize: 16 }}>
+          <Box sx={{ mt: 2 }}>
+            <Typography sx={{ mb: 1.5, fontWeight: 600, fontSize: 16 }}>
               Review your details
-            </div>
-            <div
-              style={{
+            </Typography>
+            <Box
+              sx={{
                 background: "#fff",
                 border: "1px solid #eee",
-                padding: 12,
-                borderRadius: 6,
+                p: 1.5,
+                borderRadius: 1,
               }}
             >
               {/* Build a list of key/label/value pairs to show (only relevant ones) */}
@@ -1952,9 +1813,9 @@ export default function StepBasic() {
                   );
                 });
               })()}
-            </div>
+            </Box>
 
-            <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+            <Box sx={{ display: "flex", gap: 1, mt: 1.5 }}>
               <button
                 type="button"
                 onClick={() => setReviewMode(false)}
@@ -1982,10 +1843,10 @@ export default function StepBasic() {
               >
                 Confirm & Submit
               </button>
-            </div>
-          </div>
+            </Box>
+          </Box>
         )}
       </form>
-    </div>
+    </Box>
   );
 }
