@@ -232,6 +232,9 @@ export default function PhoneAuth({
     <div style={{ maxWidth: 340, margin: "0 auto" }}>
       {step === "phone" && (
         <>
+          <div style={{ marginBottom: 12, fontSize: 14, color: "#666" }}>
+            Step 1 of 3
+          </div>
           <label htmlFor="phone">Phone Number</label>
           <PhoneInput
             country="in"
@@ -295,10 +298,53 @@ export default function PhoneAuth({
                   if (nextEl && val) nextEl.focus();
                 }}
                 onKeyDown={(e) => {
-                  if (e.key === "Backspace" && !otp[i] && i > 0) {
+                  // Handle smarter backspace navigation and deletion
+                  if (e.key === "Backspace") {
+                    e.preventDefault();
+                    const chars = otp.split("");
+                    // If current box has a value, clear it and move focus to previous
+                    if (chars[i]) {
+                      chars[i] = "";
+                      setOtp(chars.join(""));
+                      if (i > 0) {
+                        (
+                          document.getElementById(
+                            `otp-box-${i - 1}`
+                          ) as HTMLInputElement | null
+                        )?.focus();
+                      } else {
+                        // stay on current if it's the first
+                        (
+                          document.getElementById(
+                            `otp-box-${i}`
+                          ) as HTMLInputElement | null
+                        )?.focus();
+                      }
+                      return;
+                    }
+                    // If current box empty, move to previous and clear it
+                    if (i > 0) {
+                      const prev = i - 1;
+                      chars[prev] = "";
+                      setOtp(chars.join(""));
+                      (
+                        document.getElementById(
+                          `otp-box-${prev}`
+                        ) as HTMLInputElement | null
+                      )?.focus();
+                    }
+                  } else if (e.key === "ArrowLeft" && i > 0) {
+                    e.preventDefault();
                     (
                       document.getElementById(
                         `otp-box-${i - 1}`
+                      ) as HTMLInputElement | null
+                    )?.focus();
+                  } else if (e.key === "ArrowRight" && i < 5) {
+                    e.preventDefault();
+                    (
+                      document.getElementById(
+                        `otp-box-${i + 1}`
                       ) as HTMLInputElement | null
                     )?.focus();
                   }

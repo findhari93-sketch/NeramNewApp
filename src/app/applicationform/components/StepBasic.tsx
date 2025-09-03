@@ -147,28 +147,28 @@ export default function StepBasic() {
           if (latestZipQuery.current !== cleaned) return;
 
           // Map country to allowed code if possible
-                    let mappedCountry = addr.country || form.country;
-                    if (addr.country) {
-                      const code = countryNameToCode[addr.country] || addr.country_code;
-                      if (code && allowedCountryCodes.includes(code.toLowerCase())) {
-                        mappedCountry =
-                          Object.keys(countryNameToCode).find(
-                            (k) => countryNameToCode[k] === code
-                          ) || addr.country;
-                      }
-                    }
-                    setForm((prev: FormData) => ({
-                      ...prev,
-                      city:
-                        addr.city ||
-                        addr.town ||
-                        addr.village ||
-                        addr.county ||
-                        prev.city,
-                      state: addr.state || addr.region || prev.state,
-                      country: mappedCountry,
-                    }));
-                    return;
+          let mappedCountry = addr.country || form.country;
+          if (addr.country) {
+            const code = countryNameToCode[addr.country] || addr.country_code;
+            if (code && allowedCountryCodes.includes(code.toLowerCase())) {
+              mappedCountry =
+                Object.keys(countryNameToCode).find(
+                  (k) => countryNameToCode[k] === code
+                ) || addr.country;
+            }
+          }
+          setForm((prev: FormData) => ({
+            ...prev,
+            city:
+              addr.city ||
+              addr.town ||
+              addr.village ||
+              addr.county ||
+              prev.city,
+            state: addr.state || addr.region || prev.state,
+            country: mappedCountry,
+          }));
+          return;
         } catch {
           // ignore and continue
           continue;
@@ -854,101 +854,12 @@ export default function StepBasic() {
       <form
         onSubmit={async (e) => {
           e.preventDefault();
-          // Build application payload including language selections
-          const payload = {
-            phone: verifiedPhone,
-            student_name: form.studentName,
-            father_name: form.fatherName,
-            gender: form.gender,
-            class_grade: form.classGrade,
-            board: form.board,
-            board_year: form.boardYear,
-            payment_type: form.paymentType,
-            house_no: form.houseNo,
-            street: form.street,
-            landmark: form.landmark,
-            zip_code: form.zipCode,
-            city: form.city,
-            state: form.state,
-            country: form.country,
-            language_mode: form.languageMode,
-            selected_languages: selectedLanguages,
-            selected_course: selectedCourse,
-            education_type: educationType,
-            school_standard: schoolStd,
-            college_name: collegeName,
-            college_year: collegeYear,
-            diploma_course: diplomaCourse,
-            diploma_year: diplomaYear,
-            diploma_college: diplomaCollege,
-            other_description: otherDescription,
-            software_course: softwareCourse,
-            youtube_subscribed: youtubeSubscribed,
-            instagram_handle: instagramId,
-            created_at: new Date().toISOString(),
-          } as Record<string, unknown>;
-
-          // attempt to save application (table 'applications' must exist)
-          try {
-            await supabase.from("applications").insert(payload);
-          } catch (err) {
-            console.warn("applications insert error", err);
-          }
-
-          // Store location in Supabase (hidden from user)
-          if (location) {
-            try {
-              await supabase.from("user_locations").insert({
-                phone: verifiedPhone,
-                lat: location.lat,
-                lng: location.lng,
-                created_at: new Date().toISOString(),
-              });
-            } catch {
-              console.warn("user_locations insert error");
-            }
-          }
+          // ...existing code...
         }}
       >
-        {/* Step indicator and Verified Phone Number */}
+        {/* Step indicator */}
         <div style={{ marginBottom: 12, fontSize: 14, color: "#666" }}>
           Step {currentStep} of 3
-        </div>
-        {/* Verified Phone Number */}
-        <div>
-          <label style={labelStyle} htmlFor="verifiedPhone">
-            Verified Phone Number
-          </label>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <input
-              id="verifiedPhone"
-              type="text"
-              value={verifiedPhone || ""}
-              style={{ ...inputStyle, background: "#f7f7f7" }}
-              readOnly
-            />
-            <button
-              type="button"
-              onClick={() => {
-                try {
-                  localStorage.removeItem(PHONE_KEY);
-                } catch (e) {
-                  // ignore
-                }
-                // reload so component re-checks verification and shows PhoneAuth
-                window.location.reload();
-              }}
-              style={{
-                padding: "8px 10px",
-                background: "#fff",
-                border: "1px solid #ddd",
-                borderRadius: 6,
-                cursor: "pointer",
-              }}
-            >
-              Change phone
-            </button>
-          </div>
         </div>
         {/* course selection moved to the end of the form (see below) */}
         {/* Additional Contact Number Field (Step 2: Basics) */}
@@ -969,20 +880,46 @@ export default function StepBasic() {
               autoComplete="off"
             />
 
-            {/* Father Name */}
-            <label style={labelStyle} htmlFor="fatherName">
-              Father Name
-            </label>
-            <input
-              id="fatherName"
-              type="text"
-              name="fatherName"
-              value={form.fatherName}
-              onChange={handleChange}
-              style={inputStyle}
-              placeholder="Enter father name"
-              autoComplete="off"
-            />
+            {/* Back/Next buttons for Step 2 */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 8,
+                marginTop: 12,
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  setAltPhone("");
+                  setAltOtp("");
+                  setAltStep("phone");
+                  setAltConfirmation(null);
+                }}
+                style={{
+                  padding: "10px 14px",
+                  background: "#fff",
+                  border: "1px solid #ddd",
+                  borderRadius: 4,
+                }}
+              >
+                Back
+              </button>
+              <button
+                type="button"
+                onClick={() => setCurrentStep(3)}
+                style={{
+                  padding: "10px 14px",
+                  background: "#7c1fa0",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 4,
+                }}
+              >
+                Next
+              </button>
+            </div>
 
             {/* Gender */}
             <label style={labelStyle} htmlFor="gender">
@@ -1154,31 +1091,113 @@ export default function StepBasic() {
               </span>
             </div>
 
-            {/* Verified Phone Number */}
+            {/* Verified Phone Number with Change option */}
             <label style={labelStyle} htmlFor="verifiedPhone">
               Verified Phone Number
             </label>
-            <input
-              id="verifiedPhone"
-              type="text"
-              value={verifiedPhone || ""}
-              style={{ ...inputStyle, background: "#f7f7f7" }}
-              readOnly
-            />
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input
+                id="verifiedPhone"
+                type="text"
+                value={verifiedPhone || ""}
+                style={{ ...inputStyle, background: "#f7f7f7" }}
+                readOnly
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  try {
+                    localStorage.removeItem(PHONE_KEY);
+                  } catch (e) {
+                    // ignore
+                  }
+                  setVerifiedPhone(null);
+                  setCurrentStep(1);
+                }}
+                style={{
+                  padding: "8px 10px",
+                  background: "#fff",
+                  border: "1px solid #ddd",
+                  borderRadius: 6,
+                  cursor: "pointer",
+                }}
+              >
+                Change phone
+              </button>
+            </div>
 
-            {/* Additional Contact Number */}
+            {/* Additional Contact Number with OTP verification */}
             <label style={labelStyle} htmlFor="altPhone">
               Additional Contact Number (optional)
             </label>
-            <PhoneInput
-              country={"in"}
-              value={altPhone}
-              onChange={setAltPhone}
-              inputProps={{ name: "altPhone", autoComplete: "off" }}
-              inputStyle={{ width: 180, padding: 10 }}
-              specialLabel=""
-              enableSearch
-            />
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <PhoneInput
+                country={"in"}
+                value={altPhone}
+                onChange={setAltPhone}
+                inputProps={{ name: "altPhone", autoComplete: "off" }}
+                inputStyle={{ ...inputStyle, width: "100%" }}
+                specialLabel=""
+                enableSearch
+              />
+              {altStep === "phone" && altPhone && altPhone.length >= 10 && (
+                <button
+                  type="button"
+                  onClick={sendAltOtp}
+                  style={{
+                    padding: "8px 12px",
+                    background: "#7c1fa0",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: 4,
+                    cursor: "pointer",
+                  }}
+                  disabled={altLoading}
+                >
+                  {altLoading ? "Sending..." : "Send OTP"}
+                </button>
+              )}
+            </div>
+            {altStep === "otp" && (
+              <div style={{ marginTop: 8 }}>
+                <label style={labelStyle} htmlFor="altOtp">
+                  Enter OTP
+                </label>
+                <input
+                  id="altOtp"
+                  type="text"
+                  value={altOtp}
+                  onChange={(e) => setAltOtp(e.target.value)}
+                  style={inputStyle}
+                  placeholder="Enter OTP"
+                  autoComplete="off"
+                />
+                <button
+                  type="button"
+                  onClick={verifyAltOtp}
+                  style={{
+                    padding: "8px 12px",
+                    background: "#7c1fa0",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: 4,
+                    cursor: "pointer",
+                    marginLeft: 8,
+                  }}
+                  disabled={altLoading}
+                >
+                  Verify OTP
+                </button>
+                {altError && (
+                  <div style={{ color: "red", marginTop: 4 }}>{altError}</div>
+                )}
+              </div>
+            )}
+            {altStep === "done" && (
+              <div style={{ color: "green", marginTop: 4 }}>
+                Additional contact verified!
+              </div>
+            )}
 
             {/* Email ID */}
             <label style={labelStyle} htmlFor="email">
