@@ -9,6 +9,10 @@ import {
   signInWithPhoneNumber,
   type ConfirmationResult,
 } from "firebase/auth";
+import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import TextField from "@mui/material/TextField";
+import Typography from "@mui/material/Typography";
 
 const PHONE_KEY = "phone_verified";
 // reCAPTCHA Enterprise site key — prefer Vite env var VITE_RECAPTCHA_ENTERPRISE_SITE_KEY.
@@ -253,13 +257,15 @@ export default function PhoneAuth({
             specialLabel=""
             enableSearch
           />
-          <button
+          <Button
+            variant="contained"
+            fullWidth
             onClick={sendOtp}
             disabled={loading || !phone}
-            style={{ width: "100%", padding: 10 }}
+            sx={{ py: 1.25 }}
           >
             {loading ? "Sending..." : "Send OTP"}
-          </button>
+          </Button>
 
           {/* Keep this mounted; Firebase uses it for the invisible widget */}
           <div id="recaptcha-container" style={{ display: "none" }} />
@@ -268,22 +274,19 @@ export default function PhoneAuth({
 
       {step === "otp" && (
         <>
-          <label htmlFor="otp">Enter OTP</label>
-          <div
-            style={{
-              display: "flex",
-              gap: 8,
-              justifyContent: "center",
-              marginBottom: 12,
-            }}
+          <Typography sx={{ mb: 1 }}>Enter OTP</Typography>
+          <Box
+            sx={{ display: "flex", gap: 1, justifyContent: "center", mb: 1.5 }}
           >
             {[0, 1, 2, 3, 4, 5].map((i) => (
-              <input
+              <TextField
                 key={i}
                 id={`otp-box-${i}`}
-                type="text"
-                inputMode="numeric"
-                maxLength={1}
+                inputProps={{
+                  inputMode: "numeric",
+                  maxLength: 1,
+                  style: { textAlign: "center" },
+                }}
                 value={otp[i] || ""}
                 onChange={(e) => {
                   const val = e.target.value.replace(/\D/g, "");
@@ -298,11 +301,9 @@ export default function PhoneAuth({
                   if (nextEl && val) nextEl.focus();
                 }}
                 onKeyDown={(e) => {
-                  // Handle smarter backspace navigation and deletion
                   if (e.key === "Backspace") {
                     e.preventDefault();
                     const chars = otp.split("");
-                    // If current box has a value, clear it and move focus to previous
                     if (chars[i]) {
                       chars[i] = "";
                       setOtp(chars.join(""));
@@ -313,7 +314,6 @@ export default function PhoneAuth({
                           ) as HTMLInputElement | null
                         )?.focus();
                       } else {
-                        // stay on current if it's the first
                         (
                           document.getElementById(
                             `otp-box-${i}`
@@ -322,7 +322,6 @@ export default function PhoneAuth({
                       }
                       return;
                     }
-                    // If current box empty, move to previous and clear it
                     if (i > 0) {
                       const prev = i - 1;
                       chars[prev] = "";
@@ -349,24 +348,19 @@ export default function PhoneAuth({
                     )?.focus();
                   }
                 }}
-                style={{
-                  width: 36,
-                  height: 44,
-                  fontSize: 22,
-                  textAlign: "center",
-                  border: "1px solid #ccc",
-                  borderRadius: 4,
-                }}
+                sx={{ width: 48 }}
               />
             ))}
-          </div>
-          <button
+          </Box>
+          <Button
+            variant="contained"
+            fullWidth
             onClick={verifyOtp}
             disabled={loading || otp.length !== 6}
-            style={{ width: "100%", padding: 10 }}
+            sx={{ py: 1.25 }}
           >
             {loading ? "Verifying..." : "Verify OTP"}
-          </button>
+          </Button>
         </>
       )}
 
