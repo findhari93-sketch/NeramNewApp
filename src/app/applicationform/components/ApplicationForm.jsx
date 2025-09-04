@@ -40,6 +40,7 @@ export default function ApplicationForm() {
   const step2ErrorsState = useState({});
   const draftSavedState = useState(false);
   const draftLoadedState = useState(false);
+  const phoneToEditState = useState(null);
   const verifiedPhoneState = useState(() => {
     try {
       return localStorage.getItem("phone_verified");
@@ -193,6 +194,12 @@ export default function ApplicationForm() {
   const [youtubeSubscribedVal, setYoutubeSubscribedVal] =
     youtubeSubscribedState;
 
+  // extract selected course, active tab and software course primitives/setters
+  const [activeTab, setActiveTab] = activeTabState;
+  const [selectedCourse, setSelectedCourse] = selectedCourseState;
+  const [softwareCourse, setSoftwareCourse] = softwareCourseState;
+  const [, setForm] = formState;
+
   // option lists used by StepEdu
   const standardOptions = ["Below 10th", "10th", "11th", "12th"];
   const diplomaYearOptions = [
@@ -211,9 +218,14 @@ export default function ApplicationForm() {
       {currentStep === 1 && (
         <div style={{ maxWidth: 520, margin: 40 }}>
           <PhoneAuth
+            initialPhone={phoneToEditState[0]}
             onVerified={(p) => {
               try {
                 setVerifiedPhone(p);
+                // clear phoneToEdit after successful verification
+                try {
+                  phoneToEditState[1](null);
+                } catch {}
                 setCurrentStep(2);
               } catch {}
             }}
@@ -299,11 +311,16 @@ export default function ApplicationForm() {
 
       {currentStep === 4 && (
         <StepCourse
-          formState={formState}
-          activeTabState={activeTabState}
-          selectedCourseState={selectedCourseState}
-          softwareCourseState={softwareCourseState}
-          youtubeSubscribedState={youtubeSubscribedState}
+          selectedCourse={selectedCourse}
+          setSelectedCourse={setSelectedCourse}
+          setActiveTab={setActiveTab}
+          softwareCourse={softwareCourse}
+          setSoftwareCourse={setSoftwareCourse}
+          SOFTWARE_FEE={SOFTWARE_FEE}
+          youtubeSubscribed={youtubeSubscribedVal}
+          onYoutubeSubscribed={setYoutubeSubscribedVal}
+          form={form}
+          setForm={setForm}
           setCurrentStep={setCurrentStep}
         />
       )}

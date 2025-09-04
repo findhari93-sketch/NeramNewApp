@@ -69,8 +69,10 @@ function getErrorMessage(err: unknown): string {
 }
 
 export default function PhoneAuth({
+  initialPhone,
   onVerified,
 }: {
+  initialPhone?: string | null;
   onVerified?: (phone: string) => void;
 }) {
   const [phone, setPhone] = useState("");
@@ -92,6 +94,15 @@ export default function PhoneAuth({
     if (verified) setStep("done");
   }, []);
 
+  // If parent supplied an initial phone (for re-verification), prefill it.
+  useEffect(() => {
+    if (initialPhone) {
+      try {
+        setPhone(String(initialPhone));
+      } catch {}
+    }
+  }, [initialPhone]);
+
   // Ensure the verifier exists and has finished rendering before use.
   const ensureVerifier = async (): Promise<RecaptchaVerifier> => {
     if (!verifierRef.current) {
@@ -103,7 +114,8 @@ export default function PhoneAuth({
     if (renderPromiseRef.current) {
       // Avoid hanging forever if the reCAPTCHA script fails to load.
       const rp = renderPromiseRef.current;
-      const timeoutMs = 8000;
+      // Allow more time for the reCAPTCHA script to load on slow networks
+      const timeoutMs = 20000;
       try {
         await Promise.race([
           rp,
@@ -116,6 +128,12 @@ export default function PhoneAuth({
         ]);
       } catch (err) {
         // If render failed or timed out, reset the verifier so caller can retry or show an error.
+        // Provide a clearer message to the user and reset verifier
+        try {
+          setError(
+            "Unable to load reCAPTCHA. Please check your network or reload the page and try again."
+          );
+        } catch {}
         resetVerifier();
         throw err;
       }
@@ -365,6 +383,30 @@ export default function PhoneAuth({
       )}
 
       {error && <div style={{ color: "red", marginTop: 10 }}>{error}</div>}
+      {/* Retry button shown when an error occurs so users can try again without reloading */}
+      {error && (
+        <Box sx={{ mt: 1 }}>
+          <Button
+            variant="outlined"
+            fullWidth
+            onClick={async () => {
+              try {
+                setError("");
+                resetVerifier();
+                await sendOtp();
+              } catch (e) {
+                try {
+                  setError(getErrorMessage(e));
+                } catch {}
+              }
+            }}
+            disabled={loading || !phone}
+            sx={{ py: 1.25 }}
+          >
+            Retry
+          </Button>
+        </Box>
+      )}
     </div>
   );
 }

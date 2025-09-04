@@ -1,3 +1,4 @@
+"use client";
 import React from "react";
 import Box from "@mui/material/Box";
 import TextField from "@mui/material/TextField";
@@ -5,145 +6,145 @@ import MenuItem from "@mui/material/MenuItem";
 import Button from "@mui/material/Button";
 import InputAdornment from "@mui/material/InputAdornment";
 import IconButton from "@mui/material/IconButton";
+import Typography from "@mui/material/Typography";
+import Radio from "@mui/material/Radio";
+import RadioGroup from "@mui/material/RadioGroup";
+import FormControl from "@mui/material/FormControl";
+import FormControlLabel from "@mui/material/FormControlLabel";
 import ArrowBackIosIcon from "@mui/icons-material/ArrowBackIos";
 import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
-import Typography from "@mui/material/Typography";
-import FormControl from "@mui/material/FormControl";
-import RadioGroup from "@mui/material/RadioGroup";
-import FormControlLabel from "@mui/material/FormControlLabel";
-import Radio from "@mui/material/Radio";
-import YoutubeSubscribe from "./YoutubeSubscribe";
 
 export default function StepEdu(props) {
   const {
-    form,
-    handleChange,
-    educationType,
-    setEducationType,
-    isCompactSelector,
-    showStdPopup,
-    setShowStdPopup,
-    schoolStd,
-    setSchoolStd,
-    standardOptions,
-    cycleStandard,
-    diplomaYearOptions,
-    diplomaYear,
-    setDiplomaYear,
-    diplomaCourse,
-    setDiplomaCourse,
-    diplomaCollege,
-    setDiplomaCollege,
-    otherDescription,
-    setOtherDescription,
+    form = {},
+    handleChange = () => {},
+    handleSelectChange = () => {},
+    educationType = "school",
+    setEducationType = () => {},
+    schoolStd = "12th",
+    setSchoolStd = () => {},
+    standardOptions = ["Below 10th", "10th", "11th", "12th"],
     collegeName,
     setCollegeName,
     collegeYear,
     setCollegeYear,
-    labelStyle,
-    inputStyle,
-    onYoutubeSubscribed,
-    youtubeSubscribed,
-    setCurrentStep,
-    validateStep2,
-    saveDraft,
-    cycleDiplomaYear,
+    diplomaCourse,
+    setDiplomaCourse,
+    diplomaYear,
+    setDiplomaYear,
+    diplomaCollege,
+    setDiplomaCollege,
+    otherDescription,
+    setOtherDescription,
+    cycleDiplomaYear = () => {},
+    setCurrentStep = () => {},
+    validateStep2 = () => true,
+    saveDraft = () => {},
   } = props;
 
-  // show a small button to switch to college when user tries to increment past last school standard
-  const [showCollegeSwitch, setShowCollegeSwitch] = React.useState(false);
+  const labelStyle = { fontSize: 12 };
 
-  React.useEffect(() => {
-    const last =
-      standardOptions && standardOptions.length
-        ? standardOptions[standardOptions.length - 1]
-        : null;
-    if (showCollegeSwitch && schoolStd !== last) setShowCollegeSwitch(false);
-  }, [schoolStd, standardOptions, showCollegeSwitch]);
+  function getAcademicStartYear(d = new Date()) {
+    const y = d.getFullYear();
+    const month = d.getMonth(); // 0-11
+    const date = d.getDate();
+    // if date is on/after June 25 -> use current year, else previous year
+    if (month > 5 || (month === 5 && date >= 25)) return y;
+    return y - 1;
+  }
 
-  // Prepare a navigation-safe list of standards: remove any aggregated "Below 10th" entry
-  const cleanedStandardOptions = React.useMemo(() => {
-    if (!Array.isArray(standardOptions)) return standardOptions || [];
-    const filtered = standardOptions.filter(
-      (s) => !/below\s*10th/i.test(String(s))
+  function formatAcademicYear(start) {
+    const s = Number(start) || getAcademicStartYear();
+    const end = (s + 1) % 100;
+    return `${s}-${String(end).padStart(2, "0")}`;
+  }
+
+  const AcademicYearControl = ({ name }) => {
+    const defaultStart = getAcademicStartYear();
+    const minYear = getAcademicStartYear(
+      new Date(new Date().getFullYear() - 10, 6, 1)
     );
-    return filtered.length ? filtered : standardOptions;
-  }, [standardOptions]);
+    const maxYear = getAcademicStartYear(
+      new Date(new Date().getFullYear() + 5, 6, 1)
+    );
+    const currStart = Number(form[name] ?? defaultStart);
+    const canPrev = currStart > minYear;
+    const canNext = currStart < maxYear;
+    const changeYear = (nextStart) => {
+      try {
+        handleChange({ target: { name, value: String(nextStart) } });
+      } catch {}
+    };
 
-  // Determine index and whether previous arrow should be disabled.
-  const currentStdIndex = React.useMemo(() => {
-    return cleanedStandardOptions.indexOf(schoolStd);
-  }, [cleanedStandardOptions, schoolStd]);
-
-  // Disable previous arrow when at the first option or when the standard is lower than 8th
-  const isPrevDisabled = React.useMemo(() => {
-    if (currentStdIndex <= 0) return true;
-    // try to parse numeric standard (e.g., "7th" -> 7)
-    const m = String(schoolStd || "").match(/(\d+)/);
-    if (m) {
-      const n = parseInt(m[1], 10);
-      if (!Number.isNaN(n) && n < 8) return true; // disable for below 8th
-    }
-    return false;
-  }, [currentStdIndex, schoolStd]);
-
-  // Diploma year index & prev-disable helper
-  const currentDiplomaYearIndex = React.useMemo(() => {
-    if (!Array.isArray(diplomaYearOptions)) return -1;
-    return diplomaYearOptions.indexOf(diplomaYear);
-  }, [diplomaYearOptions, diplomaYear]);
-
-  const isDiplomaPrevDisabled = React.useMemo(() => {
-    return currentDiplomaYearIndex <= 0;
-  }, [currentDiplomaYearIndex]);
-
-  // College year options (1st - 5th) and helpers
-  const collegeYearOptions = React.useMemo(
-    () => ["1st Year", "2nd Year", "3rd Year", "4th Year", "5th Year"],
-    []
-  );
-
-  const currentCollegeYearIndex = React.useMemo(() => {
-    return collegeYearOptions.indexOf(collegeYear);
-  }, [collegeYearOptions, collegeYear]);
-
-  const isCollegePrevDisabled = React.useMemo(() => {
-    return currentCollegeYearIndex <= 0;
-  }, [currentCollegeYearIndex]);
-
-  const cycleCollegeYearLocal = (dir) => {
-    const idx = collegeYearOptions.indexOf(collegeYear);
-    const next =
-      (idx + dir + collegeYearOptions.length) % collegeYearOptions.length;
-    setCollegeYear(collegeYearOptions[next]);
+    return (
+      <TextField
+        size="small"
+        id={name}
+        name={name}
+        value={formatAcademicYear(currStart)}
+        variant="outlined"
+        margin="dense"
+        sx={{ width: "100%" }}
+        InputProps={{
+          readOnly: true,
+          startAdornment: (
+            <InputAdornment
+              position="start"
+              sx={{
+                mr: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 40,
+              }}
+            >
+              <IconButton
+                type="button"
+                onClick={() => canPrev && changeYear(currStart - 1)}
+                aria-label="Previous year"
+                sx={{ p: 0, minWidth: 32, height: 32 }}
+                disabled={!canPrev}
+              >
+                <ArrowBackIosIcon fontSize="small" />
+              </IconButton>
+            </InputAdornment>
+          ),
+          endAdornment: (
+            <InputAdornment
+              position="end"
+              sx={{ ml: 0, display: "flex", alignItems: "center" }}
+            >
+              <IconButton
+                type="button"
+                onClick={() => canNext && changeYear(currStart + 1)}
+                aria-label="Next year"
+                sx={{ p: "6px" }}
+                disabled={!canNext}
+              >
+                <ArrowForwardIosIcon fontSize="small" />
+              </IconButton>
+            </InputAdornment>
+          ),
+        }}
+      />
+    );
   };
 
-  // Ensure a sensible default is present when this component mounts
+  const collegeYearOptions = [
+    "1st Year",
+    "2nd Year",
+    "3rd Year",
+    "4th Year",
+    "5th Year",
+  ];
   React.useEffect(() => {
-    if (
-      !collegeYear &&
-      Array.isArray(collegeYearOptions) &&
-      collegeYearOptions.length
-    ) {
+    if (!collegeYear && collegeYearOptions.length && setCollegeYear)
       setCollegeYear(collegeYearOptions[0]);
-    }
-  }, [collegeYear, collegeYearOptions, setCollegeYear]);
-
-  const handleNextStd = () => {
-    const last =
-      standardOptions && standardOptions.length
-        ? standardOptions[standardOptions.length - 1]
-        : null;
-    if (schoolStd === last) {
-      // show a button inside the field that lets the user switch to college
-      setShowCollegeSwitch(true);
-    } else {
-      cycleStandard(1);
-    }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
-    <Box sx={{ mt: 1.5, mb: 1.5 }}>
+    <Box sx={{ maxWidth: 520, m: 5 }}>
       <Box sx={{ mt: 1.5 }}>
         <Typography sx={{ fontWeight: 600 }}>Education</Typography>
         <FormControl component="fieldset" sx={{ mt: 1 }}>
@@ -171,9 +172,8 @@ export default function StepEdu(props) {
           </RadioGroup>
         </FormControl>
 
-        {educationType === "school" ? (
+        {educationType === "school" && (
           <Box sx={{ mt: 1 }}>
-            {/* Row 1: Standard + 12th completion Year side by side (responsive) */}
             <Box
               sx={{
                 display: "flex",
@@ -196,75 +196,20 @@ export default function StepEdu(props) {
                 </Typography>
                 <TextField
                   size="small"
+                  select
                   value={schoolStd}
-                  variant="outlined"
+                  onChange={(e) => setSchoolStd(e.target.value)}
                   margin="dense"
-                  inputProps={{
-                    readOnly: true,
-                    style: { textAlign: "center" },
-                  }}
+                  variant="outlined"
                   sx={{ width: "100%" }}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment
-                        position="start"
-                        sx={{
-                          mr: 0,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          width: 40,
-                        }}
-                      >
-                        <IconButton
-                          type="button"
-                          onClick={() => {
-                            if (showCollegeSwitch) {
-                              setShowCollegeSwitch(false);
-                              return;
-                            }
-                            if (isPrevDisabled) return;
-                            cycleStandard(-1);
-                          }}
-                          aria-label="Previous standard"
-                          sx={{ p: 0, minWidth: 32, height: 32 }}
-                          disabled={isPrevDisabled}
-                        >
-                          <ArrowBackIosIcon fontSize="small" />
-                        </IconButton>
-                      </InputAdornment>
-                    ),
-                    endAdornment: (
-                      <InputAdornment
-                        position="end"
-                        sx={{ ml: 0, display: "flex", alignItems: "center" }}
-                      >
-                        {showCollegeSwitch ? (
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            onClick={() => {
-                              setEducationType("college");
-                              setShowCollegeSwitch(false);
-                            }}
-                            sx={{ textTransform: "none", ml: 0 }}
-                          >
-                            Switch to College
-                          </Button>
-                        ) : (
-                          <IconButton
-                            type="button"
-                            onClick={handleNextStd}
-                            aria-label="Next standard"
-                            sx={{ p: "6px" }}
-                          >
-                            <ArrowForwardIosIcon fontSize="small" />
-                          </IconButton>
-                        )}
-                      </InputAdornment>
-                    ),
-                  }}
-                />
+                >
+                  {standardOptions &&
+                    standardOptions.map((s) => (
+                      <MenuItem key={s} value={s}>
+                        {s}
+                      </MenuItem>
+                    ))}
+                </TextField>
               </Box>
 
               <Box
@@ -275,151 +220,42 @@ export default function StepEdu(props) {
                   minWidth: 0,
                 }}
               >
-                <Typography
-                  component="label"
-                  sx={labelStyle}
-                  htmlFor="boardYear"
-                >
-                  12th completion Year
+                <Typography component="label" sx={labelStyle}>
+                  12th completion year
                 </Typography>
-                <TextField
-                  size="small"
-                  id="boardYear"
-                  name="boardYear"
-                  type="number"
-                  value={form.boardYear}
-                  onChange={handleChange}
-                  variant="outlined"
-                  margin="dense"
-                  sx={{ width: "100%" }}
-                  inputProps={{
-                    min: new Date().getFullYear() - 10,
-                    max: new Date().getFullYear() + 1,
-                  }}
-                />
+                <AcademicYearControl name="boardYear" />
               </Box>
             </Box>
 
-            {/* Row 2: Board select full width */}
             <Box sx={{ mt: 1 }}>
               <TextField
-                select
                 size="small"
-                id="board"
-                name="board"
-                label="Board"
-                value={form.board}
-                onChange={handleChange}
+                label="School / College name"
+                value={form.schoolName || ""}
+                onChange={(e) =>
+                  handleChange({
+                    target: { name: "schoolName", value: e.target.value },
+                  })
+                }
+                fullWidth
                 variant="outlined"
                 margin="dense"
-                fullWidth
-              >
-                {["Matric", "CBSE", "ICSE", "State Board", "Other"].map((b) => (
-                  <MenuItem key={b} value={b}>
-                    {b}
-                  </MenuItem>
-                ))}
-              </TextField>
+                placeholder="School name"
+              />
             </Box>
-          </Box>
-        ) : educationType === "college" ? (
-          <Box sx={{ mt: 1 }}>
-            <Typography component="label" sx={labelStyle}>
-              College Name / Year
-            </Typography>
-            <Box
-              sx={{
-                display: "flex",
-                gap: 1,
-                flexDirection: { xs: "column", sm: "row" },
-                mt: 0.5,
-              }}
-            >
-              <Box
-                sx={{
-                  display: "flex",
-                  flexDirection: "column",
-                  flex: 1,
-                  minWidth: 0,
-                }}
-              >
-                <TextField
-                  size="small"
-                  label="College name"
-                  value={collegeName}
-                  onChange={(e) => setCollegeName(e.target.value)}
-                  fullWidth
-                  variant="outlined"
-                  margin="dense"
-                  placeholder="College name"
-                />
-              </Box>
 
-              <Box
-                sx={{
-                  display: "flex",
-                  flexDirection: "column",
-                  flex: 1,
-                  maxWidth: "11rem",
-                }}
-              >
-                <TextField
-                  size="small"
-                  value={collegeYear}
-                  variant="outlined"
-                  margin="dense"
-                  inputProps={{
-                    readOnly: true,
-                    style: { textAlign: "center" },
-                  }}
-                  sx={{ width: "100%" }}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment
-                        position="start"
-                        sx={{
-                          mr: 0,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          width: 40,
-                        }}
-                      >
-                        <IconButton
-                          type="button"
-                          onClick={() => {
-                            if (isCollegePrevDisabled) return;
-                            cycleCollegeYearLocal(-1);
-                          }}
-                          aria-label="Previous college year"
-                          sx={{ p: 0, minWidth: 32, height: 32 }}
-                          disabled={isCollegePrevDisabled}
-                        >
-                          <ArrowBackIosIcon fontSize="small" />
-                        </IconButton>
-                      </InputAdornment>
-                    ),
-                    endAdornment: (
-                      <InputAdornment
-                        position="end"
-                        sx={{ ml: 0, display: "flex", alignItems: "center" }}
-                      >
-                        <IconButton
-                          type="button"
-                          onClick={() => cycleCollegeYearLocal(1)}
-                          aria-label="Next college year"
-                          sx={{ p: "6px" }}
-                        >
-                          <ArrowForwardIosIcon fontSize="small" />
-                        </IconButton>
-                      </InputAdornment>
-                    ),
-                  }}
-                />
+            <Box sx={{ mt: 1, display: "flex", gap: 1 }}>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography component="label" sx={labelStyle}>
+                  NATA/JEE attempt plan year
+                </Typography>
+                <AcademicYearControl name="nataAttemptYear" />
               </Box>
             </Box>
           </Box>
-        ) : educationType === "diploma" ? (
+        )}
+
+        {educationType === "diploma" && (
           <Box sx={{ mt: 1 }}>
             <Box
               sx={{
@@ -441,9 +277,11 @@ export default function StepEdu(props) {
                 </Typography>
                 <TextField
                   size="small"
-                  value={diplomaCourse}
-                  onChange={(e) => setDiplomaCourse(e.target.value)}
-                  placeholder="Course (eg. Civil, ECE)"
+                  value={diplomaCourse ?? ""}
+                  onChange={(e) =>
+                    setDiplomaCourse && setDiplomaCourse(e.target.value)
+                  }
+                  placeholder="Course (eg. B.arch, Civil)"
                   margin="dense"
                   variant="outlined"
                   sx={{ width: "100%" }}
@@ -486,12 +324,12 @@ export default function StepEdu(props) {
                         <IconButton
                           type="button"
                           onClick={() => {
-                            if (isDiplomaPrevDisabled) return;
-                            cycleDiplomaYear(-1);
+                            try {
+                              cycleDiplomaYear(-1);
+                            } catch {}
                           }}
                           aria-label="Previous diploma year"
                           sx={{ p: 0, minWidth: 32, height: 32 }}
-                          disabled={isDiplomaPrevDisabled}
                         >
                           <ArrowBackIosIcon fontSize="small" />
                         </IconButton>
@@ -504,7 +342,11 @@ export default function StepEdu(props) {
                       >
                         <IconButton
                           type="button"
-                          onClick={() => cycleDiplomaYear(1)}
+                          onClick={() => {
+                            try {
+                              cycleDiplomaYear(1);
+                            } catch {}
+                          }}
                           aria-label="Next diploma year"
                           sx={{ p: "6px" }}
                         >
@@ -522,15 +364,155 @@ export default function StepEdu(props) {
                 size="small"
                 label="College name"
                 value={diplomaCollege}
-                onChange={(e) => setDiplomaCollege(e.target.value)}
+                onChange={(e) =>
+                  setDiplomaCollege && setDiplomaCollege(e.target.value)
+                }
                 fullWidth
                 variant="outlined"
                 margin="dense"
                 placeholder="College name"
               />
             </Box>
+
+            <Box sx={{ mt: 1, display: "flex", gap: 1 }}>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography component="label" sx={labelStyle}>
+                  NATA/JEE attempt plan year
+                </Typography>
+                <AcademicYearControl name="nataAttemptYear" />
+              </Box>
+            </Box>
           </Box>
-        ) : (
+        )}
+
+        {educationType === "college" && (
+          <Box sx={{ mt: 1 }}>
+            <Box
+              sx={{
+                display: "flex",
+                gap: 1,
+                flexDirection: { xs: "column", sm: "row" },
+              }}
+            >
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  flex: 1,
+                  minWidth: 0,
+                }}
+              >
+                <Typography component="label" sx={labelStyle}>
+                  College name
+                </Typography>
+                <TextField
+                  size="small"
+                  value={collegeName || ""}
+                  onChange={(e) =>
+                    setCollegeName && setCollegeName(e.target.value)
+                  }
+                  margin="dense"
+                  variant="outlined"
+                  sx={{ width: "100%" }}
+                />
+              </Box>
+
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  flex: 1,
+                  minWidth: 0,
+                }}
+              >
+                <Typography component="label" sx={labelStyle}>
+                  Current Year
+                </Typography>
+                <TextField
+                  size="small"
+                  value={collegeYear || ""}
+                  variant="outlined"
+                  margin="dense"
+                  inputProps={{
+                    readOnly: true,
+                    style: { textAlign: "center" },
+                  }}
+                  sx={{ width: "100%" }}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment
+                        position="start"
+                        sx={{
+                          mr: 0,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          width: 40,
+                        }}
+                      >
+                        <IconButton
+                          type="button"
+                          onClick={() => {
+                            try {
+                              const idx = collegeYearOptions.indexOf(
+                                collegeYear || ""
+                              );
+                              const next =
+                                (idx - 1 + collegeYearOptions.length) %
+                                collegeYearOptions.length;
+                              setCollegeYear &&
+                                setCollegeYear(collegeYearOptions[next]);
+                            } catch {}
+                          }}
+                          aria-label="Previous college year"
+                          sx={{ p: 0, minWidth: 32, height: 32 }}
+                        >
+                          <ArrowBackIosIcon fontSize="small" />
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                    endAdornment: (
+                      <InputAdornment
+                        position="end"
+                        sx={{ ml: 0, display: "flex", alignItems: "center" }}
+                      >
+                        <IconButton
+                          type="button"
+                          onClick={() => {
+                            try {
+                              const idx = collegeYearOptions.indexOf(
+                                collegeYear || ""
+                              );
+                              const next =
+                                (idx + 1) % collegeYearOptions.length;
+                              setCollegeYear &&
+                                setCollegeYear(collegeYearOptions[next]);
+                            } catch {}
+                          }}
+                          aria-label="Next college year"
+                          sx={{ p: "6px" }}
+                        >
+                          <ArrowForwardIosIcon fontSize="small" />
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+              </Box>
+            </Box>
+
+            <Box sx={{ mt: 1, display: "flex", gap: 1 }}>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography component="label" sx={labelStyle}>
+                  NATA/JEE attempt plan year
+                </Typography>
+                <AcademicYearControl name="nataAttemptYear" />
+              </Box>
+            </Box>
+          </Box>
+        )}
+
+        {educationType === "other" && (
           <Box sx={{ mt: 1 }}>
             <Typography component="label" sx={labelStyle}>
               Tell us about yourself
@@ -538,8 +520,10 @@ export default function StepEdu(props) {
             <TextField
               size="small"
               label="Tell us about yourself"
-              value={otherDescription}
-              onChange={(e) => setOtherDescription(e.target.value)}
+              value={otherDescription || ""}
+              onChange={(e) =>
+                setOtherDescription && setOtherDescription(e.target.value)
+              }
               fullWidth
               variant="outlined"
               margin="dense"
@@ -547,6 +531,15 @@ export default function StepEdu(props) {
               rows={4}
               placeholder="Describe your background, current work or study"
             />
+
+            <Box sx={{ mt: 1, display: "flex", gap: 1 }}>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography component="label" sx={labelStyle}>
+                  NATA/JEE attempt plan year
+                </Typography>
+                <AcademicYearControl name="nataAttemptYear" />
+              </Box>
+            </Box>
           </Box>
         )}
       </Box>

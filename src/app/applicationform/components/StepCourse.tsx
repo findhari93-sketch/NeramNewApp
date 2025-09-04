@@ -10,7 +10,31 @@ import FormControlLabel from "@mui/material/FormControlLabel";
 import Radio from "@mui/material/Radio";
 import YoutubeSubscribe from "./YoutubeSubscribe";
 
-export default function StepCourse(props: any) {
+type FormType = {
+  paymentType: "full" | "part";
+  [key: string]: unknown;
+};
+
+interface StepCourseProps {
+  selectedCourse: "nata-jee" | "software" | string;
+  setSelectedCourse: (course: string) => void;
+  setActiveTab: (tab: string) => void;
+  softwareCourse: string;
+  setSoftwareCourse: (course: string) => void;
+  SOFTWARE_FEE: number;
+  youtubeSubscribed: boolean;
+  onYoutubeSubscribed: (subscribed: boolean) => void;
+  nataJeeFee: number;
+  nataJeeDiscountedFee: number;
+  nataJeePart1: number;
+  nataJeeInfo: React.ReactNode;
+  form: FormType;
+  setForm: React.Dispatch<React.SetStateAction<FormType>>;
+  setCurrentStep: (step: number) => void;
+  labelStyle?: React.CSSProperties;
+}
+
+export default function StepCourse(props: StepCourseProps) {
   const {
     selectedCourse,
     setSelectedCourse,
@@ -30,8 +54,51 @@ export default function StepCourse(props: any) {
     labelStyle,
   } = props;
 
+  // Determine class grade from form (ApplicationForm keeps classGrade in form)
+  const classGrade = String(
+    (form && (form.classGrade || form.classGrade)) || ""
+  );
+  // helper: academic start year logic (if date >= June 25 use current year else previous)
+  const getAcademicStartYear = (d: Date = new Date()) => {
+    const y = d.getFullYear();
+    const month = d.getMonth();
+    const date = d.getDate();
+    if (month > 5 || (month === 5 && date >= 25)) return y;
+    return y - 1;
+  };
+
+  const currentAcademicStart = getAcademicStartYear();
+  const nataAttemptStart = Number(form.nataAttemptYear ?? currentAcademicStart);
+  const isAttemptCurrent = nataAttemptStart === currentAcademicStart;
+
+  // Determine total fee per the table from attachments
+  const determineNataFee = () => {
+    const cg = classGrade || "";
+    if (/12/.test(cg)) return isAttemptCurrent ? 30000 : 35000;
+    if (/11/.test(cg)) return 35000;
+    if (/below\s*11th|below\s*11|below 11|below 10th/i.test(cg)) return 35000;
+    if (/diploma/i.test(cg)) {
+      // if diploma 3rd year -> current year 30000 else 35000
+      const dYear = String(form.diplomaYear || "").toLowerCase();
+      if (/3|3rd|third/.test(dYear) || /3rd/.test(cg))
+        return isAttemptCurrent ? 30000 : 35000;
+      return 35000;
+    }
+    if (/college/i.test(cg)) return isAttemptCurrent ? 30000 : 35000;
+    // other / default: current -> 30000, future -> 35000
+    return isAttemptCurrent ? 30000 : 35000;
+  };
+
+  const computedNataFee =
+    selectedCourse === "nata-jee" ? determineNataFee() : nataJeeFee || 0;
+  // discounted fee when full payment (displayed as 'Discounted (if full)') is always total - 5000
+  const computedNataDiscount =
+    selectedCourse === "nata-jee"
+      ? determineNataFee() - 5000
+      : nataJeeDiscountedFee || nataJeeFee || 0;
+
   return (
-    <div style={{ marginTop: 12, marginBottom: 12 }}>
+    <Box sx={{ maxWidth: 520, m: 5 }}>
       <label style={{ fontSize: 14, color: "#444", fontWeight: 600 }}>
         Choose course
       </label>
@@ -109,7 +176,7 @@ export default function StepCourse(props: any) {
                 </Typography>
                 <TextField
                   size="small"
-                  value={`₹${nataJeeFee || 0}`}
+                  value={`₹${computedNataFee}`}
                   InputProps={{ readOnly: true }}
                   fullWidth
                   variant="outlined"
@@ -122,7 +189,7 @@ export default function StepCourse(props: any) {
                 </Typography>
                 <TextField
                   size="small"
-                  value={`₹${nataJeeDiscountedFee || nataJeeFee || 0}`}
+                  value={`₹${computedNataDiscount}`}
                   InputProps={{ readOnly: true }}
                   fullWidth
                   variant="outlined"
@@ -202,6 +269,6 @@ export default function StepCourse(props: any) {
           Back to Education
         </Button>
       </Box>
-    </div>
+    </Box>
   );
 }

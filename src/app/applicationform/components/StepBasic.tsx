@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import PhoneInput from "react-phone-input-2";
 import "react-phone-input-2/lib/style.css";
 import Box from "@mui/material/Box";
@@ -50,6 +50,7 @@ interface StepBasicProps {
   setCurrentStep: (n: number) => void;
   verifiedPhone?: string | null;
   setVerifiedPhone?: (p: string | null) => void;
+  setPhoneToEdit?: (p: string | null) => void;
   fieldRefs?: React.RefObject<Record<string, HTMLElement | null>>;
 }
 
@@ -69,7 +70,9 @@ export default function StepBasic(props: StepBasicProps) {
     saveDraft,
     setCurrentStep,
     verifiedPhone,
-    setVerifiedPhone,
+  setVerifiedPhone,
+  // optional setter to indicate phone should be edited in PhoneAuth
+  setPhoneToEdit,
     fieldRefs: externalFieldRefs,
   } = props;
 
@@ -77,6 +80,9 @@ export default function StepBasic(props: StepBasicProps) {
   const fieldRefs = externalFieldRefs ?? localFieldRefs;
   const [editField, setEditField] = useState<string | null>(null);
   const [hoverCsc, setHoverCsc] = useState<string | null>(null);
+  const zipLookupController = useRef<AbortController | null>(null);
+  const [zipLoading, setZipLoading] = useState(false);
+  const [zipDebug, setZipDebug] = useState<string | null>(null);
 
   const inputStyle: React.CSSProperties = {
     width: "100%",
@@ -87,6 +93,122 @@ export default function StepBasic(props: StepBasicProps) {
     marginBottom: 16,
     background: "#fff",
   };
+
+  // Helper: fetch city/state from zip (India postal API first, then Nominatim fallback)
+  const fetchCityStateFromZip = async (zip: string, signal?: AbortSignal) => {
+    const cleaned = String(zip || "").trim();
+    if (!cleaned) return;
+    setZipDebug(`query:${cleaned}`);
+    setZipLoading(true);
+    console.log("zipLookup: starting lookup for", cleaned);
+    try {
+      // India PIN (6 digits)
+      if (/^\d{6}$/.test(cleaned)) {
+        try {
+          const res = await fetch(
+            `https://api.postalpincode.in/pincode/${cleaned}`,
+            { signal }
+          );
+          if (res.ok) {
+            const json = await res.json();
+            if (Array.isArray(json) && json[0]?.Status === "Success") {
+              const post = json[0].PostOffice && json[0].PostOffice[0];
+              if (post) {
+                console.log("zipLookup: postal api result", post);
+                try {
+                  // update fields via provided handler
+                  try {
+                    handleChange({
+                      target: { name: "city", value: post.District || "" },
+                    } as unknown as React.ChangeEvent<HTMLInputElement>);
+                    handleChange({
+                      target: { name: "state", value: post.State || "" },
+                    } as unknown as React.ChangeEvent<HTMLInputElement>);
+                    handleChange({
+                      target: { name: "country", value: "India" },
+                    } as unknown as React.ChangeEvent<HTMLInputElement>);
+                  } catch {}
+                } catch {}
+                setZipDebug(`We found: ${post.District}, ${post.State}, India`);
+                return;
+              }
+            }
+          }
+        } catch (e) {
+          console.warn("zipLookup: postal api error", e);
+        }
+      }
+
+      // Fallback: Nominatim search restricted to allowed countries
+      const ALLOWED_COUNTRY_CODES = ["ae", "in", "sa", "om", "lk"];
+      for (const cc of ALLOWED_COUNTRY_CODES) {
+        if (signal?.aborted) return;
+        const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=1&countrycodes=${cc}&q=${encodeURIComponent(
+          cleaned
+        )}`;
+        try {
+          const r = await fetch(url, {
+            headers: { "User-Agent": "neram-app/1.0" },
+            signal,
+          });
+          if (!r.ok) continue;
+          const results = await r.json();
+          if (Array.isArray(results) && results.length > 0) {
+            const addr = results[0].address || {};
+            console.log("zipLookup: nominatim hit", addr);
+            try {
+              try {
+                handleChange({
+                  target: {
+                    name: "city",
+                    value: addr.city || addr.town || addr.village || "",
+                  },
+                } as unknown as React.ChangeEvent<HTMLInputElement>);
+                handleChange({
+                  target: { name: "state", value: addr.state || "" },
+                } as unknown as React.ChangeEvent<HTMLInputElement>);
+                handleChange({
+                  target: { name: "country", value: addr.country || "" },
+                } as unknown as React.ChangeEvent<HTMLInputElement>);
+              } catch {}
+            } catch {}
+            setZipDebug(
+              `found: ${addr.city || addr.town || addr.village || ""}, ${
+                addr.state || ""
+              }, ${addr.country || ""}`
+            );
+            return;
+          }
+        } catch (e) {
+          console.warn("zipLookup: nominatim error", e);
+          continue;
+        }
+      }
+
+      setZipDebug("no results");
+    } finally {
+      setZipLoading(false);
+    }
+  };
+
+  // Trigger lookup when zip changes (3-8 chars)
+  useEffect(() => {
+    const zip = String(form.zipCode || "").trim();
+    if (/^[A-Za-z0-9\-\s]{3,8}$/.test(zip)) {
+      if (zipLookupController.current) {
+        try {
+          zipLookupController.current.abort();
+        } catch {}
+      }
+      const controller = new AbortController();
+      zipLookupController.current = controller;
+      fetchCityStateFromZip(zip, controller.signal).finally(() => {
+        if (zipLookupController.current === controller)
+          zipLookupController.current = null;
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.zipCode]);
 
   return (
     <Box sx={{ maxWidth: 520, m: 5 }}>
@@ -160,6 +282,13 @@ export default function StepBasic(props: StepBasicProps) {
           placeholder="Postal / ZIP code"
           autoComplete="off"
         />
+
+        {/* Debug / zip lookup status (visible on page) */}
+        {zipLoading || zipDebug ? (
+          <Typography sx={{ fontSize: 12, color: "#666", mt: 0.5 }}>
+            {zipLoading ? "Looking up postal code..." : zipDebug}
+          </Typography>
+        ) : null}
 
         <Box sx={{ mt: (form.zipCode || "").toString().trim() ? 0 : 2 }}>
           {(form.zipCode || "").toString().trim() ? (
@@ -418,7 +547,12 @@ export default function StepBasic(props: StepBasicProps) {
                           aria-label="Change verified phone"
                           onClick={() => {
                             try {
-                              localStorage.removeItem("PHONE_KEY");
+                              // clear the verified marker so PhoneAuth allows editing
+                              localStorage.removeItem("phone_verified");
+                            } catch {}
+                            try {
+                              // tell PhoneAuth which phone to prefill for re-verification
+                              setPhoneToEdit?.(verifiedPhone || localStorage.getItem("phone_verified"));
                             } catch {}
                             setVerifiedPhone?.(null);
                             setCurrentStep(1);
