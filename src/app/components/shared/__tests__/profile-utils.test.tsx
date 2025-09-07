@@ -22,7 +22,7 @@ describe("initialsForName", () => {
 describe("useAvatarColor", () => {
   it("returns a deterministic color for a given name", () => {
     const theme = createTheme();
-    const wrapper = ({ children }: any) => (
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
       <ThemeProvider theme={theme}>{children}</ThemeProvider>
     );
     const { result, rerender } = renderHook(() => useAvatarColor("Alice"), {

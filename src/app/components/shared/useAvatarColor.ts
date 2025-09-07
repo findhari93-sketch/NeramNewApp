@@ -10,7 +10,7 @@ function hashString(s: string) {
   return Math.abs(h);
 }
 
-export default function useAvatarColor(name?: string) {
+export default function useAvatarColor(name?: string | null) {
   const theme = useTheme();
   const base = name ? hashString(name) : 0;
   // pick from a small palette derived from theme.palette
