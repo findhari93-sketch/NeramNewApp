@@ -90,21 +90,54 @@ export default function LoginPage() {
   }, [router]);
 
   // Auto-redirect if already logged in (client-side check)
+  // Only redirect when the Firebase token is valid. If token verification fails
+  // (for example the user was removed from Firebase by an admin), sign out and
+  // clear local flags so the user stays on the login page.
   const [redirecting, setRedirecting] = React.useState(false);
   React.useEffect(() => {
-    // check cookie neram_session or phone_verified in localStorage
-    try {
-      const cookies = document.cookie || "";
-      const hasSession = /neram_session=/.test(cookies);
-      const pv = !!localStorage.getItem("phone_verified");
-      if (hasSession || pv) {
-        setRedirecting(true);
-        // give a small delay to show the redirecting message
-        setTimeout(() => {
-          router.replace("/?notice=already_logged_in");
-        }, 300);
+    let mounted = true;
+    (async () => {
+      try {
+        const current = auth.currentUser;
+        // If there's a firebase user, force-refresh token to verify it's still valid.
+        if (current) {
+          try {
+            await current.getIdToken(true);
+            if (!mounted) return;
+            setRedirecting(true);
+            // give a small delay to show the redirecting message
+            setTimeout(() => {
+              router.replace("/?notice=already_logged_in");
+            }, 300);
+            return;
+          } catch {
+            // token refresh failed -> likely the account was deleted or token revoked
+            try {
+              await signOut(auth);
+            } catch (e) {
+              console.warn("signOut failed during invalid-token cleanup", e);
+            }
+            try {
+              localStorage.removeItem("phone_verified");
+            } catch {}
+            setFirebaseUser(null);
+            return;
+          }
+        }
+
+        // No firebase user: do not auto-redirect. Clear stale phone_verified flag
+        // so the UI prompts for login/phone again instead of sending the user
+        // straight to the app.
+        try {
+          localStorage.removeItem("phone_verified");
+        } catch {}
+      } catch {
+        // ignore errors and avoid redirecting
       }
-    } catch {}
+    })();
+    return () => {
+      mounted = false;
+    };
   }, [router]);
 
   // Handle LinkedIn callback (server redirects here with linkedin=success)

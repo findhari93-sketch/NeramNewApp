@@ -3,7 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import PhoneInput from "react-phone-input-2";
 import "react-phone-input-2/lib/style.css";
 import { auth } from "../../../lib/firebase";
-import { supabase } from "../../../lib/supabase";
+// client Supabase no longer used for persisting user; we call server upsert instead
+import saveUserProfile from "../../../lib/saveUserProfile";
 import {
   RecaptchaVerifier,
   signInWithPhoneNumber,
@@ -182,6 +183,8 @@ export default function PhoneAuth({
         } catch (err) {
           // If enterprise flow fails, fall through to the normal verifier below.
           console.warn("Enterprise reCAPTCHA failed, falling back:", err);
+          // normalize the thrown value to avoid throwing raw objects/null later
+          // and allow the fallback to proceed.
         }
       }
 
@@ -202,7 +205,7 @@ export default function PhoneAuth({
           setConfirmation(c);
           setStep("otp");
         } else {
-          throw e;
+          throw new Error(String(e ?? "unknown error"));
         }
       }
     } catch (e) {
@@ -232,8 +235,13 @@ export default function PhoneAuth({
       }
       setStep("done");
 
-      // Optional: persist to Supabase (adjust table/columns to your schema)
-      await supabase.from("users").upsert({ phone: stored });
+      // Persist user to database via secure server route (uses service role)
+      try {
+        await saveUserProfile({ phone: stored });
+      } catch (persistErr) {
+        console.warn("Server upsert failed:", persistErr);
+        // Non-fatal: the user is verified; allow proceeding. The next profile save will retry.
+      }
     } catch (e) {
       setError(getErrorMessage(e) || "Invalid OTP. Try again.");
     } finally {
