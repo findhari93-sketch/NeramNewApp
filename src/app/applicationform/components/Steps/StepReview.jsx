@@ -356,6 +356,24 @@ export default function StepReview(props) {
             <button
               type="submit"
               disabled={!agreed}
+              onClick={async (e) => {
+                e.preventDefault();
+                if (!agreed) return;
+                
+                // Save final application data to database
+                if (props.saveToDatabase) {
+                  const result = await props.saveToDatabase();
+                  if (result.ok) {
+                    alert("Application submitted successfully!");
+                    // Here you could redirect to payment or another page
+                  } else {
+                    alert("Failed to submit application. Please try again.");
+                    console.error("Final submission failed:", result.error);
+                  }
+                } else {
+                  alert("Application saved! (Database save function not available)");
+                }
+              }}
               style={{
                 padding: "10px 14px",
                 background: agreed ? "#7c1fa0" : "#e6cfee",

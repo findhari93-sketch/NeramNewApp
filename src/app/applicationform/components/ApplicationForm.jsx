@@ -7,6 +7,7 @@ import StepCourse from "./Steps/StepCourse";
 import StepEdu from "./Steps/StepEdu";
 import StepReview from "./Steps/StepReview";
 import StepPhoneVerify from "./Steps/StepPhoneVerify";
+import { saveApplicationStep } from "../../../lib/applicationAPI";
 
 // small constants used by fee logic
 const currentYear = new Date().getFullYear();
@@ -144,6 +145,57 @@ export default function ApplicationForm() {
       setTimeout(() => setDraftSaved(false), 1800);
     } catch (err) {
       console.warn("Failed to save draft", err);
+    }
+  };
+
+  // New function to save current application data to database
+  const saveToDatabase = async () => {
+    try {
+      const [form] = formState;
+      const [altPhone] = altPhoneState;
+      const [instagramId] = instagramIdState;
+      const [selectedLanguages] = selectedLanguagesState;
+      const [youtubeSubscribed] = youtubeSubscribedState;
+      const [selectedCourse] = selectedCourseState;
+      const [educationType] = educationTypeState;
+      const [schoolStd] = schoolStdState;
+      const [collegeName] = collegeNameState;
+      const [collegeYear] = collegeYearState;
+      const [diplomaCourse] = diplomaCourseState;
+      const [diplomaYear] = diplomaYearState;
+      const [diplomaCollege] = diplomaCollegeState;
+      const [otherDescription] = otherDescriptionState;
+      const [softwareCourse] = softwareCourseState;
+      const [verifiedPhone] = verifiedPhoneState;
+
+      const stepData = {
+        form,
+        altPhone,
+        instagramId,
+        selectedLanguages,
+        youtubeSubscribed,
+        selectedCourse,
+        educationType,
+        schoolStd,
+        collegeName,
+        collegeYear,
+        diplomaCourse,
+        diplomaYear,
+        diplomaCollege,
+        otherDescription,
+        softwareCourse,
+        verifiedPhone,
+      };
+
+      const result = await saveApplicationStep(stepData);
+      if (!result.ok) {
+        console.error("Failed to save to database:", result.error);
+        // Could show user notification here if needed
+      }
+      return result;
+    } catch (err) {
+      console.error("Error saving to database:", err);
+      return { ok: false, error: String(err) };
     }
   };
 
@@ -438,6 +490,7 @@ export default function ApplicationForm() {
           step2Errors={step2Errors}
           setStep2Errors={setStep2Errors}
           saveDraft={saveDraft}
+          saveToDatabase={saveToDatabase}
           validateStep2={validateStep2}
           handleChange={handleChange}
           handleSelectChange={handleSelectChange}
@@ -481,6 +534,7 @@ export default function ApplicationForm() {
           setCurrentStep={setCurrentStep}
           validateStep2={validateStep2}
           saveDraft={saveDraft}
+          saveToDatabase={saveToDatabase}
           cycleDiplomaYear={cycleDiplomaYear}
         />
       )}
@@ -498,6 +552,7 @@ export default function ApplicationForm() {
           form={form}
           setForm={setForm}
           setCurrentStep={setCurrentStep}
+          saveToDatabase={saveToDatabase}
         />
       )}
 
@@ -522,6 +577,7 @@ export default function ApplicationForm() {
           setReviewMode={setReviewMode}
           setEditField={setEditField}
           setCurrentStep={setCurrentStep}
+          saveToDatabase={saveToDatabase}
           handleGoToStep={(stepIdx, fieldKey) => {
             try {
               // navigate to requested step

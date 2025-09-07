@@ -586,9 +586,17 @@ export default function StepEdu(props) {
         </Button>
         <Button
           variant="contained"
-          onClick={() => {
+          onClick={async () => {
             if (!validateStep2()) return;
             saveDraft();
+            // Save to database
+            if (props.saveToDatabase) {
+              const result = await props.saveToDatabase();
+              if (!result.ok) {
+                console.error("Failed to save step data:", result.error);
+                // Continue to next step even if database save fails (data is in localStorage)
+              }
+            }
             setCurrentStep(4);
           }}
           sx={{ minWidth: 160 }}

@@ -38,6 +38,7 @@ interface StepCourseProps {
   form: FormObj;
   setForm: (f: FormObj | ((prev?: FormObj) => FormObj)) => void;
   setCurrentStep: (n: number) => void;
+  saveToDatabase?: () => Promise<{ ok: boolean; error?: string }>;
   labelStyle?: React.CSSProperties;
 }
 
@@ -57,6 +58,7 @@ export default function StepCourse(props: StepCourseProps) {
     form,
     setForm,
     setCurrentStep,
+    saveToDatabase,
     labelStyle,
   } = props;
 
@@ -473,7 +475,17 @@ export default function StepCourse(props: StepCourseProps) {
         </Button>
         <Button
           variant="contained"
-          onClick={() => setCurrentStep(5)}
+          onClick={async () => {
+            // Save to database before proceeding to review
+            if (saveToDatabase) {
+              const result = await saveToDatabase();
+              if (!result.ok) {
+                console.error("Failed to save step data:", result.error);
+                // Continue to review even if database save fails (data is in localStorage)
+              }
+            }
+            setCurrentStep(5);
+          }}
           sx={{ minWidth: 160 }}
         >
           Review Details

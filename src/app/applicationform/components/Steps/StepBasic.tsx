@@ -48,6 +48,7 @@ interface StepBasicProps {
   handleSelectChange: (e: SelectChangeEvent<string>) => void;
   validateStep2: () => boolean;
   saveDraft: () => void;
+  saveToDatabase?: () => Promise<{ ok: boolean; error?: string }>;
   setCurrentStep: (n: number) => void;
   verifiedPhone?: string | null;
   setVerifiedPhone?: (p: string | null) => void;
@@ -71,6 +72,7 @@ export default function StepBasic(props: StepBasicProps) {
     handleSelectChange,
     validateStep2,
     saveDraft,
+    saveToDatabase,
     setCurrentStep,
     verifiedPhone,
     setVerifiedPhone,
@@ -733,9 +735,17 @@ export default function StepBasic(props: StepBasicProps) {
           <Button
             variant="contained"
             fullWidth
-            onClick={() => {
+            onClick={async () => {
               if (!validateStep2()) return;
               saveDraft();
+              // Save to database
+              if (saveToDatabase) {
+                const result = await saveToDatabase();
+                if (!result.ok) {
+                  console.error("Failed to save step data:", result.error);
+                  // Continue to next step even if database save fails (data is in localStorage)
+                }
+              }
               setCurrentStep(3);
             }}
           >
