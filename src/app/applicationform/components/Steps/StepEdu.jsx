@@ -144,6 +144,20 @@ export default function StepEdu(props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Ensure nataAttemptYear has a default value in form so it is persisted
+  React.useEffect(() => {
+    try {
+      if (form && typeof form.nataAttemptYear === "undefined") {
+        const start = getAcademicStartYear();
+        handleChange({
+          target: { name: "nataAttemptYear", value: String(start) },
+        });
+      }
+    } catch {}
+    // only run once on mount for defaulting; avoid loop by not depending on form
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <Box sx={{ maxWidth: 520, m: 5 }}>
       <Box sx={{ mt: 1.5 }}>
