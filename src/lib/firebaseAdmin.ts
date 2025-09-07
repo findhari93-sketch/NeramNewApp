@@ -1,5 +1,5 @@
 // lib/firebaseAdmin.ts
-import admin from "firebase-admin";
+import * as admin from "firebase-admin";
 import type { DecodedIdToken } from "firebase-admin/auth";
 
 // Initialize Firebase Admin SDK (singleton pattern)
