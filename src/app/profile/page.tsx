@@ -19,6 +19,7 @@ import { auth } from "../../lib/firebase";
 import { onAuthStateChanged, signOut, updateProfile } from "firebase/auth";
 import TopNavBar from "../components/shared/TopNavBar";
 import { useRouter } from "next/navigation";
+import apiClient from "../../lib/apiClient";
 
 export default function ProfilePage() {
   const [user, setUser] = React.useState<Record<string, unknown> | null>(null);
@@ -54,21 +55,44 @@ export default function ProfilePage() {
       if (pv && !user) setUser((prev) => prev || { phoneNumber: pv });
     } catch {}
 
-    // fetch server-side session (Supabase user data) to show LinkedIn fields if present
-    (async () => {
-      try {
-        const res = await fetch("/api/session");
-        const json = await res.json();
-        if (json?.ok && json.user)
-          setSessionUser(json.user as Record<string, unknown>);
-      } catch {
-        // ignore
-      }
-    })();
-
     return () => unsub();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // After auth is known, load session safely:
+  // - If Firebase user exists, include Authorization via apiClient
+  // - Otherwise, optionally try cookie-based session (LinkedIn)
+  React.useEffect(() => {
+    if (!authChecked) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        if (auth.currentUser) {
+          // Ensure token is fresh before calling
+          try {
+            await auth.currentUser.getIdToken(true);
+          } catch {}
+          const res = await apiClient("/api/session");
+          const json = await res.json();
+          if (!cancelled && json?.ok && json.user) {
+            setSessionUser(json.user as Record<string, unknown>);
+          }
+          return;
+        }
+        // No firebase user: fall back to cookie-based session if present
+        try {
+          const res = await fetch("/api/session");
+          const json = await res.json();
+          if (!cancelled && json?.ok && json.user) {
+            setSessionUser(json.user as Record<string, unknown>);
+          }
+        } catch {}
+      } catch {}
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [authChecked, user]);
 
   // redirect to login if auth checked and no user
   React.useEffect(() => {
@@ -181,19 +205,11 @@ export default function ProfilePage() {
             displayName: trimmed,
             profile: { photoURL: auth.currentUser?.photoURL },
           };
-          try {
-            const token = await auth.currentUser?.getIdToken();
-            fetch("/api/users/upsert", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: token ? `Bearer ${token}` : "",
-              },
-              body: JSON.stringify(payload),
-            }).catch((e) => console.warn("upsert user failed", e));
-          } catch (e) {
-            console.warn("failed to get id token", e);
-          }
+          apiClient("/api/users/upsert", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          }).catch((e) => console.warn("upsert user failed", e));
         } catch {}
       } catch {}
       setSnackMsg("Saved");

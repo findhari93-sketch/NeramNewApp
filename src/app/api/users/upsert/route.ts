@@ -1,16 +1,35 @@
 import { NextResponse } from "next/server";
 import supabaseServer from "../../../../lib/supabaseServer";
 import admin from "firebase-admin";
+import type { UserRow } from "../../../../types/db";
 
 // initialize firebase-admin with service account if not already
 if (!admin.apps.length) {
   const credJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
   if (credJson) {
     try {
-      const parsed = JSON.parse(credJson);
-      admin.initializeApp({ credential: admin.credential.cert(parsed as any) });
+      const parsed = JSON.parse(credJson) as admin.ServiceAccount;
+      admin.initializeApp({ credential: admin.credential.cert(parsed) });
     } catch (e) {
       console.warn("Invalid FIREBASE_SERVICE_ACCOUNT_JSON", e);
+    }
+  } else {
+    const projectId = process.env.FIREBASE_PROJECT_ID;
+    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+    let privateKey = process.env.FIREBASE_PRIVATE_KEY;
+    if (privateKey) privateKey = privateKey.replace(/\\n/g, "\n");
+    if (projectId && clientEmail && privateKey) {
+      try {
+        admin.initializeApp({
+          credential: admin.credential.cert({
+            projectId,
+            clientEmail,
+            privateKey,
+          }),
+        });
+      } catch (e) {
+        console.warn("Failed to init Firebase Admin from discrete envs", e);
+      }
     }
   }
 }
@@ -19,7 +38,7 @@ if (!admin.apps.length) {
  * POST /api/users/upsert
  * - verifies Firebase ID token (from Authorization header)
  * - ensures decoded.phone_number exists
- * - uses phone as primary lookup: if a user with same phone exists, update it (set firebase_uid), otherwise insert
+ * - uses phone as primary lookup: if a user with same phone exists, update it; otherwise insert
  * - merges provided profile fields into dedicated columns and unknowns into `profile` jsonb
  */
 export async function POST(req: Request) {
@@ -59,18 +78,55 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json().catch(() => ({}));
-    const profileFromBody = (body && body.profile) || {};
+    const profileFromBody: Record<string, unknown> =
+      body &&
+      typeof body === "object" &&
+      (body as Record<string, unknown>).profile &&
+      typeof (body as Record<string, unknown>).profile === "object"
+        ? ((body as Record<string, unknown>).profile as Record<string, unknown>)
+        : {};
 
     // map known columns from token/profile
-    const known: Record<string, any> = {
-      firebase_uid: decoded.uid,
+    const emailFromBody = (() => {
+      const fromTop =
+        typeof (body as Record<string, unknown>)["email"] === "string"
+          ? ((body as Record<string, unknown>)["email"] as string)
+          : null;
+      const fromProfile =
+        typeof (profileFromBody as Record<string, unknown>)["email"] ===
+        "string"
+          ? ((profileFromBody as Record<string, unknown>)["email"] as string)
+          : null;
+      return fromTop ?? fromProfile ?? null;
+    })();
+
+    const displayNameFromBody = (() => {
+      const fromTop =
+        typeof (body as Record<string, unknown>)["displayName"] === "string"
+          ? ((body as Record<string, unknown>)["displayName"] as string)
+          : typeof (body as Record<string, unknown>)["display_name"] ===
+            "string"
+          ? ((body as Record<string, unknown>)["display_name"] as string)
+          : null;
+      const fromProfileDisplayName =
+        typeof (profileFromBody as Record<string, unknown>)["display_name"] ===
+        "string"
+          ? ((profileFromBody as Record<string, unknown>)[
+              "display_name"
+            ] as string)
+          : null;
+      const fromProfileName =
+        typeof (profileFromBody as Record<string, unknown>)["name"] === "string"
+          ? ((profileFromBody as Record<string, unknown>)["name"] as string)
+          : null;
+      return fromTop ?? fromProfileDisplayName ?? fromProfileName ?? null;
+    })();
+
+    const known: Partial<UserRow> & Record<string, unknown> = {
       phone,
-      email: decoded.email || profileFromBody.email || null,
+      email: (decoded.email as string | undefined) ?? emailFromBody ?? null,
       display_name:
-        decoded.name ||
-        profileFromBody.display_name ||
-        profileFromBody.name ||
-        null,
+        (decoded.name as string | undefined) ?? displayNameFromBody ?? null,
       last_sign_in: body.lastSignIn || null,
     };
 
@@ -88,14 +144,228 @@ export async function POST(req: Request) {
     };
 
     for (const key of Object.keys(fieldMap)) {
-      if (profileFromBody[key] != null) known[key] = profileFromBody[key];
-      else if (body[key] != null) known[key] = body[key];
+      if ((profileFromBody as Record<string, unknown>)[key] != null)
+        (known as Record<string, unknown>)[key] = (
+          profileFromBody as Record<string, unknown>
+        )[key];
+      else if ((body as Record<string, unknown>)[key] != null)
+        (known as Record<string, unknown>)[key] = (
+          body as Record<string, unknown>
+        )[key];
     }
 
     // remaining fields go into profile jsonb (merge)
-    const extra = { ...(profileFromBody || {}), ...(body.extra || {}) };
+    type UnknownRecord = Record<string, unknown>;
+    const bodyAsRecord: UnknownRecord =
+      body && typeof body === "object" ? (body as UnknownRecord) : {};
+    const extraFromBody: UnknownRecord =
+      bodyAsRecord["extra"] && typeof bodyAsRecord["extra"] === "object"
+        ? (bodyAsRecord["extra"] as UnknownRecord)
+        : {};
+    const extra: Record<string, unknown> = {
+      ...(profileFromBody || {}),
+      ...extraFromBody,
+    };
     // remove known keys from extra
     for (const k of Object.keys(known)) delete extra[k];
+
+    // Normalize and map common camelCase -> snake_case fields from top-level body
+    const fromAny = (...vals: unknown[]) => {
+      for (const v of vals) if (v !== undefined) return v;
+      return undefined;
+    };
+
+    // Gender normalizer to match enum gender_t
+    const normalizeGender = (
+      val: unknown
+    ): "male" | "female" | "nonbinary" | "prefer_not_to_say" | null => {
+      if (typeof val !== "string") return null;
+      const s = val.trim().toLowerCase();
+      if (["male", "m"].includes(s)) return "male";
+      if (["female", "f"].includes(s)) return "female";
+      if (["nonbinary", "non-binary", "non binary", "nb"].includes(s))
+        return "nonbinary";
+      if (
+        [
+          "prefer_not_to_say",
+          "prefer not to say",
+          "na",
+          "n/a",
+          "none",
+        ].includes(s)
+      )
+        return "prefer_not_to_say";
+      return null;
+    };
+
+    const bodyRec = bodyAsRecord;
+    const genderIncoming = fromAny(
+      bodyRec["gender"],
+      (profileFromBody as Record<string, unknown>)["gender"]
+    );
+    const genderNormalized = normalizeGender(genderIncoming);
+    if (genderNormalized !== null)
+      (known as Partial<UserRow>).gender =
+        genderNormalized as UserRow["gender"];
+
+    const fatherNameIncoming = fromAny(
+      bodyRec["fatherName"],
+      bodyRec["father_name"],
+      (profileFromBody as Record<string, unknown>)["father_name"]
+    );
+    if (fatherNameIncoming !== undefined)
+      (known as Partial<UserRow>).father_name = fatherNameIncoming as string;
+
+    const zipIncoming = fromAny(
+      bodyRec["zipCode"],
+      bodyRec["zip_code"],
+      (profileFromBody as Record<string, unknown>)["zip_code"]
+    );
+    if (zipIncoming !== undefined)
+      (known as Partial<UserRow>).zip_code = zipIncoming as string;
+
+    const instaIncoming = fromAny(
+      bodyRec["instagram"],
+      bodyRec["instagramId"],
+      (profileFromBody as Record<string, unknown>)["instagram_handle"]
+    );
+    if (instaIncoming !== undefined)
+      (known as Partial<UserRow>).instagram_handle = instaIncoming as string;
+
+    const eduIncoming = fromAny(
+      bodyRec["educationType"],
+      bodyRec["education_type"],
+      (profileFromBody as Record<string, unknown>)["education_type"]
+    );
+    if (eduIncoming !== undefined)
+      (known as Partial<UserRow>).education_type = eduIncoming as string;
+
+    const courseIncoming = fromAny(
+      bodyRec["selectedCourse"],
+      bodyRec["selected_course"],
+      (profileFromBody as Record<string, unknown>)["selected_course"]
+    );
+    if (courseIncoming !== undefined)
+      (known as Partial<UserRow>).selected_course = courseIncoming as string;
+
+    const feeIncoming = fromAny(bodyRec["courseFee"], bodyRec["course_fee"]);
+    if (feeIncoming !== undefined)
+      (known as Partial<UserRow>).course_fee = feeIncoming as number;
+
+    const discountIncoming = fromAny(
+      bodyRec["discount"],
+      bodyRec["discount_amount"]
+    );
+    if (discountIncoming !== undefined)
+      (known as Partial<UserRow>).discount = discountIncoming as number;
+
+    const paymentTypeIncoming = fromAny(
+      bodyRec["paymentType"],
+      bodyRec["payment_type"]
+    );
+    if (paymentTypeIncoming !== undefined)
+      (known as Partial<UserRow>).payment_type = paymentTypeIncoming as string;
+
+    const totalPayableIncoming = fromAny(
+      bodyRec["totalPayable"],
+      bodyRec["total_payable"]
+    );
+    if (totalPayableIncoming !== undefined)
+      (known as Partial<UserRow>).total_payable =
+        totalPayableIncoming as number;
+
+    // Prepare application JSON merge
+    const applicationFromBody =
+      bodyRec["application"] && typeof bodyRec["application"] === "object"
+        ? (bodyRec["application"] as Record<string, unknown>)
+        : {};
+
+    // Extract education section from application payload
+    const educationSection: Record<string, unknown> | undefined =
+      applicationFromBody &&
+      typeof (applicationFromBody as Record<string, unknown>)["education"] ===
+        "object"
+        ? ((applicationFromBody as Record<string, unknown>)[
+            "education"
+          ] as Record<string, unknown>)
+        : undefined;
+
+    // Helper to parse academic-year-like values to a start-year integer
+    const parseStartYear = (val: unknown): number | undefined => {
+      if (typeof val === "number" && Number.isFinite(val)) return val;
+      if (typeof val === "string") {
+        const m = val.match(/(\d{4})/);
+        if (m) return Number(m[1]);
+      }
+      return undefined;
+    };
+
+    // Map education fields to dedicated columns, respecting education_type
+    const educationType = (known as Partial<UserRow>).education_type as
+      | string
+      | undefined;
+    if (educationType && educationSection) {
+      // Common field
+      const nataAttempt = parseStartYear(educationSection["nataAttemptYear"]);
+      if (nataAttempt !== undefined)
+        (known as Partial<UserRow>).nata_attempt_year = nataAttempt;
+
+      // Clear all specific columns first, then set per type to prevent stale data
+      (known as Partial<UserRow>).school_std = null;
+      (known as Partial<UserRow>).board = null;
+      (known as Partial<UserRow>).board_year = null;
+      (known as Partial<UserRow>).school_name = null;
+      (known as Partial<UserRow>).college_name = null;
+      (known as Partial<UserRow>).college_year = null;
+      (known as Partial<UserRow>).diploma_course = null;
+      (known as Partial<UserRow>).diploma_year = null;
+      (known as Partial<UserRow>).diploma_college = null;
+      (known as Partial<UserRow>).other_description = null;
+
+      if (educationType === "school") {
+        if (typeof educationSection["schoolStd"] === "string")
+          (known as Partial<UserRow>).school_std = educationSection[
+            "schoolStd"
+          ] as string;
+        if (typeof educationSection["board"] === "string")
+          (known as Partial<UserRow>).board = educationSection[
+            "board"
+          ] as string;
+        const by = parseStartYear(educationSection["boardYear"]);
+        if (by !== undefined) (known as Partial<UserRow>).board_year = by;
+        if (typeof educationSection["schoolName"] === "string")
+          (known as Partial<UserRow>).school_name = educationSection[
+            "schoolName"
+          ] as string;
+      } else if (educationType === "college") {
+        if (typeof educationSection["collegeName"] === "string")
+          (known as Partial<UserRow>).college_name = educationSection[
+            "collegeName"
+          ] as string;
+        if (typeof educationSection["collegeYear"] === "string")
+          (known as Partial<UserRow>).college_year = educationSection[
+            "collegeYear"
+          ] as string;
+      } else if (educationType === "diploma") {
+        if (typeof educationSection["diplomaCourse"] === "string")
+          (known as Partial<UserRow>).diploma_course = educationSection[
+            "diplomaCourse"
+          ] as string;
+        if (typeof educationSection["diplomaYear"] === "string")
+          (known as Partial<UserRow>).diploma_year = educationSection[
+            "diplomaYear"
+          ] as string;
+        if (typeof educationSection["diplomaCollege"] === "string")
+          (known as Partial<UserRow>).diploma_college = educationSection[
+            "diplomaCollege"
+          ] as string;
+      } else if (educationType === "other") {
+        if (typeof educationSection["otherDescription"] === "string")
+          (known as Partial<UserRow>).other_description = educationSection[
+            "otherDescription"
+          ] as string;
+      }
+    }
 
     // 1) try find existing user by phone
     const { data: existing, error: selectError } = await supabaseServer
@@ -113,14 +383,35 @@ export async function POST(req: Request) {
       );
     }
 
-    let user: any = null;
+    let user: UserRow | null = null;
 
-    if (existing) {
-      // update existing row -> set firebase_uid (if different) and update provided fields
-      const updateObj: Record<string, any> = { ...known };
+    const existingRow = existing as unknown as UserRow | null;
+    if (existingRow) {
+      // update existing row -> update provided fields
+      const updateObj: Partial<UserRow> & Record<string, unknown> = {
+        ...known,
+      };
+      // ensure we control profile explicitly
+      delete (updateObj as Record<string, unknown>)["profile"];
+      // do not attempt to change primary key id on update
+      delete (updateObj as Record<string, unknown>)["id"];
       // merge extra into profile column
-      updateObj.profile = existing.profile || {} || {};
-      updateObj.profile = { ...updateObj.profile, ...extra };
+      const currentProfile: Record<string, unknown> =
+        (existingRow.profile as Record<string, unknown>) || {};
+      (updateObj as Partial<UserRow>).profile = {
+        ...currentProfile,
+        ...extra,
+      } as Record<string, unknown>;
+
+      // Merge application JSON if provided
+      const currentApp: Record<string, unknown> =
+        (existingRow.application as Record<string, unknown>) || {};
+      if (Object.keys(applicationFromBody).length > 0) {
+        (updateObj as Partial<UserRow>).application = {
+          ...currentApp,
+          ...applicationFromBody,
+        } as Record<string, unknown>;
+      }
 
       const { data: updated, error: updateError } = await supabaseServer
         .from("users")
@@ -139,9 +430,24 @@ export async function POST(req: Request) {
       user = updated;
     } else {
       // insert new row
-      const insertObj: Record<string, any> = { ...known };
-      insertObj.profile = { ...extra };
-      insertObj.created_at = body.createdAt || new Date().toISOString();
+      const insertObj: Partial<UserRow> & Record<string, unknown> = {
+        ...known,
+      };
+      // allow database default to generate UUID id
+      (insertObj as Partial<UserRow>).profile = { ...extra } as Record<
+        string,
+        unknown
+      >;
+      // application JSON on insert
+      if (Object.keys(applicationFromBody).length > 0) {
+        (insertObj as Partial<UserRow>).application = {
+          ...applicationFromBody,
+        } as Record<string, unknown>;
+      }
+
+      (insertObj as Partial<UserRow>).created_at =
+        ((body as Record<string, unknown>).createdAt as string) ||
+        new Date().toISOString();
 
       const { data: inserted, error: insertError } = await supabaseServer
         .from("users")

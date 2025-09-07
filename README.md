@@ -14,6 +14,17 @@ pnpm dev
 bun dev
 ```
 
+### Supabase schema
+
+- SQL migrations live in `supabase_migrations/`.
+- Apply them in your Supabase project by pasting the SQL into the SQL editor in the Dashboard (in order), or use the Supabase CLI if configured.
+- Make sure `public.users` has these columns used by the app:
+  - id text PRIMARY KEY (default gen_random_uuid())
+  - firebase_uid text
+  - phone text UNIQUE
+  - email text UNIQUE
+  - display_name text, profile jsonb, application jsonb, etc.
+
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
