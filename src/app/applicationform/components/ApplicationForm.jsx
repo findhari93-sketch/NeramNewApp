@@ -1,10 +1,13 @@
 "use client";
 import React, { useState, useRef } from "react";
-import StepBasic from "./StepBasic";
-import StepCourse from "./StepCourse";
-import StepEdu from "./StepEdu";
-import StepReview from "./StepReview";
-import PhoneAuth from "./PhoneAuth";
+import { auth } from "../../../lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
+import StepBasic from "./Steps/StepBasic";
+import StepCourse from "./Steps/StepCourse";
+import StepEdu from "./Steps/StepEdu";
+import StepReview from "./Steps/StepReview";
+import StepPhoneVerify from "./Steps/StepPhoneVerify";
+import { saveApplicationStep } from "../../../lib/applicationAPI";
 
 // small constants used by fee logic
 const currentYear = new Date().getFullYear();
@@ -145,6 +148,57 @@ export default function ApplicationForm() {
     }
   };
 
+  // New function to save current application data to database
+  const saveToDatabase = async () => {
+    try {
+      const [form] = formState;
+      const [altPhone] = altPhoneState;
+      const [instagramId] = instagramIdState;
+      const [selectedLanguages] = selectedLanguagesState;
+      const [youtubeSubscribed] = youtubeSubscribedState;
+      const [selectedCourse] = selectedCourseState;
+      const [educationType] = educationTypeState;
+      const [schoolStd] = schoolStdState;
+      const [collegeName] = collegeNameState;
+      const [collegeYear] = collegeYearState;
+      const [diplomaCourse] = diplomaCourseState;
+      const [diplomaYear] = diplomaYearState;
+      const [diplomaCollege] = diplomaCollegeState;
+      const [otherDescription] = otherDescriptionState;
+      const [softwareCourse] = softwareCourseState;
+      const [verifiedPhone] = verifiedPhoneState;
+
+      const stepData = {
+        form,
+        altPhone,
+        instagramId,
+        selectedLanguages,
+        youtubeSubscribed,
+        selectedCourse,
+        educationType,
+        schoolStd,
+        collegeName,
+        collegeYear,
+        diplomaCourse,
+        diplomaYear,
+        diplomaCollege,
+        otherDescription,
+        softwareCourse,
+        verifiedPhone,
+      };
+
+      const result = await saveApplicationStep(stepData);
+      if (!result.ok) {
+        console.error("Failed to save to database:", result.error);
+        // Could show user notification here if needed
+      }
+      return result;
+    } catch (err) {
+      console.error("Error saving to database:", err);
+      return { ok: false, error: String(err) };
+    }
+  };
+
   // cycle helpers copied from StepBasic
   const cycleStandard = (dir) => {
     const [schoolStd, setSchoolStd] = schoolStdState;
@@ -170,6 +224,65 @@ export default function ApplicationForm() {
   // Orchestrate steps here using currentStepState
   const [currentStep, setCurrentStep] = currentStepState;
   const [verifiedPhone, setVerifiedPhone] = verifiedPhoneState;
+
+  // If user is already authenticated via Firebase, skip phone verification step
+  React.useEffect(() => {
+    try {
+      const current = auth.currentUser;
+      if (current) {
+        // mark verifiedPhone if available and advance to step 2
+        setVerifiedPhone(current.phoneNumber || verifiedPhone || null);
+        setCurrentStep(2);
+      }
+    } catch {}
+
+    const unsub = onAuthStateChanged(auth, (u) => {
+      try {
+        if (u) {
+          setVerifiedPhone(u.phoneNumber || verifiedPhone || null);
+          setCurrentStep(2);
+        }
+      } catch {}
+    });
+    return () => unsub && unsub();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Initialize studentName from authenticated user's displayName when no draft loaded
+  React.useEffect(() => {
+    try {
+      const [draftLoaded] = draftLoadedState;
+      const [, setForm] = formState;
+      const current = auth.currentUser;
+      if (current && !draftLoaded) {
+        setForm((prev) => ({
+          ...(prev || {}),
+          studentName: current.displayName || "",
+        }));
+      }
+    } catch {}
+
+    const unsub2 = onAuthStateChanged(auth, (u) => {
+      try {
+        const [draftLoaded] = draftLoadedState;
+        const [, setForm] = formState;
+        if (u && !draftLoaded) {
+          setForm((prev) => ({
+            ...(prev || {}),
+            studentName: u.displayName || "",
+          }));
+        }
+      } catch {}
+    });
+    return () => unsub2 && unsub2();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // If we know a phone is already verified (from localStorage), skip step 1
+  React.useEffect(() => {
+    if (verifiedPhone) setCurrentStep(2);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [verifiedPhone]);
 
   // extract primitives/setters for StepBasic props
   const [form] = formState;
@@ -200,6 +313,10 @@ export default function ApplicationForm() {
   const [softwareCourse, setSoftwareCourse] = softwareCourseState;
   const [, setForm] = formState;
 
+  const [hoveredKey, setHoveredKey] = hoveredKeyState;
+  const [reviewMode, setReviewMode] = reviewModeState;
+  const [editField, setEditField] = editFieldState;
+
   // option lists used by StepEdu
   const standardOptions = ["Below 10th", "10th", "11th", "12th"];
   const diplomaYearOptions = [
@@ -209,6 +326,133 @@ export default function ApplicationForm() {
     "Completed",
   ];
 
+  // Auto-load draft from localStorage on mount so user data survives refresh
+  const saveTimerRef = React.useRef(null);
+  React.useEffect(() => {
+    try {
+      const raw = localStorage.getItem("neram_application_draft_v1");
+      if (raw) {
+        const payload = JSON.parse(raw);
+        const [, setFormLocal] = formState;
+        const [, setAltPhoneLocal] = altPhoneState;
+        const [, setInstagramLocal] = instagramIdState;
+        const [, setSelectedLanguagesLocal] = selectedLanguagesState;
+        const [, setYoutubeSubscribedLocal] = youtubeSubscribedState;
+        const [, setSelectedCourseLocal] = selectedCourseState;
+        const [, setEducationTypeLocal] = educationTypeState;
+        const [, setSchoolStdLocal] = schoolStdState;
+        const [, setCollegeNameLocal] = collegeNameState;
+        const [, setCollegeYearLocal] = collegeYearState;
+        const [, setDiplomaCourseLocal] = diplomaCourseState;
+        const [, setDiplomaYearLocal] = diplomaYearState;
+        const [, setDiplomaCollegeLocal] = diplomaCollegeState;
+        const [, setOtherDescriptionLocal] = otherDescriptionState;
+        const [, setSoftwareCourseLocal] = softwareCourseState;
+        if (payload.form) setFormLocal(payload.form);
+        if (payload.altPhone) setAltPhoneLocal(payload.altPhone);
+        if (payload.instagramId) setInstagramLocal(payload.instagramId);
+        if (payload.selectedLanguages)
+          setSelectedLanguagesLocal(payload.selectedLanguages);
+        if (typeof payload.youtubeSubscribed !== "undefined")
+          setYoutubeSubscribedLocal(payload.youtubeSubscribed);
+        if (payload.selectedCourse)
+          setSelectedCourseLocal(payload.selectedCourse);
+        if (payload.educationType) setEducationTypeLocal(payload.educationType);
+        if (payload.schoolStd) setSchoolStdLocal(payload.schoolStd);
+        if (payload.collegeName) setCollegeNameLocal(payload.collegeName);
+        if (payload.collegeYear) setCollegeYearLocal(payload.collegeYear);
+        if (payload.diplomaCourse) setDiplomaCourseLocal(payload.diplomaCourse);
+        if (payload.diplomaYear) setDiplomaYearLocal(payload.diplomaYear);
+        if (payload.diplomaCollege)
+          setDiplomaCollegeLocal(payload.diplomaCollege);
+        if (payload.otherDescription)
+          setOtherDescriptionLocal(payload.otherDescription);
+        if (payload.softwareCourse)
+          setSoftwareCourseLocal(payload.softwareCourse);
+        const [, setDraftLoaded] = draftLoadedState;
+        setDraftLoaded(true);
+      }
+    } catch (err) {
+      // ignore parse errors
+    }
+    // run once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Auto-save (debounced) — write a compact payload to localStorage
+  React.useEffect(() => {
+    try {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = setTimeout(() => {
+        try {
+          const [formVal] = formState;
+          const [altPhoneVal] = altPhoneState;
+          const [instagramVal] = instagramIdState;
+          const [selectedLanguagesVal] = selectedLanguagesState;
+          const [youtubeSubscribedValLocal] = youtubeSubscribedState;
+          const [selectedCourseVal] = selectedCourseState;
+          const [educationTypeVal] = educationTypeState;
+          const [schoolStdVal] = schoolStdState;
+          const [collegeNameVal] = collegeNameState;
+          const [collegeYearVal] = collegeYearState;
+          const [diplomaCourseVal] = diplomaCourseState;
+          const [diplomaYearVal] = diplomaYearState;
+          const [diplomaCollegeVal] = diplomaCollegeState;
+          const [otherDescriptionVal] = otherDescriptionState;
+          const [softwareCourseVal] = softwareCourseState;
+
+          const payload = {
+            form: formVal || {},
+            altPhone: altPhoneVal || "",
+            instagramId: instagramVal || "",
+            selectedLanguages: selectedLanguagesVal || [],
+            youtubeSubscribed: youtubeSubscribedValLocal || false,
+            selectedCourse: selectedCourseVal || "nata-jee",
+            educationType: educationTypeVal || "school",
+            schoolStd: schoolStdVal,
+            collegeName: collegeNameVal,
+            collegeYear: collegeYearVal,
+            diplomaCourse: diplomaCourseVal,
+            diplomaYear: diplomaYearVal,
+            diplomaCollege: diplomaCollegeVal,
+            otherDescription: otherDescriptionVal,
+            softwareCourse: softwareCourseVal,
+          };
+
+          localStorage.setItem(
+            "neram_application_draft_v1",
+            JSON.stringify(payload)
+          );
+        } catch (err) {
+          // ignore
+        }
+      }, 700);
+    } catch (err) {}
+    return () => {
+      try {
+        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      } catch {}
+    };
+    // watch all lifted primitives
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    formState,
+    altPhoneState,
+    instagramIdState,
+    selectedLanguagesState,
+    youtubeSubscribedState,
+    selectedCourseState,
+    educationTypeState,
+    schoolStdState,
+    collegeNameState,
+    collegeYearState,
+    diplomaCourseState,
+    diplomaYearState,
+    diplomaCollegeState,
+    otherDescriptionState,
+    softwareCourseState,
+  ]);
+
   return (
     <div>
       <h1 style={{ textAlign: "center", color: "#7c1fa0" }}>
@@ -216,36 +460,19 @@ export default function ApplicationForm() {
       </h1>
 
       {currentStep === 1 && (
-        <div style={{ maxWidth: 520, margin: 40 }}>
-          <PhoneAuth
-            initialPhone={phoneToEditState[0]}
-            onVerified={(p) => {
+        <StepPhoneVerify
+          initialPhone={phoneToEditState[0]}
+          onVerified={(p) => {
+            try {
+              setVerifiedPhone(p);
+              // clear phoneToEdit after successful verification
               try {
-                setVerifiedPhone(p);
-                // clear phoneToEdit after successful verification
-                try {
-                  phoneToEditState[1](null);
-                } catch {}
-                setCurrentStep(2);
+                phoneToEditState[1](null);
               } catch {}
-            }}
-          />
-          <div style={{ textAlign: "center", marginTop: 12 }}>
-            <button
-              type="button"
-              onClick={() => setCurrentStep(2)}
-              style={{
-                padding: "8px 14px",
-                borderRadius: 6,
-                border: "1px solid #ccc",
-                background: "#f3f3f3",
-                cursor: "pointer",
-              }}
-            >
-              Continue to application
-            </button>
-          </div>
-        </div>
+            } catch {}
+          }}
+          onContinue={() => setCurrentStep(2)}
+        />
       )}
 
       {currentStep === 2 && (
@@ -263,6 +490,7 @@ export default function ApplicationForm() {
           step2Errors={step2Errors}
           setStep2Errors={setStep2Errors}
           saveDraft={saveDraft}
+          saveToDatabase={saveToDatabase}
           validateStep2={validateStep2}
           handleChange={handleChange}
           handleSelectChange={handleSelectChange}
@@ -270,6 +498,7 @@ export default function ApplicationForm() {
           verifiedPhone={verifiedPhone}
           setVerifiedPhone={setVerifiedPhone}
           fieldRefs={fieldRefs}
+          editField={editField}
         />
       )}
 
@@ -305,6 +534,7 @@ export default function ApplicationForm() {
           setCurrentStep={setCurrentStep}
           validateStep2={validateStep2}
           saveDraft={saveDraft}
+          saveToDatabase={saveToDatabase}
           cycleDiplomaYear={cycleDiplomaYear}
         />
       )}
@@ -322,14 +552,48 @@ export default function ApplicationForm() {
           form={form}
           setForm={setForm}
           setCurrentStep={setCurrentStep}
+          saveToDatabase={saveToDatabase}
         />
       )}
 
       {currentStep === 5 && (
         <StepReview
-          formState={formState}
+          form={form}
           verifiedPhone={verifiedPhone}
+          altPhone={altPhone}
+          instagramId={instagramId}
+          educationType={educationType}
+          collegeName={collegeName}
+          collegeYear={collegeYear}
+          diplomaCourse={diplomaCourse}
+          diplomaYear={diplomaYear}
+          diplomaCollege={diplomaCollege}
+          otherDescription={otherDescription}
+          selectedLanguages={selectedLanguages}
+          selectedCourse={selectedCourse}
+          softwareCourse={softwareCourse}
+          hoveredKey={hoveredKey}
+          setHoveredKey={setHoveredKey}
+          setReviewMode={setReviewMode}
+          setEditField={setEditField}
           setCurrentStep={setCurrentStep}
+          saveToDatabase={saveToDatabase}
+          handleGoToStep={(stepIdx, fieldKey) => {
+            try {
+              // navigate to requested step
+              setCurrentStep(stepIdx);
+              // set parent editField so target step can enter edit mode
+              setEditField && setEditField(fieldKey || null);
+              // special-case phone: if navigating to phone verify (step 1) put phoneToEdit
+              if (stepIdx === 1 && fieldKey === "phone") {
+                try {
+                  phoneToEditState[1](form?.phone || null);
+                } catch {}
+              }
+            } catch (err) {
+              console.warn(err);
+            }
+          }}
         />
       )}
     </div>
