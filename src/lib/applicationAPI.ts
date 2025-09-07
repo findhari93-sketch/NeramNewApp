@@ -2,7 +2,7 @@
 import { auth } from "./firebase";
 
 interface ApplicationData {
-  form?: any;
+  form?: Record<string, unknown>;
   altPhone?: string;
   instagramId?: string;
   selectedLanguages?: string[];
@@ -24,6 +24,7 @@ export const saveApplicationStep = async (stepData: ApplicationData): Promise<{ 
   try {
     const user = auth.currentUser;
     if (!user) {
+      console.warn("User not authenticated, skipping database save");
       return { ok: false, error: "User not authenticated" };
     }
 
