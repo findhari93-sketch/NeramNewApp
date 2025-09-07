@@ -38,7 +38,9 @@ interface StepCourseProps {
   form: FormObj;
   setForm: (f: FormObj | ((prev?: FormObj) => FormObj)) => void;
   setCurrentStep: (n: number) => void;
-  saveToDatabase?: () => Promise<{ ok: boolean; error?: string }>;
+  saveToDatabase?: (
+    overrides?: Record<string, unknown>
+  ) => Promise<{ ok: boolean; error?: string }>;
   labelStyle?: React.CSSProperties;
 }
 
@@ -478,7 +480,16 @@ export default function StepCourse(props: StepCourseProps) {
           onClick={async () => {
             // Save to database before proceeding to review
             if (saveToDatabase) {
-              const result = await saveToDatabase();
+              const result = await saveToDatabase({
+                // Ensure payment-related fields are present in payload
+                form: {
+                  courseFee: inclusiveCourseFee,
+                  discount: savings,
+                  paymentType,
+                  totalPayable: displayInclusive,
+                },
+                selectedCourse,
+              });
               if (!result.ok) {
                 console.error("Failed to save step data:", result.error);
                 // Continue to review even if database save fails (data is in localStorage)

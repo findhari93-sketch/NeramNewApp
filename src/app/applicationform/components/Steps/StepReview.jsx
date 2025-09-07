@@ -79,6 +79,12 @@ export default function StepReview(props) {
     return y - 1;
   };
 
+  const formatAcademicYear = (start) => {
+    const s = Number(start) || getAcademicStartYear();
+    const end = (s + 1) % 100;
+    return `${s}-${String(end).padStart(2, "0")}`;
+  };
+
   const currentAcademicStart = getAcademicStartYear();
   const nataAttemptStart = Number(
     form?.nataAttemptYear ?? currentAcademicStart
@@ -141,6 +147,12 @@ export default function StepReview(props) {
             ["educationType", "Education (type)", educationLabel],
             ["paymentType", "Payment Type", form?.paymentType || "-"],
           ];
+          // Common attempt year across all education types
+          educationItems.push([
+            "nataAttemptYear",
+            "NATA/JEE attempt plan year",
+            formatAcademicYear(nataAttemptStart),
+          ]);
           if (educationType === "school") {
             educationItems.push([
               "classGrade",
@@ -359,7 +371,7 @@ export default function StepReview(props) {
               onClick={async (e) => {
                 e.preventDefault();
                 if (!agreed) return;
-                
+
                 // Save final application data to database
                 if (props.saveToDatabase) {
                   const result = await props.saveToDatabase();
@@ -371,7 +383,9 @@ export default function StepReview(props) {
                     console.error("Final submission failed:", result.error);
                   }
                 } else {
-                  alert("Application saved! (Database save function not available)");
+                  alert(
+                    "Application saved! (Database save function not available)"
+                  );
                 }
               }}
               style={{

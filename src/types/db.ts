@@ -1,8 +1,9 @@
 export type UserRow = {
   id?: string; // UUID primary key (as string)
+  firebase_uid?: string | null;
   phone?: string | null;
   email?: string | null;
-  display_name?: string | null;
+  student_name?: string | null;
   father_name?: string | null;
   gender?: string | null;
   zip_code?: string | null;
@@ -42,7 +43,7 @@ export type UserRow = {
 export type UserUpsertPayload = Partial<
   Pick<
     UserRow,
-    | "display_name"
+    | "student_name"
     | "father_name"
     | "gender"
     | "zip_code"

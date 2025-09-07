@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import supabaseServer from "../../../../lib/supabaseServer";
 import admin from "firebase-admin";
 import type { UserRow } from "../../../../types/db";
+import crypto from "crypto";
 
 // initialize firebase-admin with service account if not already
 if (!admin.apps.length) {
@@ -12,6 +13,27 @@ if (!admin.apps.length) {
       admin.initializeApp({ credential: admin.credential.cert(parsed) });
     } catch (e) {
       console.warn("Invalid FIREBASE_SERVICE_ACCOUNT_JSON", e);
+      // Fallback to discrete env vars if JSON parsing fails
+      const projectId = process.env.FIREBASE_PROJECT_ID;
+      const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+      let privateKey = process.env.FIREBASE_PRIVATE_KEY;
+      if (privateKey) privateKey = privateKey.replace(/\\n/g, "\n");
+      if (projectId && clientEmail && privateKey) {
+        try {
+          admin.initializeApp({
+            credential: admin.credential.cert({
+              projectId,
+              clientEmail,
+              privateKey,
+            }),
+          });
+        } catch (err) {
+          console.warn(
+            "Failed to init Firebase Admin from discrete envs after JSON parse error",
+            err
+          );
+        }
+      }
     }
   } else {
     const projectId = process.env.FIREBASE_PROJECT_ID;
@@ -69,6 +91,7 @@ export async function POST(req: Request) {
       );
     }
 
+    const firebaseUid = decoded.uid as string;
     const phone = (decoded.phone_number || null) as string | null;
     if (!phone) {
       return NextResponse.json(
@@ -109,10 +132,10 @@ export async function POST(req: Request) {
           ? ((body as Record<string, unknown>)["display_name"] as string)
           : null;
       const fromProfileDisplayName =
-        typeof (profileFromBody as Record<string, unknown>)["display_name"] ===
+        typeof (profileFromBody as Record<string, unknown>)["student_name"] ===
         "string"
           ? ((profileFromBody as Record<string, unknown>)[
-              "display_name"
+              "student_name"
             ] as string)
           : null;
       const fromProfileName =
@@ -122,12 +145,33 @@ export async function POST(req: Request) {
       return fromTop ?? fromProfileDisplayName ?? fromProfileName ?? null;
     })();
 
+    // derive sign-in context
+    const signInProvider: string | null = (() => {
+      try {
+        const fb = (
+          decoded as unknown as { firebase?: { sign_in_provider?: string } }
+        ).firebase;
+        if (fb && typeof fb.sign_in_provider === "string")
+          return fb.sign_in_provider;
+      } catch {}
+      return null;
+    })();
+    const lastSignInIso: string = (() => {
+      const t = (decoded as unknown as { auth_time?: number }).auth_time;
+      if (typeof t === "number" && Number.isFinite(t))
+        return new Date(t * 1000).toISOString();
+      return new Date().toISOString();
+    })();
+
     const known: Partial<UserRow> & Record<string, unknown> = {
+      firebase_uid: firebaseUid,
       phone,
       email: (decoded.email as string | undefined) ?? emailFromBody ?? null,
-      display_name:
+      student_name:
         (decoded.name as string | undefined) ?? displayNameFromBody ?? null,
-      last_sign_in: body.lastSignIn || null,
+      last_sign_in: lastSignInIso,
+      // tentative phone flag (may be further merged with existing row on update)
+      phone_auth_used: !!phone || signInProvider === "phone",
     };
 
     // pick other known profile fields if provided
@@ -301,15 +345,25 @@ export async function POST(req: Request) {
     };
 
     // Map education fields to dedicated columns, respecting education_type
-    const educationType = (known as Partial<UserRow>).education_type as
+    let educationType = (known as Partial<UserRow>).education_type as
       | string
       | undefined;
-    if (educationType && educationSection) {
-      // Common field
+    // If not provided at top-level, try to pick from the application section
+    if (!educationType && educationSection) {
+      const t = educationSection["educationType"];
+      if (typeof t === "string") {
+        educationType = t;
+        (known as Partial<UserRow>).education_type = t;
+      }
+    }
+    // Common field: record NATA attempt year if present even when type is undefined
+    if (educationSection) {
       const nataAttempt = parseStartYear(educationSection["nataAttemptYear"]);
-      if (nataAttempt !== undefined)
+      if (nataAttempt !== undefined) {
         (known as Partial<UserRow>).nata_attempt_year = nataAttempt;
-
+      }
+    }
+    if (educationType && educationSection) {
       // Clear all specific columns first, then set per type to prevent stale data
       (known as Partial<UserRow>).school_std = null;
       (known as Partial<UserRow>).board = null;
@@ -367,20 +421,50 @@ export async function POST(req: Request) {
       }
     }
 
-    // 1) try find existing user by phone
-    const { data: existing, error: selectError } = await supabaseServer
-      .from("users")
-      .select("*")
-      .eq("phone", phone)
-      .limit(1)
-      .maybeSingle();
+    // 1) try find existing user by firebase_uid, fallback to phone
+    let existing: UserRow | null = null;
+    let selectError: unknown = null;
+    if (firebaseUid) {
+      const r1 = await supabaseServer
+        .from("users")
+        .select("*")
+        .eq("firebase_uid", firebaseUid)
+        .limit(1)
+        .maybeSingle();
+      existing = (r1.data as unknown as UserRow) ?? null;
+      selectError = r1.error;
+      if (!selectError && !existing && phone) {
+        const r2 = await supabaseServer
+          .from("users")
+          .select("*")
+          .eq("phone", phone)
+          .limit(1)
+          .maybeSingle();
+        existing = (r2.data as unknown as UserRow) ?? null;
+        selectError = r2.error;
+      }
+    } else {
+      const r = await supabaseServer
+        .from("users")
+        .select("*")
+        .eq("phone", phone)
+        .limit(1)
+        .maybeSingle();
+      existing = (r.data as unknown as UserRow) ?? null;
+      selectError = r.error;
+    }
 
     if (selectError) {
       console.error("select error", selectError);
-      return NextResponse.json(
-        { ok: false, error: selectError.message },
-        { status: 500 }
-      );
+      const errMsg =
+        selectError &&
+        typeof selectError === "object" &&
+        "message" in selectError
+          ? String(
+              (selectError as { message?: unknown }).message || "select error"
+            )
+          : String(selectError);
+      return NextResponse.json({ ok: false, error: errMsg }, { status: 500 });
     }
 
     let user: UserRow | null = null;
@@ -413,10 +497,30 @@ export async function POST(req: Request) {
         } as Record<string, unknown>;
       }
 
-      const { data: updated, error: updateError } = await supabaseServer
-        .from("users")
-        .update(updateObj)
-        .eq("phone", phone)
+      // Merge providers: ensure we record current sign-in provider
+      const existingProviders = Array.isArray(existingRow.providers)
+        ? (existingRow.providers as unknown[])
+        : [];
+      const providerStrings = existingProviders.filter(
+        (v) => typeof v === "string"
+      ) as string[];
+      const provSet = new Set<string>(providerStrings);
+      if (signInProvider) provSet.add(signInProvider);
+      (updateObj as Partial<UserRow>).providers = Array.from(provSet);
+
+      // Preserve phone_auth_used once true
+      const alreadyPhone = Boolean(existingRow.phone_auth_used);
+      (updateObj as Partial<UserRow>).phone_auth_used =
+        alreadyPhone || !!phone || signInProvider === "phone";
+
+      // choose a stable filter for update
+      const updateQuery = supabaseServer.from("users").update(updateObj);
+      if (existingRow.firebase_uid) {
+        updateQuery.eq("firebase_uid", existingRow.firebase_uid);
+      } else {
+        updateQuery.eq("phone", phone);
+      }
+      const { data: updated, error: updateError } = await updateQuery
         .select()
         .maybeSingle();
 
@@ -433,7 +537,8 @@ export async function POST(req: Request) {
       const insertObj: Partial<UserRow> & Record<string, unknown> = {
         ...known,
       };
-      // allow database default to generate UUID id
+      // allow database default to generate UUID id; as a fallback, generate one here if needed
+      (insertObj as Partial<UserRow>).id = crypto.randomUUID();
       (insertObj as Partial<UserRow>).profile = { ...extra } as Record<
         string,
         unknown
@@ -448,6 +553,13 @@ export async function POST(req: Request) {
       (insertObj as Partial<UserRow>).created_at =
         ((body as Record<string, unknown>).createdAt as string) ||
         new Date().toISOString();
+
+      // Initialize providers and phone flag
+      (insertObj as Partial<UserRow>).providers = signInProvider
+        ? [signInProvider]
+        : [];
+      (insertObj as Partial<UserRow>).phone_auth_used =
+        !!phone || signInProvider === "phone";
 
       const { data: inserted, error: insertError } = await supabaseServer
         .from("users")

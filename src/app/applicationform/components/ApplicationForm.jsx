@@ -149,7 +149,7 @@ export default function ApplicationForm() {
   };
 
   // New function to save current application data to database (per step)
-  const saveToDatabase = async (step) => {
+  const saveToDatabase = async (step, overrides) => {
     try {
       const [form] = formState;
       const [altPhone] = altPhoneState;
@@ -168,7 +168,7 @@ export default function ApplicationForm() {
       const [softwareCourse] = softwareCourseState;
       const [verifiedPhone] = verifiedPhoneState;
 
-      const stepData = {
+      const baseStepData = {
         form,
         altPhone,
         instagramId,
@@ -185,6 +185,13 @@ export default function ApplicationForm() {
         otherDescription,
         softwareCourse,
         verifiedPhone,
+      };
+
+      // Apply optional overrides (e.g., computed payment fields from StepCourse)
+      const stepData = {
+        ...baseStepData,
+        ...(overrides || {}),
+        form: { ...(baseStepData.form || {}), ...(overrides?.form || {}) },
       };
 
       const result = await saveApplicationStep(step, stepData);
@@ -552,7 +559,7 @@ export default function ApplicationForm() {
           form={form}
           setForm={setForm}
           setCurrentStep={setCurrentStep}
-          saveToDatabase={() => saveToDatabase("course")}
+          saveToDatabase={(overrides) => saveToDatabase("course", overrides)}
         />
       )}
 
@@ -577,7 +584,7 @@ export default function ApplicationForm() {
           setReviewMode={setReviewMode}
           setEditField={setEditField}
           setCurrentStep={setCurrentStep}
-          saveToDatabase={() => saveToDatabase("course")}
+          saveToDatabase={(overrides) => saveToDatabase("course", overrides)}
           handleGoToStep={(stepIdx, fieldKey) => {
             try {
               // navigate to requested step
