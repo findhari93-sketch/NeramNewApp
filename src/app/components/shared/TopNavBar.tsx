@@ -37,14 +37,23 @@ export default function TopNavBar() {
   React.useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
       if (!u) return setUserLabel(null);
-      // Prefer displayName -> email. Do not fall back to phone number for display.
+      // Prefer displayName -> email -> phone, so phone users are treated as logged in.
       const asObj = u as unknown as Record<string, unknown>;
       const displayName =
         typeof asObj.displayName === "string" && asObj.displayName
           ? (asObj.displayName as string)
           : null;
       const email = typeof asObj.email === "string" ? asObj.email : null;
-      setUserLabel((displayName as string) || (email as string) || null);
+      const phone =
+        typeof asObj.phoneNumber === "string"
+          ? (asObj.phoneNumber as string)
+          : null;
+      setUserLabel(
+        (displayName as string) ||
+          (email as string) ||
+          (phone as string) ||
+          null
+      );
     });
     return () => unsub();
   }, []);
@@ -137,11 +146,22 @@ export default function TopNavBar() {
           </List>
           <Divider />
           <Box sx={{ p: 2 }}>
-            <Link href="/auth/login" style={{ textDecoration: "none" }}>
-              <Button variant="contained" fullWidth>
-                Log in / Sign up
-              </Button>
-            </Link>
+            {userLabel ? (
+              <Link
+                href="/profile"
+                style={{ textDecoration: "none", width: "100%" }}
+              >
+                <Button variant="contained" fullWidth>
+                  Go to Profile
+                </Button>
+              </Link>
+            ) : (
+              <Link href="/auth/login" style={{ textDecoration: "none" }}>
+                <Button variant="contained" fullWidth>
+                  Log in / Sign up
+                </Button>
+              </Link>
+            )}
           </Box>
         </Box>
       </Drawer>

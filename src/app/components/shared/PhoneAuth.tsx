@@ -138,7 +138,10 @@ export default function PhoneAuth({
           );
         } catch {}
         resetVerifier();
-        throw err;
+        // Never rethrow a non-Error value to avoid `Runtime Error: null/undefined` in Next.js dev overlay
+        throw err instanceof Error
+          ? err
+          : new Error(String(err ?? "unknown error"));
       }
     }
     return verifierRef.current!;

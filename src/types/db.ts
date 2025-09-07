@@ -1,6 +1,5 @@
 export type UserRow = {
-  id?: string; // database PK (could be uuid or text)
-  firebase_uid?: string | null;
+  id?: string; // UUID primary key (as string)
   phone?: string | null;
   email?: string | null;
   display_name?: string | null;
@@ -13,6 +12,18 @@ export type UserRow = {
   instagram_handle?: string | null;
   education_type?: string | null;
   selected_course?: string | null;
+  // Education details (dedicated columns)
+  nata_attempt_year?: number | null;
+  school_std?: string | null;
+  board?: string | null;
+  board_year?: number | null;
+  school_name?: string | null;
+  college_name?: string | null;
+  college_year?: string | null;
+  diploma_course?: string | null;
+  diploma_year?: string | null;
+  diploma_college?: string | null;
+  other_description?: string | null;
   course_fee?: number | null;
   discount?: number | null;
   payment_type?: string | null;
@@ -42,6 +53,17 @@ export type UserUpsertPayload = Partial<
     | "instagram_handle"
     | "education_type"
     | "selected_course"
+    | "nata_attempt_year"
+    | "school_std"
+    | "board"
+    | "board_year"
+    | "school_name"
+    | "college_name"
+    | "college_year"
+    | "diploma_course"
+    | "diploma_year"
+    | "diploma_college"
+    | "other_description"
   >
 > & { [key: string]: unknown };
 

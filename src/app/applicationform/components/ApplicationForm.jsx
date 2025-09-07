@@ -148,8 +148,8 @@ export default function ApplicationForm() {
     }
   };
 
-  // New function to save current application data to database
-  const saveToDatabase = async () => {
+  // New function to save current application data to database (per step)
+  const saveToDatabase = async (step) => {
     try {
       const [form] = formState;
       const [altPhone] = altPhoneState;
@@ -187,7 +187,7 @@ export default function ApplicationForm() {
         verifiedPhone,
       };
 
-      const result = await saveApplicationStep(stepData);
+      const result = await saveApplicationStep(step, stepData);
       if (!result.ok) {
         console.error("Failed to save to database:", result.error);
         // Could show user notification here if needed
@@ -490,7 +490,7 @@ export default function ApplicationForm() {
           step2Errors={step2Errors}
           setStep2Errors={setStep2Errors}
           saveDraft={saveDraft}
-          saveToDatabase={saveToDatabase}
+          saveToDatabase={() => saveToDatabase("basic")}
           validateStep2={validateStep2}
           handleChange={handleChange}
           handleSelectChange={handleSelectChange}
@@ -534,7 +534,7 @@ export default function ApplicationForm() {
           setCurrentStep={setCurrentStep}
           validateStep2={validateStep2}
           saveDraft={saveDraft}
-          saveToDatabase={saveToDatabase}
+          saveToDatabase={() => saveToDatabase("education")}
           cycleDiplomaYear={cycleDiplomaYear}
         />
       )}
@@ -552,7 +552,7 @@ export default function ApplicationForm() {
           form={form}
           setForm={setForm}
           setCurrentStep={setCurrentStep}
-          saveToDatabase={saveToDatabase}
+          saveToDatabase={() => saveToDatabase("course")}
         />
       )}
 
@@ -577,7 +577,7 @@ export default function ApplicationForm() {
           setReviewMode={setReviewMode}
           setEditField={setEditField}
           setCurrentStep={setCurrentStep}
-          saveToDatabase={saveToDatabase}
+          saveToDatabase={() => saveToDatabase("course")}
           handleGoToStep={(stepIdx, fieldKey) => {
             try {
               // navigate to requested step
