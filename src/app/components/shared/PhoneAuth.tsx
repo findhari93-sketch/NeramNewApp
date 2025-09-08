@@ -5,6 +5,7 @@ import "react-phone-input-2/lib/style.css";
 import { auth } from "../../../lib/firebase";
 // client Supabase no longer used for persisting user; we call server upsert instead
 import saveUserProfile from "../../../lib/saveUserProfile";
+import apiClient from "../../../lib/apiClient";
 import {
   RecaptchaVerifier,
   signInWithPhoneNumber,
@@ -240,6 +241,17 @@ export default function PhoneAuth({
 
       // Persist user to database via secure server route (uses service role)
       try {
+        // Create/ensure user row with just phone + firebase uid
+        const current = auth.currentUser;
+        await apiClient("/api/users/upsert", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            // seed name if available to populate student_name early
+            displayName: current?.displayName || undefined,
+          }),
+        });
+        // Also persist the phone into profile for completeness
         await saveUserProfile({ phone: stored });
       } catch (persistErr) {
         console.warn("Server upsert failed:", persistErr);

@@ -14,7 +14,8 @@ export type UserRow = {
   education_type?: string | null;
   selected_course?: string | null;
   // Education details (dedicated columns)
-  nata_attempt_year?: number | null;
+  // Now stored as an academic-year label (e.g., "2025-26")
+  nata_attempt_year?: string | null;
   school_std?: string | null;
   board?: string | null;
   board_year?: number | null;
