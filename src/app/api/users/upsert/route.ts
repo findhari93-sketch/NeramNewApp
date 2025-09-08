@@ -167,12 +167,19 @@ export async function POST(req: Request) {
       firebase_uid: firebaseUid,
       phone,
       email: (decoded.email as string | undefined) ?? emailFromBody ?? null,
-      student_name:
-        (decoded.name as string | undefined) ?? displayNameFromBody ?? null,
       last_sign_in: lastSignInIso,
       // tentative phone flag (may be further merged with existing row on update)
       phone_auth_used: !!phone || signInProvider === "phone",
     };
+
+    // Only set student_name when a non-empty value is provided to avoid wiping it on unrelated updates.
+    // Prefer an explicit name from the request body over the token's display name.
+    const nameFromToken =
+      typeof decoded.name === "string" ? (decoded.name as string) : null;
+    const candidateName = (displayNameFromBody || nameFromToken || "").trim();
+    if (candidateName.length > 0) {
+      (known as Partial<UserRow>).student_name = candidateName;
+    }
 
     // pick other known profile fields if provided
     const fieldMap: Record<string, string> = {
@@ -343,6 +350,15 @@ export async function POST(req: Request) {
       }
       return undefined;
     };
+    // Build academic-year label from start year (e.g., 2025 -> "2025-26")
+    const toAcademicLabel = (
+      startYear: number | undefined
+    ): string | undefined => {
+      if (typeof startYear !== "number" || !Number.isFinite(startYear))
+        return undefined;
+      const yy = String((startYear + 1) % 100).padStart(2, "0");
+      return `${startYear}-${yy}`;
+    };
 
     // Map education fields to dedicated columns, respecting education_type
     let educationType = (known as Partial<UserRow>).education_type as
@@ -356,12 +372,12 @@ export async function POST(req: Request) {
         (known as Partial<UserRow>).education_type = t;
       }
     }
-    // Common field: record NATA attempt year if present even when type is undefined
+    // Common field: record NATA attempt label if present even when type is undefined
     if (educationSection) {
       const nataAttempt = parseStartYear(educationSection["nataAttemptYear"]);
-      if (nataAttempt !== undefined) {
-        (known as Partial<UserRow>).nata_attempt_year = nataAttempt;
-      }
+      const label = toAcademicLabel(nataAttempt);
+      if (label !== undefined)
+        (known as Partial<UserRow>).nata_attempt_year = label;
     }
     if (educationType && educationSection) {
       // Clear all specific columns first, then set per type to prevent stale data

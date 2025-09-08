@@ -14,6 +14,8 @@ import InputLabel from "@mui/material/InputLabel";
 import InputAdornment from "@mui/material/InputAdornment";
 import IconButton from "@mui/material/IconButton";
 import StepHeader from "../ui/TitleWsteps";
+import { auth } from "../../../../lib/firebase";
+import { updateProfile } from "firebase/auth";
 
 type FormData = {
   studentName?: string;
@@ -254,6 +256,31 @@ export default function StepBasic(props: StepBasicProps) {
             label="Student Name"
             value={form.studentName || ""}
             onChange={handleChange}
+            onBlur={async () => {
+              // Auto-save student name when the field loses focus
+              try {
+                const trimmed = String(form.studentName || "").trim();
+                if (trimmed && auth.currentUser) {
+                  const currentDisplay = auth.currentUser.displayName || "";
+                  // If displayName is missing or equals phone, set it to the provided name
+                  if (
+                    !currentDisplay ||
+                    currentDisplay === (auth.currentUser.phoneNumber || "") ||
+                    currentDisplay !== trimmed
+                  ) {
+                    try {
+                      await updateProfile(auth.currentUser, {
+                        displayName: trimmed,
+                      });
+                    } catch (e) {
+                      // non-fatal: proceed to DB save even if displayName update failed
+                      console.warn("updateProfile failed", e);
+                    }
+                  }
+                }
+                if (saveToDatabase) await saveToDatabase();
+              } catch {}
+            }}
             sx={{ flex: 1, "& .MuiFormHelperText-root": { minHeight: 20 } }}
             error={!!step2Errors.studentName}
             helperText={step2Errors.studentName ? "Required" : ""}
