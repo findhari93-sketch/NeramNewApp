@@ -7,6 +7,11 @@ import Divider from "@mui/material/Divider";
 import Stack from "@mui/material/Stack";
 import Alert from "@mui/material/Alert";
 import CircularProgress from "@mui/material/CircularProgress";
+import TextField from "@mui/material/TextField";
+import InputAdornment from "@mui/material/InputAdornment";
+import IconButton from "@mui/material/IconButton";
+import Visibility from "@mui/icons-material/Visibility";
+import VisibilityOff from "@mui/icons-material/VisibilityOff";
 import PhoneAuth from "../../components/shared/PhoneAuth";
 import TopNavBar from "../../components/shared/TopNavBar";
 import { useRouter } from "next/navigation";
@@ -17,6 +22,8 @@ import {
   signOut,
   onAuthStateChanged,
 } from "firebase/auth";
+import { signInWithEmailOrUsername } from "../../../lib/auth/firebaseAuth";
+import { signInSchema } from "../../../lib/auth/validation";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -173,6 +180,127 @@ export default function LoginPage() {
     setFirebaseUser(null);
   };
 
+  // Email/Password Auth Component
+  const EmailPasswordAuth = () => {
+    const [emailPasswordForm, setEmailPasswordForm] = useState({
+      identifier: "",
+      password: "",
+    });
+    const [emailPasswordLoading, setEmailPasswordLoading] = useState(false);
+    const [emailPasswordError, setEmailPasswordError] = useState<string | null>(null);
+    const [showPassword, setShowPassword] = useState(false);
+
+    const handleEmailPasswordSignIn = async (e: React.FormEvent) => {
+      e.preventDefault();
+      setEmailPasswordLoading(true);
+      setEmailPasswordError(null);
+
+      try {
+        const validation = signInSchema.safeParse(emailPasswordForm);
+        if (!validation.success) {
+          throw new Error(validation.error.errors[0].message);
+        }
+
+        await signInWithEmailOrUsername(
+          emailPasswordForm.identifier,
+          emailPasswordForm.password
+        );
+
+        // Success - redirect to home
+        router.replace("/?notice=login_success");
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : "Sign in failed";
+        setEmailPasswordError(message);
+      } finally {
+        setEmailPasswordLoading(false);
+      }
+    };
+
+    const isPhoneNumber = (value: string) => {
+      return /^\+?\d[\d\s\-\(\)]+$/.test(value.trim());
+    };
+
+    return (
+      <Box>
+        <Typography variant="subtitle1" sx={{ mb: 2 }}>
+          Sign in with email or username
+        </Typography>
+        <Box
+          component="form"
+          onSubmit={handleEmailPasswordSignIn}
+          sx={{ display: "flex", flexDirection: "column", gap: 2 }}
+        >
+          <TextField
+            label="Email or Username"
+            value={emailPasswordForm.identifier}
+            onChange={(e) =>
+              setEmailPasswordForm((prev) => ({
+                ...prev,
+                identifier: e.target.value,
+              }))
+            }
+            fullWidth
+            required
+            helperText={
+              emailPasswordForm.identifier &&
+              isPhoneNumber(emailPasswordForm.identifier)
+                ? "Phone number detected - use phone OTP option below"
+                : ""
+            }
+          />
+          <TextField
+            label="Password"
+            type={showPassword ? "text" : "password"}
+            value={emailPasswordForm.password}
+            onChange={(e) =>
+              setEmailPasswordForm((prev) => ({
+                ...prev,
+                password: e.target.value,
+              }))
+            }
+            fullWidth
+            required
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    onClick={() => setShowPassword(!showPassword)}
+                    edge="end"
+                  >
+                    {showPassword ? <VisibilityOff /> : <Visibility />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
+          />
+          <Button
+            type="submit"
+            variant="contained"
+            disabled={emailPasswordLoading}
+            fullWidth
+          >
+            {emailPasswordLoading ? (
+              <CircularProgress size={20} />
+            ) : (
+              "Sign In"
+            )}
+          </Button>
+          {emailPasswordError && (
+            <Alert severity="error">{emailPasswordError}</Alert>
+          )}
+          <Button
+            variant="text"
+            size="small"
+            onClick={() => router.push("/account")}
+            sx={{ alignSelf: "center" }}
+          >
+            Forgot password?
+          </Button>
+        </Box>
+      </Box>
+    );
+  };
+
   return (
     <>
       <TopNavBar />
@@ -214,6 +342,10 @@ export default function LoginPage() {
           <Button variant="outlined" onClick={linkedInSignIn}>
             Continue with LinkedIn
           </Button>
+
+          <Divider>OR</Divider>
+
+          <EmailPasswordAuth />
 
           <Divider>OR</Divider>
 
