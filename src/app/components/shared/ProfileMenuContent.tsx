@@ -37,11 +37,13 @@ export default function ProfileMenuContent({
   onSignOut,
   onClose,
 }: Props) {
-  const color = useAvatarColor(user?.name);
+  const color = useAvatarColor(user?.name ?? undefined);
   const avatar = user?.avatarUrl ? (
     <Avatar src={user.avatarUrl} alt={user?.name ?? "user"} />
   ) : (
-    <Avatar sx={{ bgcolor: color }}>{initialsForName(user?.name)}</Avatar>
+    <Avatar sx={{ bgcolor: color }}>
+      {initialsForName(user?.name ?? undefined)}
+    </Avatar>
   );
 
   const handleLogout = async () => {

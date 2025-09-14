@@ -6,7 +6,6 @@ import ButtonBase from "@mui/material/ButtonBase";
 import Typography from "@mui/material/Typography";
 import Popover from "@mui/material/Popover";
 import Skeleton from "@mui/material/Skeleton";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import useAvatarColor from "./useAvatarColor";
 import ProfileMenuContent from "./ProfileMenuContent";
 import { useRouter } from "next/navigation";
@@ -17,6 +16,7 @@ type Props = {
   isOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
   onSignOut?: () => Promise<void> | void;
+  showDetails?: boolean; // controls whether to show name/role text
 };
 
 function initialsForName(name?: string) {
@@ -31,6 +31,7 @@ export default function NavbarProfile({
   isOpen: controlledOpen,
   onOpenChange,
   onSignOut,
+  showDetails = true,
 }: Props) {
   const router = useRouter();
   const [anchorEl, setAnchorEl] = React.useState<HTMLElement | null>(null);
@@ -58,14 +59,9 @@ export default function NavbarProfile({
 
   return (
     <>
-      <ButtonBase
-        onClick={handleToggle}
-        aria-haspopup
-        aria-expanded={open}
-        aria-label="Open profile menu"
-      >
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1, px: 1 }}>
-          {user ? (
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1, px: 1 }}>
+        {showDetails &&
+          (user ? (
             <Box
               sx={{
                 display: "flex",
@@ -96,10 +92,21 @@ export default function NavbarProfile({
               <Skeleton variant="text" width={100} height={24} />
               <Skeleton variant="text" width={60} height={16} />
             </Box>
-          )}
+          ))}
 
-          {user ? (
-            <Avatar sx={{ width: 36, height: 36, bgcolor: color }}>
+        {user ? (
+          <ButtonBase
+            onClick={handleToggle}
+            aria-haspopup
+            aria-expanded={open}
+            aria-label="Open profile menu"
+            sx={{ borderRadius: "50%" }}
+          >
+            <Avatar
+              sx={{ width: 36, height: 36, bgcolor: color }}
+              src={user?.avatarUrl || undefined}
+              imgProps={{ referrerPolicy: "no-referrer" }}
+            >
               {user?.avatarUrl
                 ? null
                 : initialsForName(
@@ -108,18 +115,11 @@ export default function NavbarProfile({
                       : undefined
                   )}
             </Avatar>
-          ) : (
-            <Skeleton variant="circular" width={36} height={36} />
-          )}
-
-          <ExpandMoreIcon
-            sx={{
-              transform: open ? "rotate(180deg)" : "rotate(0deg)",
-              transition: "transform 180ms ease",
-            }}
-          />
-        </Box>
-      </ButtonBase>
+          </ButtonBase>
+        ) : (
+          <Skeleton variant="circular" width={36} height={36} />
+        )}
+      </Box>
 
       <Popover
         open={open}

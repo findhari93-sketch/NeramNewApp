@@ -3,6 +3,7 @@ export type UserRow = {
   firebase_uid?: string | null;
   phone?: string | null;
   email?: string | null;
+  username?: string | null;
   student_name?: string | null;
   father_name?: string | null;
   gender?: string | null;
@@ -52,6 +53,7 @@ export type UserUpsertPayload = Partial<
     | "state"
     | "country"
     | "email"
+    | "username"
     | "instagram_handle"
     | "education_type"
     | "selected_course"
