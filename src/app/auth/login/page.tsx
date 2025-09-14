@@ -7,6 +7,11 @@ import Divider from "@mui/material/Divider";
 import Stack from "@mui/material/Stack";
 import Alert from "@mui/material/Alert";
 import CircularProgress from "@mui/material/CircularProgress";
+import TextField from "@mui/material/TextField";
+import InputAdornment from "@mui/material/InputAdornment";
+import IconButton from "@mui/material/IconButton";
+import Visibility from "@mui/icons-material/Visibility";
+import VisibilityOff from "@mui/icons-material/VisibilityOff";
 import PhoneAuth from "../../components/shared/PhoneAuth";
 import TopNavBar from "../../components/shared/TopNavBar";
 import { useRouter } from "next/navigation";
@@ -17,6 +22,8 @@ import {
   signOut,
   onAuthStateChanged,
 } from "firebase/auth";
+import { signInWithEmailOrUsername, sendPasswordReset } from "../../../lib/auth/firebaseAuth";
+import { signInSchema, forgotPasswordSchema } from "../../../lib/auth/validation";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -173,6 +180,223 @@ export default function LoginPage() {
     setFirebaseUser(null);
   };
 
+  // Email/Password Auth Component
+  const EmailPasswordAuth = () => {
+    const [emailPasswordForm, setEmailPasswordForm] = useState({
+      identifier: "",
+      password: "",
+    });
+    const [emailPasswordLoading, setEmailPasswordLoading] = useState(false);
+    const [emailPasswordError, setEmailPasswordError] = useState<string | null>(null);
+    const [showPassword, setShowPassword] = useState(false);
+    const [showForgotPassword, setShowForgotPassword] = useState(false);
+    const [forgotPasswordEmail, setForgotPasswordEmail] = useState("");
+    const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
+    const [forgotPasswordMessage, setForgotPasswordMessage] = useState<string | null>(null);
+    const [forgotPasswordError, setForgotPasswordError] = useState<string | null>(null);
+
+    const handleEmailPasswordSignIn = async (e: React.FormEvent) => {
+      e.preventDefault();
+      setEmailPasswordLoading(true);
+      setEmailPasswordError(null);
+
+      try {
+        const validation = signInSchema.safeParse(emailPasswordForm);
+        if (!validation.success) {
+          throw new Error(validation.error.issues[0].message);
+        }
+
+        await signInWithEmailOrUsername(
+          emailPasswordForm.identifier,
+          emailPasswordForm.password
+        );
+
+        // Success - redirect to home
+        router.replace("/?notice=login_success");
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : "Sign in failed";
+        setEmailPasswordError(message);
+      } finally {
+        setEmailPasswordLoading(false);
+      }
+    };
+
+    const isPhoneNumber = (value: string) => {
+      return /^\+?\d[\d\s\-\(\)]+$/.test(value.trim());
+    };
+
+    const handleForgotPassword = async (e: React.FormEvent) => {
+      e.preventDefault();
+      setForgotPasswordLoading(true);
+      setForgotPasswordError(null);
+      setForgotPasswordMessage(null);
+
+      try {
+        const validation = forgotPasswordSchema.safeParse({ email: forgotPasswordEmail });
+        if (!validation.success) {
+          throw new Error(validation.error.issues[0].message);
+        }
+
+        await sendPasswordReset(forgotPasswordEmail);
+        setForgotPasswordMessage("Password reset email sent! Check your inbox.");
+        
+        // Auto close the forgot password form after success
+        setTimeout(() => {
+          setShowForgotPassword(false);
+          setForgotPasswordEmail("");
+          setForgotPasswordMessage(null);
+        }, 3000);
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : "Failed to send reset email";
+        setForgotPasswordError(message);
+      } finally {
+        setForgotPasswordLoading(false);
+      }
+    };
+
+    return (
+      <Box>
+        <Typography variant="subtitle1" sx={{ mb: 2 }}>
+          Sign in with email or username
+        </Typography>
+        <Box
+          component="form"
+          onSubmit={handleEmailPasswordSignIn}
+          sx={{ display: "flex", flexDirection: "column", gap: 2 }}
+        >
+          <TextField
+            label="Email or Username"
+            value={emailPasswordForm.identifier}
+            onChange={(e) =>
+              setEmailPasswordForm((prev) => ({
+                ...prev,
+                identifier: e.target.value,
+              }))
+            }
+            fullWidth
+            required
+            helperText={
+              emailPasswordForm.identifier &&
+              isPhoneNumber(emailPasswordForm.identifier)
+                ? "Phone number detected - use phone OTP option below"
+                : ""
+            }
+          />
+          <TextField
+            label="Password"
+            type={showPassword ? "text" : "password"}
+            value={emailPasswordForm.password}
+            onChange={(e) =>
+              setEmailPasswordForm((prev) => ({
+                ...prev,
+                password: e.target.value,
+              }))
+            }
+            fullWidth
+            required
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    onClick={() => setShowPassword(!showPassword)}
+                    edge="end"
+                  >
+                    {showPassword ? <VisibilityOff /> : <Visibility />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
+          />
+          <Button
+            type="submit"
+            variant="contained"
+            disabled={emailPasswordLoading}
+            fullWidth
+          >
+            {emailPasswordLoading ? (
+              <CircularProgress size={20} />
+            ) : (
+              "Sign In"
+            )}
+          </Button>
+          {emailPasswordError && (
+            <Alert severity="error">{emailPasswordError}</Alert>
+          )}
+          
+          {/* Forgot Password Section */}
+          {!showForgotPassword ? (
+            <Button
+              variant="text"
+              size="small"
+              onClick={() => setShowForgotPassword(true)}
+              sx={{ alignSelf: "center" }}
+            >
+              Forgot password?
+            </Button>
+          ) : (
+            <Box sx={{ mt: 1 }}>
+              <Typography variant="body2" sx={{ mb: 2, textAlign: "center" }}>
+                Enter your email address to reset your password
+              </Typography>
+              <Box
+                component="form"
+                onSubmit={handleForgotPassword}
+                sx={{ display: "flex", flexDirection: "column", gap: 2 }}
+              >
+                <TextField
+                  label="Email address"
+                  type="email"
+                  value={forgotPasswordEmail}
+                  onChange={(e) => setForgotPasswordEmail(e.target.value)}
+                  fullWidth
+                  required
+                  size="small"
+                />
+                <Box sx={{ display: "flex", gap: 1 }}>
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    disabled={forgotPasswordLoading}
+                    size="small"
+                    sx={{ flex: 1 }}
+                  >
+                    {forgotPasswordLoading ? (
+                      <CircularProgress size={16} />
+                    ) : (
+                      "Send Reset Email"
+                    )}
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => {
+                      setShowForgotPassword(false);
+                      setForgotPasswordEmail("");
+                      setForgotPasswordError(null);
+                      setForgotPasswordMessage(null);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </Box>
+                {forgotPasswordError && (
+                  <Alert severity="error" sx={{ mt: 1 }}>
+                    {forgotPasswordError}
+                  </Alert>
+                )}
+                {forgotPasswordMessage && (
+                  <Alert severity="success" sx={{ mt: 1 }}>
+                    {forgotPasswordMessage}
+                  </Alert>
+                )}
+              </Box>
+            </Box>
+          )}
+        </Box>
+      </Box>
+    );
+  };
+
   return (
     <>
       <TopNavBar />
@@ -214,6 +438,10 @@ export default function LoginPage() {
           <Button variant="outlined" onClick={linkedInSignIn}>
             Continue with LinkedIn
           </Button>
+
+          <Divider>OR</Divider>
+
+          <EmailPasswordAuth />
 
           <Divider>OR</Divider>
 

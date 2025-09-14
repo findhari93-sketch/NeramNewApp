@@ -145,6 +145,19 @@ export async function POST(req: Request) {
       return fromTop ?? fromProfileDisplayName ?? fromProfileName ?? null;
     })();
 
+    const usernameFromBody = (() => {
+      const fromTop =
+        typeof (body as Record<string, unknown>)["username"] === "string"
+          ? ((body as Record<string, unknown>)["username"] as string)
+          : null;
+      const fromProfile =
+        typeof (profileFromBody as Record<string, unknown>)["username"] ===
+        "string"
+          ? ((profileFromBody as Record<string, unknown>)["username"] as string)
+          : null;
+      return fromTop ?? fromProfile ?? null;
+    })();
+
     // derive sign-in context
     const signInProvider: string | null = (() => {
       try {
@@ -171,6 +184,11 @@ export async function POST(req: Request) {
       // tentative phone flag (may be further merged with existing row on update)
       phone_auth_used: !!phone || signInProvider === "phone",
     };
+
+    // Add username if provided (only set if non-empty to avoid overwriting)
+    if (usernameFromBody && usernameFromBody.trim().length > 0) {
+      (known as Record<string, unknown>).username = usernameFromBody.trim().toLowerCase();
+    }
 
     // Only set student_name when a non-empty value is provided to avoid wiping it on unrelated updates.
     // Prefer an explicit name from the request body over the token's display name.
