@@ -1,0 +1,42 @@
+{
+  // Reduce noise from spell checker in Problems panel
+  "cSpell.enabled": true,
+  // Downgrade to Hint so Problems can easily filter them out
+  "cSpell.diagnosticLevel": "Hint",
+  // Ignore common noisy paths and env files
+  "cSpell.ignorePaths": [
+    "**/node_modules/**",
+    "**/.git/**",
+    "**/.next/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/*.lock",
+    "**/.env",
+    "**/.env.*",
+    "**/*.env",
+    "supabase_migrations/**"
+  ],
+  // Honor .gitignore to reduce noise
+  "cSpell.useGitignore": true,
+  // Allow compound words like firebaseAuth, phoneAuth
+  "cSpell.allowCompoundWords": true,
+  // Disable spell checking for dotenv files
+  "cSpell.enabledFileTypes": {
+    "dotenv": false
+  },
+  // Optional: hide status bar indicator if desired
+  "cSpell.showStatus": false,
+  // Project-specific dictionary to prevent repeated unknown word reports
+  "cSpell.words": [
+    "neramtypeco",
+    "recaptcha",
+    "supabase",
+    "firebase",
+    "linkedin",
+    "otp",
+    "NATA",
+    "JEE",
+    "diploma",
+    "uuid"
+  ]
+}

@@ -9,7 +9,10 @@ import apiClient from "../../../lib/apiClient";
 import {
   RecaptchaVerifier,
   signInWithPhoneNumber,
+  linkWithPhoneNumber,
+  signInWithRedirect,
   type ConfirmationResult,
+  PhoneAuthProvider,
 } from "firebase/auth";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -30,9 +33,15 @@ const RECAPTCHA_ENTERPRISE_SITE_KEY =
 // Small helper: detect if grecaptcha.enterprise is available
 function hasEnterpriseGreCaptcha(): boolean {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const g = (window as any).grecaptcha;
-    return !!(g && g.enterprise && typeof g.enterprise.execute === "function");
+    const win = window as unknown as { grecaptcha?: unknown };
+    const g = win.grecaptcha;
+    if (!g || typeof g !== "object") return false;
+    const enterprise = (g as { enterprise?: unknown }).enterprise;
+    return !!(
+      enterprise &&
+      typeof enterprise === "object" &&
+      typeof (enterprise as { execute?: unknown }).execute === "function"
+    );
   } catch {
     return false;
   }
@@ -43,7 +52,6 @@ function createEnterpriseVerifier(action = "submit") {
   return {
     type: "recaptcha",
     async verify() {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const g = (window as any).grecaptcha;
       if (!RECAPTCHA_ENTERPRISE_SITE_KEY)
         throw new Error("RECAPTCHA_ENTERPRISE_SITE_KEY is not configured");
@@ -87,6 +95,7 @@ export default function PhoneAuth({
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [popupBlocked, setPopupBlocked] = useState(false);
 
   // Keep a single verifier instance for the component lifetime.
   const verifierRef = useRef<RecaptchaVerifier | null>(null);
@@ -165,6 +174,7 @@ export default function PhoneAuth({
   const sendOtp = async () => {
     setError("");
     setLoading(true);
+    setPopupBlocked(false);
     try {
       const num = normalizeE164(phone);
       if (!num || num.length < 8)
@@ -173,22 +183,27 @@ export default function PhoneAuth({
       if (hasEnterpriseGreCaptcha()) {
         try {
           const enterpriseVerifier = createEnterpriseVerifier("phone_auth");
-          const c = await signInWithPhoneNumber(
-            auth,
-            num,
-            // signInWithPhoneNumber expects an ApplicationVerifier; our wrapper matches the shape.
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            enterpriseVerifier as any
-          );
+          const current = auth.currentUser;
+          let c;
+          if (current) {
+            c = await linkWithPhoneNumber(
+              current,
+              num,
+              enterpriseVerifier as any
+            );
+          } else {
+            c = await signInWithPhoneNumber(
+              auth,
+              num,
+              enterpriseVerifier as any
+            );
+          }
           setConfirmation(c);
           setStep("otp");
           setLoading(false);
           return;
         } catch (err) {
-          // If enterprise flow fails, fall through to the normal verifier below.
           console.warn("Enterprise reCAPTCHA failed, falling back:", err);
-          // normalize the thrown value to avoid throwing raw objects/null later
-          // and allow the fallback to proceed.
         }
       }
 
@@ -197,17 +212,58 @@ export default function PhoneAuth({
 
       // Try to send; if verifier is in a destroyed state, recreate and retry once.
       try {
-        const c = await signInWithPhoneNumber(auth, num, verifier);
-        setConfirmation(c);
-        setStep("otp");
+        // Detect popup block by catching DOMException or window.open failure
+        let popupBlockedDetected = false;
+        const origWindowOpen = window.open;
+        window.open = function (...args) {
+          const win = origWindowOpen.apply(window, args);
+          if (!win || win.closed || typeof win.closed === "undefined") {
+            popupBlockedDetected = true;
+          }
+          return win;
+        };
+        try {
+          const current = auth.currentUser;
+          let c;
+          if (current) {
+            c = await linkWithPhoneNumber(current, num, verifier);
+          } else {
+            c = await signInWithPhoneNumber(auth, num, verifier);
+          }
+          if (popupBlockedDetected) {
+            setPopupBlocked(true);
+            setError(
+              "Popup blocked. Please allow popups or use the fallback below."
+            );
+            return;
+          }
+          setConfirmation(c);
+          setStep("otp");
+        } finally {
+          window.open = origWindowOpen;
+        }
       } catch (e) {
         const s = String(e);
         if (s.includes("assertNotDestroyed") || s.includes("_reset")) {
           resetVerifier();
           const v2 = await ensureVerifier();
-          const c = await signInWithPhoneNumber(auth, num, v2);
+          const current = auth.currentUser;
+          let c;
+          if (current) {
+            c = await linkWithPhoneNumber(current, num, v2);
+          } else {
+            c = await signInWithPhoneNumber(auth, num, v2);
+          }
           setConfirmation(c);
           setStep("otp");
+        } else if (
+          s.toLowerCase().includes("popup") ||
+          s.toLowerCase().includes("blocked")
+        ) {
+          setPopupBlocked(true);
+          setError(
+            "Popup blocked. Please allow popups or use the fallback below."
+          );
         } else {
           throw new Error(String(e ?? "unknown error"));
         }
@@ -241,16 +297,24 @@ export default function PhoneAuth({
 
       // Persist user to database via secure server route (uses service role)
       try {
-        // Create/ensure user row with just phone + firebase uid
         const current = auth.currentUser;
-        await apiClient("/api/users/upsert", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            // seed name if available to populate student_name early
-            displayName: current?.displayName || undefined,
-          }),
-        });
+        if (current) {
+          const idToken = await current.getIdToken();
+          await fetch("/api/users/upsert", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${idToken}`,
+            },
+            body: JSON.stringify({
+              uid: current.uid,
+              phone: stored,
+              email: current.email,
+              displayName: current.displayName || undefined,
+              profile: { photoURL: current.photoURL },
+            }),
+          });
+        }
         // Also persist the phone into profile for completeness
         await saveUserProfile({ phone: stored });
       } catch (persistErr) {
@@ -333,6 +397,40 @@ export default function PhoneAuth({
           >
             {loading ? "Sending..." : "Send OTP"}
           </Button>
+
+          {/* Fallback for popup blocked */}
+          {popupBlocked && (
+            <Box sx={{ mt: 2 }}>
+              <Typography color="error" sx={{ mb: 1 }}>
+                Popup was blocked by your browser. You can try the fallback
+                below:
+              </Typography>
+              <Button
+                variant="outlined"
+                fullWidth
+                onClick={async () => {
+                  setError("");
+                  setLoading(true);
+                  try {
+                    const num = normalizeE164(phone);
+                    if (!num || num.length < 8)
+                      throw new Error("Enter a valid phone number.");
+                    // Use signInWithRedirect as fallback
+                    const provider = new PhoneAuthProvider(auth);
+                    await signInWithRedirect(auth, provider);
+                  } catch (e) {
+                    setError(getErrorMessage(e));
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                disabled={loading || !phone}
+                sx={{ py: 1.25 }}
+              >
+                Use Fallback (Redirect)
+              </Button>
+            </Box>
+          )}
 
           {/* Keep this mounted; Firebase uses it for the invisible widget */}
           <div id="recaptcha-container" style={{ display: "none" }} />

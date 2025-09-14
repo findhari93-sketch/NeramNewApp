@@ -73,7 +73,6 @@ export default function AccountMenu({ label: initialLabel }: Props) {
     }
     try {
       localStorage.removeItem("phone_verified");
-      localStorage.removeItem("linkedin_token");
     } catch {}
     router.push("/");
   };
