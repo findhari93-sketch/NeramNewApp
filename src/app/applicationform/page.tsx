@@ -4,7 +4,7 @@ import TopNavBar from "../components/shared/TopNavBar";
 export default function Page() {
   return (
     <div>
-      <TopNavBar />
+      <TopNavBar backgroundMode="gradient" />
       <ApplicationForm />
     </div>
   );

@@ -59,8 +59,7 @@ if (!admin.apps.length) {
 /**
  * POST /api/users/upsert
  * - verifies Firebase ID token (from Authorization header)
- * - ensures decoded.phone_number exists
- * - uses phone as primary lookup: if a user with same phone exists, update it; otherwise insert
+ * - uses firebase_uid as primary lookup; falls back to phone, then email
  * - merges provided profile fields into dedicated columns and unknowns into `profile` jsonb
  */
 export async function POST(req: Request) {
@@ -93,12 +92,6 @@ export async function POST(req: Request) {
 
     const firebaseUid = decoded.uid as string;
     const phone = (decoded.phone_number || null) as string | null;
-    if (!phone) {
-      return NextResponse.json(
-        { ok: false, error: "Phone not found on token" },
-        { status: 400 }
-      );
-    }
 
     const body = await req.json().catch(() => ({}));
     const profileFromBody: Record<string, unknown> =
@@ -187,7 +180,9 @@ export async function POST(req: Request) {
 
     // Add username if provided (only set if non-empty to avoid overwriting)
     if (usernameFromBody && usernameFromBody.trim().length > 0) {
-      (known as Record<string, unknown>).username = usernameFromBody.trim().toLowerCase();
+      (known as Record<string, unknown>).username = usernameFromBody
+        .trim()
+        .toLowerCase();
     }
 
     // Only set student_name when a non-empty value is provided to avoid wiping it on unrelated updates.
@@ -455,7 +450,7 @@ export async function POST(req: Request) {
       }
     }
 
-    // 1) try find existing user by firebase_uid, fallback to phone
+    // 1) try find existing user by firebase_uid, fallback to phone, then email
     let existing: UserRow | null = null;
     let selectError: unknown = null;
     if (firebaseUid) {
@@ -476,6 +471,23 @@ export async function POST(req: Request) {
           .maybeSingle();
         existing = (r2.data as unknown as UserRow) ?? null;
         selectError = r2.error;
+        // if found by phone, we can attach firebase_uid on update below
+      }
+      // fallback by email if still not found
+      if (!selectError && !existing) {
+        const emailForLookup =
+          ((decoded.email as string | undefined) ?? emailFromBody ?? null) ||
+          null;
+        if (emailForLookup) {
+          const r3 = await supabaseServer
+            .from("users")
+            .select("*")
+            .ilike("email", emailForLookup)
+            .limit(1)
+            .maybeSingle();
+          existing = (r3.data as unknown as UserRow) ?? null;
+          selectError = r3.error;
+        }
       }
     } else {
       const r = await supabaseServer
@@ -486,6 +498,22 @@ export async function POST(req: Request) {
         .maybeSingle();
       existing = (r.data as unknown as UserRow) ?? null;
       selectError = r.error;
+      // if still not found and we have email from token/body, try email too
+      if (!selectError && !existing) {
+        const emailForLookup =
+          ((decoded.email as string | undefined) ?? emailFromBody ?? null) ||
+          null;
+        if (emailForLookup) {
+          const r3 = await supabaseServer
+            .from("users")
+            .select("*")
+            .ilike("email", emailForLookup)
+            .limit(1)
+            .maybeSingle();
+          existing = (r3.data as unknown as UserRow) ?? null;
+          selectError = r3.error;
+        }
+      }
     }
 
     if (selectError) {
@@ -504,6 +532,22 @@ export async function POST(req: Request) {
     let user: UserRow | null = null;
 
     const existingRow = existing as unknown as UserRow | null;
+    // Helper to detect and strip unknown columns then retry
+    const parseUnknownColumn = (err: unknown): string | null => {
+      if (!err) return null;
+      const msg =
+        typeof err === "object" && err && "message" in err
+          ? String((err as { message?: unknown }).message || "")
+          : String(err);
+      // examples: 'column users.username does not exist', 'column "application" does not exist'
+      const m = msg.match(
+        /column\s+(?:[\w\.]*\.)?"?([a-zA-Z_][a-zA-Z0-9_]*)"?\s+does not exist/i
+      );
+      return m ? m[1] : null;
+    };
+    const stripKey = (obj: Record<string, unknown>, key: string) => {
+      if (key in obj) delete (obj as Record<string, unknown>)[key];
+    };
     if (existingRow) {
       // update existing row -> update provided fields
       const updateObj: Partial<UserRow> & Record<string, unknown> = {
@@ -547,25 +591,54 @@ export async function POST(req: Request) {
       (updateObj as Partial<UserRow>).phone_auth_used =
         alreadyPhone || !!phone || signInProvider === "phone";
 
-      // choose a stable filter for update
+      // choose a stable filter for update (prefer identifiers present on existing row)
       const updateQuery = supabaseServer.from("users").update(updateObj);
       if (existingRow.firebase_uid) {
         updateQuery.eq("firebase_uid", existingRow.firebase_uid);
+      } else if (existingRow.phone) {
+        updateQuery.eq("phone", existingRow.phone as string);
+      } else if (existingRow.email) {
+        updateQuery.ilike("email", existingRow.email as string);
       } else {
-        updateQuery.eq("phone", phone);
+        // fallback to primary key id
+        updateQuery.eq("id", existingRow.id);
       }
-      const { data: updated, error: updateError } = await updateQuery
-        .select()
-        .maybeSingle();
+      const doUpdate = async (
+        obj: Partial<UserRow> & Record<string, unknown>
+      ): Promise<{ updated: UserRow | null; error: unknown }> => {
+        const q = supabaseServer.from("users").update(obj);
+        if (existingRow.firebase_uid)
+          q.eq("firebase_uid", existingRow.firebase_uid);
+        else if (existingRow.phone) q.eq("phone", existingRow.phone as string);
+        else if (existingRow.email)
+          q.ilike("email", existingRow.email as string);
+        else q.eq("id", existingRow.id);
+        const { data, error } = await q.select().maybeSingle();
+        return { updated: (data as unknown as UserRow) ?? null, error };
+      };
 
-      if (updateError) {
-        console.error("update error", updateError);
-        return NextResponse.json(
-          { ok: false, error: updateError.message },
-          { status: 500 }
-        );
+      const attemptObj = updateObj;
+      let tries = 0;
+      while (true) {
+        const { updated, error } = await doUpdate(attemptObj);
+        if (!error) {
+          user = updated;
+          break;
+        }
+        const col = parseUnknownColumn(error);
+        if (!col || tries >= 5) {
+          console.error("update error", error);
+          const msg =
+            typeof error === "object" && error && "message" in error
+              ? String(
+                  (error as { message?: unknown }).message || "update error"
+                )
+              : String(error);
+          return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+        }
+        stripKey(attemptObj as Record<string, unknown>, col);
+        tries++;
       }
-      user = updated;
     } else {
       // insert new row
       const insertObj: Partial<UserRow> & Record<string, unknown> = {
@@ -595,20 +668,39 @@ export async function POST(req: Request) {
       (insertObj as Partial<UserRow>).phone_auth_used =
         !!phone || signInProvider === "phone";
 
-      const { data: inserted, error: insertError } = await supabaseServer
-        .from("users")
-        .insert([insertObj])
-        .select()
-        .maybeSingle();
+      const doInsert = async (
+        obj: Partial<UserRow> & Record<string, unknown>
+      ): Promise<{ inserted: UserRow | null; error: unknown }> => {
+        const { data, error } = await supabaseServer
+          .from("users")
+          .insert([obj])
+          .select()
+          .maybeSingle();
+        return { inserted: (data as unknown as UserRow) ?? null, error };
+      };
 
-      if (insertError) {
-        console.error("insert error", insertError);
-        return NextResponse.json(
-          { ok: false, error: insertError.message },
-          { status: 500 }
-        );
+      const attemptObj = insertObj;
+      let tries = 0;
+      while (true) {
+        const { inserted, error } = await doInsert(attemptObj);
+        if (!error) {
+          user = inserted;
+          break;
+        }
+        const col = parseUnknownColumn(error);
+        if (!col || tries >= 5) {
+          console.error("insert error", error);
+          const msg =
+            typeof error === "object" && error && "message" in error
+              ? String(
+                  (error as { message?: unknown }).message || "insert error"
+                )
+              : String(error);
+          return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+        }
+        stripKey(attemptObj as Record<string, unknown>, col);
+        tries++;
       }
-      user = inserted;
     }
 
     return NextResponse.json({ ok: true, user });

@@ -219,6 +219,36 @@ export default function StepBasic(props: StepBasicProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.zipCode]);
 
+  // Autofill student name and email from Firebase user once on mount if empty
+  useEffect(() => {
+    try {
+      const u = auth.currentUser;
+      if (!u) return;
+      const updates: Partial<FormData> = {};
+      if (!form.email && u.email) updates.email = u.email;
+      const display = u.displayName || "";
+      if (!form.studentName && display) updates.studentName = display;
+      if (Object.keys(updates).length > 0) {
+        // drive through handlers so parent state updates
+        if (updates.email) {
+          handleChange({
+            target: { name: "email", value: updates.email },
+          } as unknown as React.ChangeEvent<HTMLInputElement>);
+        }
+        if (updates.studentName) {
+          handleChange({
+            target: { name: "studentName", value: updates.studentName },
+          } as unknown as React.ChangeEvent<HTMLInputElement>);
+        }
+        // save silently
+        if (saveToDatabase) {
+          saveToDatabase().catch(() => {});
+        }
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // When parent requests an edit, adopt it and focus the corresponding input
   React.useEffect(() => {
     if (typeof parentEditField !== "undefined" && parentEditField !== null) {

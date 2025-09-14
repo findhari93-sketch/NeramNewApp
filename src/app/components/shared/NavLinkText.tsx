@@ -10,6 +10,20 @@ type Props = {
 };
 
 export default function NavLinkText({ primary, badge, secondary }: Props) {
+  const trimmed = badge?.trim();
+  const isFree = (trimmed ?? "").toLowerCase() === "free";
+  const toTitleCase = (s: string) =>
+    s
+      .split(/\s+/)
+      .map((w) =>
+        w.length > 0 ? w[0].toUpperCase() + w.slice(1).toLowerCase() : w
+      )
+      .join(" ");
+  const displayBadge = trimmed
+    ? isFree
+      ? "FREE"
+      : toTitleCase(trimmed)
+    : null;
   return (
     <Box
       sx={{
@@ -17,33 +31,37 @@ export default function NavLinkText({ primary, badge, secondary }: Props) {
         flexDirection: "column",
         alignItems: "flex-start",
         gap: 0.25,
+        textTransform: "none",
       }}
     >
-      {badge ? (
+      {displayBadge ? (
         <Box
           sx={(theme) => ({
-            color: theme.palette.warning.main,
+            color: theme.palette.highlight.main,
             fontSize: 10,
             fontWeight: 800,
             letterSpacing: 0.4,
+            textTransform: "none",
           })}
         >
-          {badge.toUpperCase()}
+          {displayBadge}
         </Box>
       ) : null}
 
       <Typography
         variant="body2"
-        sx={{ fontWeight: 700, lineHeight: 1 }}
+        sx={(theme) => ({
+          fontWeight: 700,
+          lineHeight: 1,
+          color: theme.palette.white.main,
+        })}
         component="span"
       >
         {primary}
       </Typography>
 
       {secondary ? (
-        <Typography variant="caption" color="text.secondary">
-          {secondary}
-        </Typography>
+        <Typography variant="caption">{secondary}</Typography>
       ) : null}
     </Box>
   );
