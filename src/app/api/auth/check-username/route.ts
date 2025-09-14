@@ -19,7 +19,10 @@ const checkUsernameBodySchema = z.object({
 export async function POST(req: Request) {
   try {
     // Rate limiting
-    const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown";
+    const ip =
+      req.headers.get("x-forwarded-for") ||
+      req.headers.get("x-real-ip") ||
+      "unknown";
     const now = Date.now();
     const userLimit = rateLimitMap.get(ip);
 
@@ -51,10 +54,10 @@ export async function POST(req: Request) {
     const validation = checkUsernameBodySchema.safeParse(body);
     if (!validation.success) {
       return NextResponse.json(
-        { 
-          ok: false, 
+        {
+          ok: false,
           available: false,
-          error: validation.error.errors[0].message 
+          error: validation.error.issues[0]?.message || "Invalid username",
         },
         { status: 400 }
       );

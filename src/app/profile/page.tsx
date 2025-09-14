@@ -13,7 +13,6 @@ import Divider from "@mui/material/Divider";
 import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
 import ListItemText from "@mui/material/ListItemText";
-import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
 import { auth } from "../../lib/firebase";
 import { onAuthStateChanged, signOut, updateProfile } from "firebase/auth";
@@ -22,13 +21,15 @@ import { useRouter } from "next/navigation";
 import apiClient from "../../lib/apiClient";
 
 export default function ProfilePage() {
+  // All hooks must be inside the function and before any return
   const [user, setUser] = React.useState<Record<string, unknown> | null>(null);
-  const [sessionUser, setSessionUser] = React.useState<Record<
-    string,
-    unknown
-  > | null>(null);
   const router = useRouter();
   const [authChecked, setAuthChecked] = React.useState(false);
+  const [studentName, setStudentName] = React.useState<string>("");
+  const [saving, setSaving] = React.useState(false);
+  const [snackOpen, setSnackOpen] = React.useState(false);
+  const [snackMsg, setSnackMsg] = React.useState<string | null>(null);
+  const [requireNameSnackOpen, setRequireNameSnackOpen] = React.useState(false);
 
   React.useEffect(() => {
     // First try a synchronous currentUser read (safe only on client)
@@ -59,47 +60,69 @@ export default function ProfilePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // After auth is known, load session safely:
-  // - If Firebase user exists, include Authorization via apiClient
-  // - Otherwise, optionally try cookie-based session (LinkedIn)
   React.useEffect(() => {
-    if (!authChecked) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        if (auth.currentUser) {
-          // Ensure token is fresh before calling
-          try {
-            await auth.currentUser.getIdToken(true);
-          } catch {}
-          const res = await apiClient("/api/session");
-          const json = await res.json();
-          if (!cancelled && json?.ok && json.user) {
-            setSessionUser(json.user as Record<string, unknown>);
-          }
-          return;
-        }
-        // No firebase user: fall back to cookie-based session if present
-        try {
-          const res = await fetch("/api/session");
-          const json = await res.json();
-          if (!cancelled && json?.ok && json.user) {
-            setSessionUser(json.user as Record<string, unknown>);
-          }
-        } catch {}
-      } catch {}
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [authChecked, user]);
+    // when user or derived name changes, preload the input
+    const name =
+      typeof user?.displayName === "string"
+        ? (user!.displayName as string)
+        : typeof user?.email === "string"
+        ? (user!.email as string)
+        : typeof user?.phoneNumber === "string"
+        ? (user!.phoneNumber as string)
+        : "";
+    setStudentName(typeof name === "string" ? name : "");
+  }, [user]);
 
-  // redirect to login if auth checked and no user
+  // Save Google user details to Supabase on Google login
   React.useEffect(() => {
-    if (!authChecked) return;
-    if (!user) router.replace("/auth/login");
+    if (!user || !authChecked) return;
+    // Check if Google provider is present
+    const providerData = user.providerData as
+      | Array<{ providerId: string }>
+      | undefined;
+    const isGoogle =
+      providerData && providerData.some((p) => p.providerId === "google.com");
+    if (!isGoogle) return;
+
+    // Prepare payload
+    const payload = {
+      uid: (user as any).uid,
+      email: (user as any).email,
+      displayName: (user as any).displayName,
+      phone: (user as any).phoneNumber,
+      profile: { photoURL: (user as any).photoURL },
+      provider: "google.com",
+    };
+    // Save to Supabase
+    apiClient("/api/users/upsert", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }).catch((e) => console.warn("Google user upsert failed", e));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authChecked, user]);
+  }, [user, authChecked, apiClient]);
+
+  if (authChecked && !user) {
+    return (
+      <Container maxWidth="sm" sx={{ mt: 8 }}>
+        <Paper elevation={3} sx={{ p: 4, textAlign: "center" }}>
+          <Typography variant="h4" color="error" gutterBottom>
+            401 Unauthorized
+          </Typography>
+          <Typography variant="body1" sx={{ mb: 3 }}>
+            User not logged in. Please log in to access your profile.
+          </Typography>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={() => router.push("/auth/login")}
+          >
+            Login
+          </Button>
+        </Paper>
+      </Container>
+    );
+  }
 
   const handleLogout = async () => {
     try {
@@ -109,7 +132,6 @@ export default function ProfilePage() {
     }
     try {
       localStorage.removeItem("phone_verified");
-      localStorage.removeItem("linkedin_token");
     } catch {}
     router.push("/");
   };
@@ -127,36 +149,9 @@ export default function ProfilePage() {
     typeof user?.photoURL === "string" ? (user!.photoURL as string) : null;
 
   // student name editing state (declared after derived `name`/`photo`)
-  const [studentName, setStudentName] = React.useState<string>(
-    typeof name === "string" ? name : ""
-  );
-  const [saving, setSaving] = React.useState(false);
-  const [snackOpen, setSnackOpen] = React.useState(false);
-  const [snackMsg, setSnackMsg] = React.useState<string | null>(null);
-  const [requireNameSnackOpen, setRequireNameSnackOpen] = React.useState(false);
+  // ...existing code...
 
-  React.useEffect(() => {
-    // when user or derived name changes, preload the input
-    setStudentName(typeof name === "string" ? name : "");
-  }, [name]);
-
-  // show persistent snackbar if displayName is missing or equals phone number
-  React.useEffect(() => {
-    if (!authChecked) return;
-    const displayName =
-      typeof user?.displayName === "string"
-        ? (user!.displayName as string)
-        : null;
-    const phone =
-      typeof user?.phoneNumber === "string"
-        ? (user!.phoneNumber as string)
-        : null;
-    if (!displayName || (phone && displayName === phone)) {
-      setRequireNameSnackOpen(true);
-    } else {
-      setRequireNameSnackOpen(false);
-    }
-  }, [authChecked, user]);
+  // ...existing code...
 
   const saveStudentName = async () => {
     // client-side validation: not empty and no digits
@@ -255,23 +250,12 @@ export default function ProfilePage() {
         .filter(Boolean)
     : [];
 
-  const linkedInId = sessionUser
-    ? (((sessionUser as Record<string, unknown>)["linkedin_id"] ??
-        (sessionUser as Record<string, unknown>)["linkedinId"]) as
-        | string
-        | undefined)
-    : undefined;
-  const linkedInExpiry = sessionUser
-    ? (((sessionUser as Record<string, unknown>)["linkedin_token_expires_at"] ??
-        (sessionUser as Record<string, unknown>)[
-          "linkedin_token_expires_at"
-        ]) as string | undefined)
-    : undefined;
+  // LinkedIn fields removed
 
   if (!authChecked) {
     return (
       <>
-        <TopNavBar />
+        <TopNavBar backgroundMode="gradient" />
         <Container
           maxWidth="sm"
           sx={{ mt: 6, display: "flex", justifyContent: "center" }}
@@ -293,7 +277,7 @@ export default function ProfilePage() {
 
   return (
     <>
-      <TopNavBar />
+      <TopNavBar backgroundMode="gradient" />
       <Container maxWidth="sm" sx={{ mt: 6 }}>
         <Paper sx={{ p: 4 }} elevation={2}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
@@ -373,33 +357,14 @@ export default function ProfilePage() {
                 }
               />
             </ListItem>
-            {sessionUser && (
-              <>
-                <Divider sx={{ my: 2 }} />
-                <ListItem>
-                  <ListItemText
-                    primary="LinkedIn ID"
-                    secondary={String(linkedInId ?? "—")}
-                  />
-                </ListItem>
-                <ListItem>
-                  <ListItemText
-                    primary="LinkedIn token expires at"
-                    secondary={String(linkedInExpiry ?? "—")}
-                  />
-                </ListItem>
-              </>
-            )}
+            {/* LinkedIn session details removed */}
           </List>
 
           <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 2 }}>
             <Button variant="outlined" onClick={() => router.push("/")}>
               Back
             </Button>
-            <Chip
-              label={linkedInId ? "LinkedIn connected" : "Not connected"}
-              color={linkedInId ? "primary" : "default"}
-            />
+            {/* LinkedIn connection chip removed */}
             <Button color="error" variant="contained" onClick={handleLogout}>
               Logout
             </Button>
