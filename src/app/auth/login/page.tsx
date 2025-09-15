@@ -27,7 +27,7 @@ import {
   User,
 } from "firebase/auth";
 import { signInWithEmailOrUsername } from "../../../lib/auth/firebaseAuth";
-import { signInSchema } from "../../../lib/auth/validation";
+import { signInSchema, passwordSchema } from "../../../lib/auth/validation";
 import { Container } from "@mui/material";
 import GoogleProfileCompletionModal from "../../components/shared/GoogleProfileCompletionModal";
 
@@ -47,6 +47,8 @@ export default function LoginPage() {
   const [cooldown, setCooldown] = useState(0);
   const [showGoogleModal, setShowGoogleModal] = useState(false);
   const [googleProfile, setGoogleProfile] = useState<User | null>(null);
+  const [emailFlowPendingProfile, setEmailFlowPendingProfile] =
+    useState<boolean>(false);
 
   const getUserLabel = (u: unknown) => {
     if (!u || typeof u !== "object") return null;
@@ -65,6 +67,11 @@ export default function LoginPage() {
       const user = res.user;
       // Immediately upsert Google user data to Supabase
       const idToken = await user.getIdToken();
+      try {
+        // store a short-lived id token to help with session restore across
+        // verification redirects (best-effort)
+        localStorage.setItem("firebase_id_token", idToken);
+      } catch {}
       await fetch("/api/users/upsert", {
         method: "POST",
         headers: {
@@ -110,7 +117,7 @@ export default function LoginPage() {
   }: {
     studentName?: string;
     username: string;
-    password: string;
+    password?: string;
     phone: string;
   }) => {
     setLoading(true);
@@ -177,8 +184,46 @@ export default function LoginPage() {
       }
       setShowGoogleModal(false);
       router.replace("/?notice=login_success");
+    } catch {
+      setError("Failed to complete profile");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handler when email-verified user completes the modal.
+  const handleEmailProfileComplete = async ({
+    studentName,
+    username,
+    phone,
+  }: {
+    studentName?: string;
+    username: string;
+    phone: string;
+  }) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error("No authenticated user");
+      const idToken = await user.getIdToken();
+      await fetch("/api/users/upsert", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ student_name: studentName, username, phone }),
+      });
+      setShowGoogleModal(false);
+      setEmailFlowPendingProfile(false);
+      // refresh token/state
+      try {
+        await user.getIdToken(true);
+      } catch {}
+      router.replace("/?notice=login_success");
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError("Failed to save profile");
     } finally {
       setLoading(false);
     }
@@ -193,7 +238,49 @@ export default function LoginPage() {
       if (pv) setPhoneVerified(true);
     } catch {}
     return () => unsub();
-  }, [router]);
+  }, [router, showGoogleModal, emailFlowPendingProfile]);
+
+  // If a verified Firebase user signs in (for example after verification),
+  // ensure their Supabase profile has required fields before allowing
+  // automatic navigation into the app. If missing fields are detected,
+  // show the profile completion modal and prevent redirect.
+  React.useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const u = auth.currentUser;
+        if (u && u.emailVerified) {
+          // ask server for profile status
+          try {
+            const idToken = await u.getIdToken();
+            const res = await fetch("/api/session", {
+              headers: { Authorization: `Bearer ${idToken}` },
+            });
+            if (!mounted) return;
+            const j = await res.json().catch(() => ({}));
+            const userRow = j?.user || null;
+            const missingName = !(userRow && userRow.student_name);
+            const missingPhone = !(userRow && userRow.phone);
+            const missingUsername = !(userRow && userRow.username);
+            if (missingName || missingPhone || missingUsername) {
+              setGoogleProfile(u as any);
+              setShowGoogleModal(true);
+            }
+          } catch (e) {
+            console.warn("profile completion check failed", e);
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [firebaseUser]);
+
+  // Removed duplicate profile-check effect: the redirect flow will now run
+  // profile checks just-before-redirect to ensure modal can block navigation.
 
   const [redirecting, setRedirecting] = React.useState(false);
   React.useEffect(() => {
@@ -205,6 +292,42 @@ export default function LoginPage() {
           try {
             await current.getIdToken(true);
             if (!mounted) return;
+            // Before auto-redirecting, ensure the user's Supabase profile has
+            // required fields. If not, show the modal and block navigation.
+            try {
+              if (showGoogleModal || emailFlowPendingProfile) {
+                return;
+              }
+              const u = auth.currentUser;
+              if (u && u.emailVerified) {
+                const idToken = await u.getIdToken();
+                const res = await fetch("/api/users/upsert", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${idToken}`,
+                  },
+                  body: JSON.stringify({}),
+                });
+                const j = await res.json().catch(() => ({}));
+                const userRow = j && j.user ? j.user : null;
+                const missingName = !(userRow && userRow.student_name);
+                const missingUsername = !(userRow && userRow.username);
+                const missingPhone = !(
+                  userRow &&
+                  (userRow.phone || (userRow.profile && userRow.profile.phone))
+                );
+                if (missingName || missingUsername || missingPhone) {
+                  setGoogleProfile(u as User);
+                  setShowGoogleModal(true);
+                  setEmailFlowPendingProfile(true);
+                  return;
+                }
+              }
+            } catch (e) {
+              console.warn("pre-redirect profile check failed", e);
+              // fall back to redirecting normally
+            }
             setRedirecting(true);
             setTimeout(() => {
               router.replace("/?notice=already_logged_in");
@@ -231,7 +354,7 @@ export default function LoginPage() {
     return () => {
       mounted = false;
     };
-  }, [router]);
+  }, [router, showGoogleModal, emailFlowPendingProfile]);
 
   React.useEffect(() => {
     const n = searchParams?.get("notice");
@@ -325,7 +448,11 @@ export default function LoginPage() {
   };
 
   const EmailPasswordAuth = () => {
-    const [form, setForm] = useState({ identifier: "", password: "" });
+    const [form, setForm] = useState({
+      identifier: "",
+      password: "",
+      confirmPassword: "",
+    });
     const [emailPasswordLoading, setEmailPasswordLoading] = useState(false);
     const [emailPasswordError, setEmailPasswordError] = useState<string | null>(
       null
@@ -367,8 +494,8 @@ export default function LoginPage() {
                     methods = j.providers;
                   }
                 }
-              } catch (e) {
-                console.warn("check-email fallback failed", e);
+              } catch {
+                console.warn("check-email fallback failed");
               }
             }
             if (cancelled) return;
@@ -414,14 +541,13 @@ export default function LoginPage() {
       const password = form.password;
       const isEmail = identifier.includes("@");
       try {
-        // Validate inputs unless we're in a staged/confirmation UI step where user explicitly wants to create an account.
-        if (!(emailExists === false && stagedNewEmail)) {
-          const validation = signInSchema.safeParse({ identifier, password });
-          if (!validation.success)
-            throw new Error(
-              validation.error.issues[0]?.message || "Invalid input"
-            );
-        }
+        // Always validate inputs (require password for sign-up path). This ensures
+        // a password is provided for new accounts and prevents auth/missing-password.
+        const validation = signInSchema.safeParse({ identifier, password });
+        if (!validation.success)
+          throw new Error(
+            validation.error.issues[0]?.message || "Invalid input"
+          );
 
         // If email appears to be new (no providers), proceed with signup flow.
         if (emailExists === false) {
@@ -464,6 +590,21 @@ export default function LoginPage() {
           }
 
           // create new email/password user
+          // Validate password strength and confirm password when creating account
+          const pwValidation = passwordSchema.safeParse(password);
+          if (!pwValidation.success) {
+            setEmailPasswordError(
+              pwValidation.error.issues[0]?.message ||
+                "Password validation failed"
+            );
+            setEmailPasswordLoading(false);
+            return;
+          }
+          if (stagedNewEmail && password !== form.confirmPassword) {
+            setEmailPasswordError("Passwords do not match.");
+            setEmailPasswordLoading(false);
+            return;
+          }
           const cred = await createUserWithEmailAndPassword(
             auth,
             identifier,
@@ -479,6 +620,23 @@ export default function LoginPage() {
             await sendEmailVerification(cred.user, actionCodeSettings);
           } catch (ve) {
             console.warn("sendEmailVerification (sign-up) failed", ve);
+          }
+          // Upsert user to Supabase now while we still have a valid user session.
+          try {
+            const idToken = await cred.user.getIdToken();
+            try {
+              localStorage.setItem("firebase_id_token", idToken);
+            } catch {}
+            await fetch("/api/users/upsert", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${idToken}`,
+              },
+              body: JSON.stringify({}),
+            });
+          } catch (upsertErr) {
+            console.warn("upsert after sign-up failed", upsertErr);
           }
           try {
             await signOut(auth);
@@ -532,6 +690,9 @@ export default function LoginPage() {
         if (u) {
           try {
             const idToken = await u.getIdToken();
+            try {
+              localStorage.setItem("firebase_id_token", idToken);
+            } catch {}
             await fetch("/api/users/upsert", {
               method: "POST",
               headers: {
@@ -606,7 +767,9 @@ export default function LoginPage() {
         />
 
         {/* Always show password field for any existing email (any provider, including Google). Only hide for truly new emails. */}
-        {(emailProviders === null || emailProviders.length > 0) && (
+        {(stagedNewEmail ||
+          emailProviders === null ||
+          emailProviders.length > 0) && (
           <>
             <TextField
               size="small"
@@ -631,6 +794,23 @@ export default function LoginPage() {
                 ),
               }}
             />
+            {/* Confirm password only for staged sign-up (new email) */}
+            {stagedNewEmail && (
+              <TextField
+                size="small"
+                label="Confirm password"
+                type={showPassword ? "text" : "password"}
+                value={form.confirmPassword}
+                onChange={(e) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    confirmPassword: e.target.value,
+                  }))
+                }
+                fullWidth
+                required
+              />
+            )}
             {emailExists !== false && (
               <Button
                 variant="text"
@@ -923,8 +1103,25 @@ export default function LoginPage() {
       <GoogleProfileCompletionModal
         open={showGoogleModal}
         onClose={() => setShowGoogleModal(false)}
-        onComplete={handleGoogleProfileComplete}
+        onComplete={
+          emailFlowPendingProfile
+            ? handleEmailProfileComplete
+            : handleGoogleProfileComplete
+        }
         initialPhone={googleProfile?.phoneNumber ?? undefined}
+        forceComplete={emailFlowPendingProfile}
+        hidePasswordFields={
+          // If this modal was triggered by emailFlowPendingProfile (email/password sign-in), hide password creation
+          emailFlowPendingProfile ||
+          // As a fallback, check providerData on the current firebase user
+          Boolean(
+            auth.currentUser &&
+              Array.isArray(auth.currentUser.providerData) &&
+              auth.currentUser.providerData.some(
+                (p: any) => p.providerId === "password"
+              )
+          )
+        }
       />
     </>
   );

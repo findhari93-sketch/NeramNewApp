@@ -6,7 +6,7 @@ import Alert from "@mui/material/Alert";
 import CircularProgress from "@mui/material/CircularProgress";
 import Button from "@mui/material/Button";
 import { useRouter } from "next/navigation";
-import { applyActionCode } from "firebase/auth";
+import { applyActionCode, signInWithCustomToken } from "firebase/auth";
 import { auth } from "../../../lib/firebase";
 
 export default function AuthActionPage() {
@@ -53,6 +53,86 @@ export default function AuthActionPage() {
       (async () => {
         try {
           await applyActionCode(auth, oobCode);
+          // Try to auto-sign-in the user if they are already authenticated
+          // in this browser (Firebase may have a session). If not, attempt
+          // to refresh any existing local token stored by the app.
+          try {
+            let u = auth.currentUser;
+            if (!u) {
+              // Some flows keep an id token in localStorage under 'firebase_id_token'.
+              // Try a conservative, optional silent restore: if a token exists,
+              // verify it by calling a backend endpoint that accepts an id token.
+              const maybeToken =
+                typeof window !== "undefined"
+                  ? localStorage.getItem("firebase_id_token")
+                  : null;
+              if (maybeToken) {
+                // We can't directly set the client auth state from a raw token, but
+                // we can call a lightweight /api/auth/restore-session which will
+                // (optionally) validate token server-side and set a session cookie
+                // or return user info. We'll attempt a restore and then call
+                // auth.currentUser.getIdToken() after a brief delay.
+                try {
+                  const res = await fetch("/api/auth/restore-session", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ idToken: maybeToken }),
+                  });
+                  const j = await res.json().catch(() => ({}));
+                  if (j && j.customToken) {
+                    try {
+                      await signInWithCustomToken(auth, j.customToken);
+                      // client is now signed in
+                      u = auth.currentUser;
+                    } catch (siErr) {
+                      console.warn("signInWithCustomToken failed", siErr);
+                    }
+                  } else {
+                    // give firebase a moment to reflect any session/cookie change
+                    await new Promise((r) => setTimeout(r, 300));
+                    u = auth.currentUser;
+                  }
+                } catch (e) {
+                  // ignore restore failures; this is best-effort
+                  console.warn("session restore attempt failed", e);
+                }
+              }
+            }
+            // If we have a user now, upsert to DB and refresh token
+            if (u) {
+              try {
+                const idToken = await u.getIdToken();
+                await fetch("/api/users/upsert", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${idToken}`,
+                  },
+                  body: JSON.stringify({}),
+                });
+              } catch (e) {
+                console.warn("upsert after verify (auto-signin) failed", e);
+              }
+            }
+          } catch (e) {
+            console.warn("auto sign-in logic failed", e);
+          }
+
+          // Fire a lightweight analytics event for verification completion
+          try {
+            await fetch("/api/analytics/event", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                event: "email_verified",
+                email: continueEmail || null,
+                timestamp: new Date().toISOString(),
+              }),
+            });
+          } catch (e) {
+            // analytics failure should not block UX
+            console.warn("analytics event failed", e);
+          }
           // If the user happens to be signed in already, seed/update DB now
           try {
             const u = auth.currentUser;
@@ -73,10 +153,19 @@ export default function AuthActionPage() {
           // If a session exists, redirect to home; otherwise, send to login with a success notice
           const u = auth.currentUser;
           if (u) {
+            // Instead of redirecting straight to home, send the user to the
+            // login flow so the app can check profile completeness and prompt
+            // for missing student name/phone before allowing full access.
             setStatus("success");
-            setMessage("Email verified. Redirecting…");
+            setMessage("Email verified. Redirecting to complete your profile…");
             setTimeout(() => {
-              router.replace("/?notice=login_success");
+              const emailForQP = continueEmail || u.email || "";
+              const qp = emailForQP
+                ? `?notice=verify_email_success&email=${encodeURIComponent(
+                    emailForQP
+                  )}&auto_signin=1`
+                : `?notice=verify_email_success&auto_signin=1`;
+              router.replace(`/auth/login${qp}`);
             }, 300);
           } else {
             setStatus("success");
@@ -101,6 +190,29 @@ export default function AuthActionPage() {
         }
       })();
     } else {
+      // If there's no oobCode but we received an `email` param, this is
+      // likely the post-verification redirect from Firebase's hosted action
+      // page: Firebase already applied the action and then redirects to our
+      // continueUrl without the oobCode. Treat this as success and route to
+      // the login page with a success notice.
+      if (continueEmail) {
+        setStatus("success");
+        setMessage(
+          `Your email${
+            continueEmail ? ` (${continueEmail})` : ""
+          } has been verified. You can now sign in.`
+        );
+        setTimeout(() => {
+          const qp = continueEmail
+            ? `?notice=verify_email_success&email=${encodeURIComponent(
+                continueEmail
+              )}`
+            : `?notice=verify_email_success`;
+          router.replace(`/auth/login${qp}`);
+        }, 600);
+        return;
+      }
+
       setStatus("error");
       setMessage("Invalid action link.");
     }

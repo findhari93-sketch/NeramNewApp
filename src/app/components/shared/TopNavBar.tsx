@@ -15,6 +15,9 @@ import ListItem from "@mui/material/ListItem";
 // ListItemText not used; custom NavLinkText used instead
 import ListItemButton from "@mui/material/ListItemButton";
 import Divider from "@mui/material/Divider";
+import Typography from "@mui/material/Typography";
+import Breadcrumbs from "@mui/material/Breadcrumbs";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import Link from "next/link";
 import Image from "next/image";
 import NavbarProfile from "./NavbarProfile";
@@ -26,10 +29,27 @@ type TopNavBarProps = {
   // - 'transparent' (default): transparent at top; gradient appears on scroll
   // - 'gradient': gradient is shown even at top
   backgroundMode?: "transparent" | "gradient";
+  // Optional titleBar to render attached directly beneath the TopNavBar.
+  // If omitted the titlebar is not shown.
+  titleBar?: {
+    visible?: boolean;
+    title: string;
+    breadcrumbs?: Array<{ label: string; href?: string }>;
+    showBreadcrumbs?: boolean;
+    actions?: Array<{
+      name: string;
+      label: string;
+      variant?: "text" | "outlined" | "contained";
+      onClick?: () => void;
+    }>;
+    showBackButton?: boolean;
+    onBack?: () => void;
+  };
 };
 
 export default function TopNavBar({
   backgroundMode = "transparent",
+  titleBar,
 }: TopNavBarProps) {
   const [open, setOpen] = React.useState(false);
   const [userLabel, setUserLabel] = React.useState<string | null>(null);
@@ -85,6 +105,152 @@ export default function TopNavBar({
   }, []);
 
   const showGradient = backgroundMode === "gradient" || scrolled;
+
+  // Titlebar constants (match requirements)
+  const TB_HEIGHT = 45;
+  const TB_TITLE_FONT = 15;
+  const TB_BC_FONT = 12;
+  const TB_ACTION_HEIGHT = 28;
+
+  const renderTitleBar = () => {
+    if (!titleBar || titleBar.visible === false) return null;
+    const {
+      title,
+      breadcrumbs,
+      showBreadcrumbs = true,
+      actions = [],
+      showBackButton = true,
+      onBack,
+    } = titleBar;
+    const isSmall = window?.matchMedia?.("(max-width:600px)")?.matches ?? false;
+    const visibleLimit = isSmall ? 1 : 2;
+    const visibleActions = actions.slice(0, visibleLimit);
+    const overflowActions = actions.slice(visibleLimit);
+
+    return (
+      <Box
+        sx={(theme) => ({
+          height: `${TB_HEIGHT}px`,
+          display: "flex",
+          alignItems: "center",
+          borderBottom: `1px solid ${theme.palette.divider}`,
+          px: 2,
+          gap: 2,
+          backgroundColor: theme.palette.background.paper,
+        })}
+      >
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+            flex: "0 0 auto",
+          }}
+        >
+          {showBackButton && (
+            <IconButton
+              onClick={() => (onBack ? onBack() : window.history.back())}
+              aria-label="back"
+              size="large"
+            >
+              <ArrowBackIcon fontSize="small" />
+            </IconButton>
+          )}
+        </Box>
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            flex: "1 1 auto",
+            minWidth: 0,
+          }}
+        >
+          {showBreadcrumbs && breadcrumbs && breadcrumbs.length > 0 && (
+            <Breadcrumbs
+              aria-label="breadcrumb"
+              separator="›"
+              sx={{
+                fontSize: `${TB_BC_FONT}px`,
+                color: "text.secondary",
+                display: isSmall ? "none" : "flex",
+              }}
+            >
+              {breadcrumbs.map((c, idx) =>
+                c.href ? (
+                  <Link
+                    key={idx}
+                    href={c.href}
+                    style={{
+                      color: "inherit",
+                      textDecoration: "none",
+                      fontSize: `${TB_BC_FONT}px`,
+                    }}
+                  >
+                    {c.label}
+                  </Link>
+                ) : (
+                  <Typography
+                    key={idx}
+                    sx={{ fontSize: `${TB_BC_FONT}px` }}
+                    color="text.secondary"
+                  >
+                    {c.label}
+                  </Typography>
+                )
+              )}
+            </Breadcrumbs>
+          )}
+          <Typography
+            sx={{
+              fontSize: `${TB_TITLE_FONT}px`,
+              fontWeight: 600,
+              lineHeight: 1,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+            title={title}
+          >
+            {title}
+          </Typography>
+        </Box>
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+            flex: "0 0 auto",
+          }}
+        >
+          {visibleActions.map((a) => (
+            <Button
+              key={a.name}
+              onClick={() => a.onClick && a.onClick()}
+              variant={a.variant ?? "text"}
+              size="small"
+              aria-label={a.label}
+              sx={{
+                height: `${TB_ACTION_HEIGHT}px`,
+                minHeight: `${TB_ACTION_HEIGHT}px`,
+                textTransform: "none",
+                fontSize: 13,
+                px: 1.5,
+              }}
+            >
+              {a.label}
+            </Button>
+          ))}
+          {overflowActions.length > 0 && (
+            <>
+              <IconButton aria-label="more actions" size="large">
+                <MenuIcon />
+              </IconButton>
+            </>
+          )}
+        </Box>
+      </Box>
+    );
+  };
 
   return (
     <>
@@ -201,6 +367,9 @@ export default function TopNavBar({
             )}
           </Box>
         </Toolbar>
+        {/* Render the TitleBar inside the AppBar so it is attached to the bottom
+            of the AppBar and not visually hidden behind it. */}
+        {renderTitleBar()}
       </AppBar>
 
       <Drawer open={open} onClose={() => setOpen(false)}>
@@ -251,6 +420,7 @@ export default function TopNavBar({
           </Box>
         </Box>
       </Drawer>
+      {renderTitleBar()}
     </>
   );
 }
