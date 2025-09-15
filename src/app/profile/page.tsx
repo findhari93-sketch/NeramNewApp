@@ -255,7 +255,40 @@ export default function ProfilePage() {
   if (!authChecked) {
     return (
       <>
-        <TopNavBar backgroundMode="gradient" />
+        <TopNavBar
+          backgroundMode="gradient"
+          titleBar={{
+            visible: true,
+            title: "Profile Page",
+            breadcrumbs: [
+              { label: "Home", href: "/" },
+              { label: "Profile" },
+              { label: "Requests" },
+            ],
+            showBreadcrumbs: true,
+            // up to 2 visible actions; additional actions go to overflow menu
+            actions: [
+              {
+                name: "filter",
+                label: "Add Filter",
+                variant: "outlined",
+                onClick: () => {
+                  /* action */
+                },
+              },
+              {
+                name: "download",
+                label: "Download",
+                variant: "contained",
+                onClick: () => {
+                  /* action */
+                },
+              },
+            ],
+            showBackButton: true,
+            onBack: () => router.back(),
+          }}
+        />
         <Container
           maxWidth="sm"
           sx={{ mt: 6, display: "flex", justifyContent: "center" }}
@@ -277,7 +310,41 @@ export default function ProfilePage() {
 
   return (
     <>
-      <TopNavBar backgroundMode="gradient" />
+      <TopNavBar
+        backgroundMode="gradient"
+        titleBar={{
+          visible: true,
+          title: "Profile Page",
+          breadcrumbs: [
+            { label: "Home", href: "/" },
+            { label: "Profile" },
+            { label: "Requests" },
+          ],
+          showBreadcrumbs: true,
+          // up to 2 visible actions; additional actions go to overflow menu
+          actions: [
+            {
+              name: "filter",
+              label: "Add Filter",
+              variant: "outlined",
+              onClick: () => {
+                /* action */
+              },
+            },
+            {
+              name: "download",
+              label: "Download",
+              variant: "contained",
+              onClick: () => {
+                /* action */
+              },
+            },
+          ],
+          showBackButton: true,
+          onBack: () => router.back(),
+        }}
+      />
+
       <Container maxWidth="sm" sx={{ mt: 6 }}>
         <Paper sx={{ p: 4 }} elevation={2}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
