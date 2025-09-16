@@ -105,21 +105,33 @@ export default function TopNavBar({
           null
       );
 
-      // Optimistically set any photoURL from Firebase then try to fetch
-      // a fresh signed URL for the user's stored avatar_path (if any).
-      // Use a global last-avatar cache for instant loads across navigation.
+      // Prefer a uid-specific cache when available so we don't show another
+      // user's avatar when switching accounts. Fallback to the global
+      // `avatar-cache:last` only when it matches the current uid.
       try {
-        const raw = localStorage.getItem("avatar-cache:last");
-        if (raw) {
-          const parsed = JSON.parse(raw) as Record<string, any>;
-          if (parsed?.photo) {
-            setAvatarUrl(parsed.photo as string);
-          } else {
-            setAvatarUrl(photo);
+        const uid = (u as any)?.uid as string | undefined;
+        let used: string | null = null;
+        if (uid) {
+          const rawUid = localStorage.getItem(`avatar-cache:${uid}`);
+          if (rawUid) {
+            try {
+              const parsed = JSON.parse(rawUid) as Record<string, any>;
+              used = parsed?.dataUrl || parsed?.url || null;
+            } catch {}
           }
-        } else {
-          setAvatarUrl(photo);
         }
+        if (!used) {
+          const rawLast = localStorage.getItem("avatar-cache:last");
+          if (rawLast) {
+            try {
+              const parsedLast = JSON.parse(rawLast) as Record<string, any>;
+              if (!parsedLast?.uid || parsedLast.uid === (u as any)?.uid) {
+                used = parsedLast?.photo ?? null;
+              }
+            } catch {}
+          }
+        }
+        setAvatarUrl(used ?? photo);
       } catch {
         setAvatarUrl(photo);
       }
@@ -139,8 +151,21 @@ export default function TopNavBar({
               // update global last-avatar cache for faster subsequent loads
               localStorage.setItem(
                 "avatar-cache:last",
-                JSON.stringify({ photo: j.signedUrl, fetchedAt: Date.now() })
+                JSON.stringify({
+                  uid,
+                  photo: j.signedUrl,
+                  fetchedAt: Date.now(),
+                })
               );
+              // also notify in-page listeners so other components (same tab)
+              // can react immediately to the new avatar
+              try {
+                window.dispatchEvent(
+                  new CustomEvent("avatar-updated", {
+                    detail: { uid, photo: j.signedUrl },
+                  })
+                );
+              } catch {}
             } catch {}
           }
         } catch {
@@ -148,7 +173,40 @@ export default function TopNavBar({
         }
       })();
     });
-    return () => unsub();
+    // listen for in-page avatar updates (dispatched by profile upload flow)
+    const onAvatarUpdated = (ev: Event) => {
+      try {
+        const detail = (ev as CustomEvent).detail as
+          | { uid?: string; photo?: string }
+          | undefined;
+        const curUid = (auth.currentUser as any)?.uid;
+        if (!detail || !detail.photo) return;
+        if (detail.uid && curUid && detail.uid !== curUid) return;
+        setAvatarUrl(detail.photo);
+      } catch {}
+    };
+    window.addEventListener("avatar-updated", onAvatarUpdated as EventListener);
+    // also listen to storage changes from other tabs
+    const onStorage = (ev: StorageEvent) => {
+      try {
+        if (ev.key !== "avatar-cache:last") return;
+        if (!ev.newValue) return;
+        const parsed = JSON.parse(ev.newValue) as Record<string, any>;
+        const curUid = (auth.currentUser as any)?.uid;
+        if (!parsed?.uid || parsed.uid === curUid) {
+          if (parsed.photo) setAvatarUrl(parsed.photo);
+        }
+      } catch {}
+    };
+    window.addEventListener("storage", onStorage);
+    return () => {
+      unsub();
+      window.removeEventListener(
+        "avatar-updated",
+        onAvatarUpdated as EventListener
+      );
+      window.removeEventListener("storage", onStorage as EventListener);
+    };
   }, []);
 
   React.useEffect(() => {
@@ -175,7 +233,7 @@ export default function TopNavBar({
           else mq.removeListener(mqHandler as any);
         };
       }
-    } catch (e) {
+    } catch {
       // ignore; fallback to default
     }
 

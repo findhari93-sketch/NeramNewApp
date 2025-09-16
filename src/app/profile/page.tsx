@@ -21,7 +21,7 @@ import { onAuthStateChanged, updateProfile } from "firebase/auth";
 import TopNavBar from "../components/shared/TopNavBar";
 import { useRouter } from "next/navigation";
 import apiClient from "../../lib/apiClient";
-import ProfileCard from "./components/ProfileCard";
+import HeaderCardDesign from "./components/HeaderCardDesign";
 import ProfilePictureCard from "./components/ProfilePictureCard";
 
 export default function ProfilePage() {
@@ -97,8 +97,27 @@ export default function ProfilePage() {
     defaultValues: {},
   });
 
+  // Ensure the form is reset whenever the drawer opens or its values change.
+  // This fixes a bug where controlled inputs (notably the `chips` text field)
+  // didn't update or accept typing because react-hook-form retained stale
+  // internal state. Calling `reset` keeps controller values in sync. We also
+  // include drawer.open in the deps so opening the drawer for the same
+  // values still triggers a reset.
+  React.useEffect(() => {
+    try {
+      if (drawer.open) {
+        reset(drawer.values ?? {});
+      }
+    } catch {
+      /* ignore */
+    }
+    // We intentionally depend on drawer.open and drawer.values
+    // so this runs when the drawer is shown with new values.
+  }, [drawer.open, drawer.values, reset]);
+
   // Field schemas for drawer (examples)
   const profileFields = [
+    { name: "father_name", label: "Father&apos;s Name", type: "text" },
     {
       name: "student_name",
       label: "Student Name",
@@ -111,7 +130,13 @@ export default function ProfilePage() {
       name: "gender",
       label: "Gender",
       type: "select",
-      options: ["Male", "Female", "Other"],
+      // use normalized values for option.value to match server enum values;
+      // label is the human-friendly string shown to users.
+      options: [
+        { value: "male", label: "Male" },
+        { value: "female", label: "Female" },
+        { value: "nonbinary", label: "Other" },
+      ],
     },
     { name: "interests", label: "Interests", type: "chips" },
   ];
@@ -140,14 +165,93 @@ export default function ProfilePage() {
     fields: any[];
     values?: Record<string, any>;
   }) => {
+    // Build initial values for the form. Use provided values but
+    // fall back to other user fields so required fields (e.g. student_name)
+    // are prefilled when possible.
+    const provided = params.values ?? {};
+    const initialValues: Record<string, any> = { ...provided };
+    try {
+      // student_name fallback -> displayName
+      if (
+        (params.fields || []).some((f: any) => f.name === "student_name") &&
+        !initialValues["student_name"]
+      ) {
+        if (
+          typeof (provided as any).student_name === "string" &&
+          (provided as any).student_name
+        )
+          initialValues["student_name"] = (provided as any).student_name;
+        else if (
+          typeof (user as any)?.displayName === "string" &&
+          (user as any).displayName
+        )
+          initialValues["student_name"] = (user as any).displayName;
+        else if (
+          typeof (user as any)?.student_name === "string" &&
+          (user as any).student_name
+        )
+          initialValues["student_name"] = (user as any).student_name;
+      }
+
+      // father_name fallback -> profile.father_name or user.father_name
+      if (
+        (params.fields || []).some((f: any) => f.name === "father_name") &&
+        !initialValues["father_name"]
+      ) {
+        if ((provided as any).father_name)
+          initialValues["father_name"] = (provided as any).father_name;
+        else if ((user as any)?.profile && (user as any).profile.father_name)
+          initialValues["father_name"] = (user as any).profile.father_name;
+        else if ((user as any)?.father_name)
+          initialValues["father_name"] = (user as any).father_name;
+      }
+
+      // gender fallback -> profile.gender or user.gender
+      if (
+        (params.fields || []).some((f: any) => f.name === "gender") &&
+        !initialValues["gender"]
+      ) {
+        if ((provided as any).gender)
+          initialValues["gender"] = (provided as any).gender;
+        else if ((user as any)?.profile && (user as any).profile.gender)
+          initialValues["gender"] = (user as any).profile.gender;
+        else if ((user as any)?.gender)
+          initialValues["gender"] = (user as any).gender;
+      }
+
+      // dob fallback -> prefer top-level dob or profile.dob but format for <input type="date" />
+      if (
+        (params.fields || []).some((f: any) => f.name === "dob") &&
+        !initialValues["dob"]
+      ) {
+        const rawDob =
+          (provided as any).dob ||
+          (user as any)?.profile?.dob ||
+          (user as any)?.dob;
+        try {
+          if (rawDob) {
+            const d = new Date(rawDob);
+            if (!isNaN(d.getTime())) {
+              // format as YYYY-MM-DD for the date input
+              initialValues["dob"] = d.toISOString().slice(0, 10);
+            }
+          }
+        } catch {
+          // ignore parse errors
+        }
+      }
+    } catch {
+      // ignore any access errors and proceed with provided values
+    }
+
     setDrawer({
       open: true,
       title: params.title,
       fields: params.fields,
-      values: params.values ?? {},
+      values: initialValues,
       userId: (user as any)?.uid ?? null,
     });
-    reset(params.values ?? {});
+    reset(initialValues);
   };
 
   const closeDrawer = () => {
@@ -164,24 +268,52 @@ export default function ProfilePage() {
     const optimistic = { ...(user as any), ...changedFields };
     setUser(optimistic);
     try {
-      // Use your apiClient helper - replace endpoint if needed
-      const res = await apiClient(`/api/users/${userId}`, {
-        method: "PATCH",
+      // Use the server-side upsert endpoint which merges provided profile
+      // fields into dedicated columns and profile JSON. Send only changed
+      // fields under `profile` so single-field updates (e.g. father_name)
+      // persist without requiring other fields.
+      // Promote certain top-level fields (e.g., dob, student_name, username)
+      // into top-level payload keys so the server upsert can place them into
+      // dedicated columns. Keep the rest under `profile` JSON.
+      const payload: Record<string, any> = { uid: userId };
+      const profilePayload: Record<string, any> = {};
+      for (const k of Object.keys(changedFields)) {
+        // heuristics: promote known top-level columns
+        if (k === "dob" || k === "student_name" || k === "username") {
+          payload[k] = changedFields[k];
+        } else {
+          profilePayload[k] = changedFields[k];
+        }
+      }
+      payload.profile = profilePayload;
+      const res = await apiClient(`/api/users/upsert`, {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(changedFields),
+        body: JSON.stringify(payload),
       });
-      if (
-        !res ||
-        (res && (res.ok === false || (res.status && res.status >= 400)))
-      ) {
+      if (!res || res.status >= 400) {
         // best-effort rollback
         setUser(previous);
         const text = res?.statusText ?? "Failed to update";
         throw new Error(text);
       }
-      const data = await (res.json ? res.json() : Promise.resolve(null));
-      setUser((prev) => ({ ...(prev as any), ...(data ?? {}) }));
-      return { ok: true, data };
+      const parsed = await res.json().catch(() => null);
+      // server returns { ok: true, user }
+      const returnedUser = parsed && parsed.user ? parsed.user : parsed;
+      if (returnedUser) {
+        setUser((prev) => ({ ...(prev as any), ...(returnedUser ?? {}) }));
+        try {
+          const uid = String(userId);
+          // write a local cache copy to avoid extra DB hits on reload
+          localStorage.setItem(
+            `user-cache:${uid}`,
+            JSON.stringify({ user: returnedUser, fetchedAt: Date.now() })
+          );
+        } catch {
+          /* ignore */
+        }
+      }
+      return { ok: true, data: parsed };
     } catch (err: any) {
       setUser(previous);
       return { ok: false, error: err?.message ?? String(err) };
@@ -261,10 +393,18 @@ export default function ProfilePage() {
               localStorage.setItem(
                 "avatar-cache:last",
                 JSON.stringify({
+                  uid,
                   photo: parsed.signedUrl,
                   fetchedAt: Date.now(),
                 })
               );
+              try {
+                window.dispatchEvent(
+                  new CustomEvent("avatar-updated", {
+                    detail: { uid, photo: parsed.signedUrl },
+                  })
+                );
+              } catch {}
             } catch {}
           }
         } catch {}
@@ -427,6 +567,19 @@ export default function ProfilePage() {
             dataUrl: (cached && cached.dataUrl) || null,
           };
           setCache(uid, newCache);
+          try {
+            localStorage.setItem(
+              "avatar-cache:last",
+              JSON.stringify({ uid, photo: j.signedUrl, fetchedAt: Date.now() })
+            );
+            try {
+              window.dispatchEvent(
+                new CustomEvent("avatar-updated", {
+                  detail: { uid, photo: j.signedUrl },
+                })
+              );
+            } catch {}
+          } catch {}
 
           // Try to fetch image and cache small images as base64 for instant loads
           (async () => {
@@ -476,6 +629,105 @@ export default function ProfilePage() {
     }).catch(() => console.warn("Google user upsert failed"));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, authChecked, apiClient]);
+
+  // Fetch the server-side Supabase user row once after auth so DB-backed
+  // fields (father_name, gender, profile JSON, etc.) appear on refresh.
+  const fetchedMeForUid = React.useRef<string | null>(null);
+  // Simple local cache for the full DB user row to avoid hitting the DB on
+  // every reload. Cache key: `user-cache:<uid>` with shape { user, fetchedAt }.
+  const USER_CACHE_TTL_MS_REF = React.useRef<number>(24 * 60 * 60 * 1000);
+  const readUserCache = React.useCallback((uid: string) => {
+    try {
+      const raw = localStorage.getItem(`user-cache:${uid}`);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as {
+        user?: any;
+        fetchedAt?: number;
+      } | null;
+      if (!parsed || !parsed.fetchedAt) return null;
+      if (Date.now() - parsed.fetchedAt > USER_CACHE_TTL_MS_REF.current)
+        return null;
+      return parsed.user ?? null;
+    } catch {
+      return null;
+    }
+  }, []);
+  const writeUserCache = React.useCallback(
+    (uid: string, u: Record<string, any>) => {
+      try {
+        localStorage.setItem(
+          `user-cache:${uid}`,
+          JSON.stringify({ user: u, fetchedAt: Date.now() })
+        );
+      } catch {
+        // ignore quota errors
+      }
+    },
+    []
+  );
+
+  React.useEffect(() => {
+    if (!authChecked || !user) return;
+    const uid = (user as any)?.uid;
+    if (!uid) return;
+    if (fetchedMeForUid.current === uid) return; // already fetched for this uid
+
+    // if we have a fresh cache, use it and avoid a network call
+    const cached = readUserCache(uid);
+    if (cached) {
+      setUser((prev) => {
+        const prevObj = (prev as any) || {};
+        const merged = { ...prevObj, ...(cached || {}) } as Record<
+          string,
+          unknown
+        >;
+        try {
+          if (prevObj.profile && (cached as any).profile) {
+            merged.profile = {
+              ...(prevObj.profile || {}),
+              ...((cached as any).profile || {}),
+            };
+          }
+        } catch {}
+        return merged;
+      });
+      fetchedMeForUid.current = uid;
+      return;
+    }
+
+    (async () => {
+      try {
+        const res = await apiClient(`/api/users/me`);
+        if (!res || !res.ok) return;
+        const parsed = await res.json().catch(() => null);
+        const dbUser = parsed && parsed.user ? parsed.user : parsed;
+        if (dbUser) {
+          setUser((prev) => {
+            // merge top-level fields; preserve client auth properties like uid/email when present
+            const prevObj = (prev as any) || {};
+            const merged = { ...prevObj, ...dbUser } as Record<string, unknown>;
+            // deep-merge profile JSON if both exist to avoid losing client-side transient keys
+            try {
+              if (prevObj.profile && dbUser.profile) {
+                merged.profile = {
+                  ...(prevObj.profile || {}),
+                  ...(dbUser.profile || {}),
+                };
+              }
+            } catch {}
+            return merged;
+          });
+          // write to local cache for future reloads
+          try {
+            writeUserCache(uid, dbUser);
+          } catch {}
+        }
+        fetchedMeForUid.current = uid;
+      } catch {
+        // ignore network errors
+      }
+    })();
+  }, [authChecked, user, readUserCache, writeUserCache]);
 
   if (authChecked && !user) {
     return (
@@ -673,17 +925,7 @@ export default function ProfilePage() {
         <Grid container spacing={3}>
           <Grid item component="div" xs={12} md={4}>
             <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              <ProfilePictureCard
-                user={
-                  (user as any) ?? {
-                    displayName: undefined,
-                  }
-                }
-                onUpload={onUpload}
-                avatarSize={96}
-              />
-
-              <ProfileCard
+              <HeaderCardDesign
                 title="Profile Details"
                 icon={null}
                 onEdit={() =>
@@ -694,6 +936,15 @@ export default function ProfilePage() {
                   })
                 }
               >
+                <ProfilePictureCard
+                  user={
+                    (user as any) ?? {
+                      displayName: undefined,
+                    }
+                  }
+                  onUpload={onUpload}
+                  avatarSize={96}
+                />
                 <Typography variant="body2" sx={{ mb: 1 }}>
                   {((user as any)?.bio ?? (user as any)?.profile?.bio) || "—"}
                 </Typography>
@@ -705,9 +956,24 @@ export default function ProfilePage() {
                   >
                     Student Name:
                   </Typography>
+
                   <Typography variant="body2">
                     {((user as any)?.student_name ??
                       (user as any)?.displayName) ||
+                      "—"}
+                  </Typography>
+                </Stack>
+
+                <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                  <Typography
+                    variant="body2"
+                    sx={{ minWidth: 140, color: "text.secondary" }}
+                  >
+                    Father&apos;s Name:
+                  </Typography>
+                  <Typography variant="body2">
+                    {(user as any)?.father_name ??
+                      (user as any)?.profile?.father_name ??
                       "—"}
                   </Typography>
                 </Stack>
@@ -721,6 +987,20 @@ export default function ProfilePage() {
                   </Typography>
                   <Typography variant="body2">
                     {(user as any)?.dob || "—"}
+                  </Typography>
+                </Stack>
+
+                <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                  <Typography
+                    variant="body2"
+                    sx={{ minWidth: 140, color: "text.secondary" }}
+                  >
+                    Gender:
+                  </Typography>
+                  <Typography variant="body2">
+                    {(user as any)?.gender ??
+                      (user as any)?.profile?.gender ??
+                      "—"}
                   </Typography>
                 </Stack>
 
@@ -744,14 +1024,14 @@ export default function ProfilePage() {
                     )}
                   </Box>
                 </Box>
-              </ProfileCard>
+              </HeaderCardDesign>
             </Box>
           </Grid>
 
           <Grid item component="div" xs={12} md={8}>
-            <Grid container spacing={2}>
+            <Grid container spacing={2} direction="column">
               <Grid item xs={12}>
-                <ProfileCard
+                <HeaderCardDesign
                   title="Account Details"
                   icon={null}
                   onEdit={() =>
@@ -773,11 +1053,12 @@ export default function ProfilePage() {
                       {(user as any)?.username || "—"}
                     </Typography>
                   </Stack>
-                </ProfileCard>
+                  
+                </HeaderCardDesign>
               </Grid>
 
               <Grid item xs={12}>
-                <ProfileCard
+                <HeaderCardDesign
                   title="Contact Details"
                   icon={null}
                   onEdit={() =>
@@ -810,11 +1091,11 @@ export default function ProfilePage() {
                       {(user as any)?.phone || "—"}
                     </Typography>
                   </Stack>
-                </ProfileCard>
+                </HeaderCardDesign>
               </Grid>
 
               <Grid item xs={12}>
-                <ProfileCard
+                <HeaderCardDesign
                   title="Education Details"
                   icon={null}
                   onEdit={() =>
@@ -847,7 +1128,7 @@ export default function ProfilePage() {
                       {(user as any)?.board || "—"}
                     </Typography>
                   </Stack>
-                </ProfileCard>
+                </HeaderCardDesign>
               </Grid>
             </Grid>
           </Grid>
@@ -910,13 +1191,100 @@ export default function ProfilePage() {
                 }
               }
 
+              // Build changed set, with client-side normalization for some fields
+              const normalizeGender = (v: any) => {
+                if (v == null) return null;
+                const s = String(v).trim().toLowerCase();
+                const map: Record<string, string> = {
+                  male: "male",
+                  m: "male",
+                  female: "female",
+                  f: "female",
+                  other: "nonbinary",
+                  "non-binary": "nonbinary",
+                  "non binary": "nonbinary",
+                  nonbinary: "nonbinary",
+                  nb: "nonbinary",
+                };
+                return map[s] ?? null;
+              };
+
               const changed: Record<string, any> = {};
               for (const f of drawer.fields!) {
                 const key = f.name;
-                const oldVal = (user as any)?.[key];
-                const newVal = vals[key];
-                if (newVal !== oldVal)
-                  changed[key] = newVal === "" ? null : newVal;
+                // prefer top-level user property, fall back to profile
+                const oldVal =
+                  (user as any)?.[key] ?? (user as any)?.profile?.[key];
+                let newVal = vals[key];
+
+                // normalize empty string -> null
+                if (newVal === "") newVal = null;
+
+                // field-specific normalization/validation
+                if (key === "student_name" && typeof newVal === "string") {
+                  const trimmed = newVal.trim().replace(/\s+/g, " ");
+                  if (!trimmed) {
+                    newVal = null;
+                  } else if (/\d/.test(trimmed)) {
+                    setSnack({
+                      open: true,
+                      message: "Name must not contain numbers",
+                      severity: "error",
+                    });
+                    return;
+                  } else {
+                    newVal = trimmed;
+                  }
+                }
+
+                if (key === "gender") {
+                  const mapped = normalizeGender(newVal);
+                  if (mapped == null) {
+                    // drop unknown gender value rather than risk a DB enum error
+                    continue;
+                  }
+                  newVal = mapped;
+                }
+
+                if (f.type === "chips") {
+                  if (Array.isArray(newVal)) {
+                    newVal = newVal
+                      .map((s: any) => String(s).trim())
+                      .filter(Boolean);
+                  } else if (typeof newVal === "string") {
+                    newVal = newVal
+                      .split(",")
+                      .map((s) => s.trim())
+                      .filter(Boolean);
+                  } else {
+                    newVal = null;
+                  }
+                }
+
+                // Only include if changed (strict equality vs both null)
+                const oldNormalized = oldVal === undefined ? null : oldVal;
+                const newNormalized = newVal === undefined ? null : newVal;
+                const bothNull = oldNormalized == null && newNormalized == null;
+                if (!bothNull) {
+                  const changedFlag =
+                    JSON.stringify(oldNormalized) !==
+                    JSON.stringify(newNormalized);
+                  if (changedFlag) changed[key] = newNormalized;
+                }
+              }
+
+              // Special case: if dob present, convert YYYY-MM-DD -> ISO date string
+              if (typeof changed.dob === "string" && changed.dob) {
+                try {
+                  const d = new Date(changed.dob);
+                  if (!isNaN(d.getTime())) {
+                    // store as full ISO (server-side upsert will accept and you can also
+                    // include top-level dob column to persist into a dedicated column)
+                    changed.dob = d.toISOString();
+                  }
+                } catch {
+                  // leave as-is if conversion fails
+                }
               }
               if (Object.keys(changed).length === 0) {
                 setSnack({
@@ -964,11 +1332,15 @@ export default function ProfilePage() {
                       onChange={(e) => field.onChange(e.target.value)}
                       fullWidth
                     >
-                      {(f.options ?? []).map((opt: string) => (
-                        <MenuItem key={opt} value={opt}>
-                          {opt}
-                        </MenuItem>
-                      ))}
+                      {(f.options ?? []).map((opt: any) => {
+                        const val = typeof opt === "string" ? opt : opt.value;
+                        const lbl = typeof opt === "string" ? opt : opt.label;
+                        return (
+                          <MenuItem key={String(val)} value={val}>
+                            {lbl}
+                          </MenuItem>
+                        );
+                      })}
                     </TextField>
                   )}
                 />
