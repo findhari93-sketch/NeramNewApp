@@ -9,6 +9,7 @@ const mockUser: User = {
   id: "u123",
   name: "Subramanya",
   role: "Visitor",
+  accountType: "Free",
   avatarUrl: null,
   plan: "Free",
   storageFull: true,

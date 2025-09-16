@@ -334,54 +334,120 @@ export default function ApplicationForm() {
   ];
 
   // Auto-load draft from localStorage on mount so user data survives refresh
+  // Also fetch latest DB values from /api/users/me and merge into form state
   const saveTimerRef = React.useRef(null);
   React.useEffect(() => {
-    try {
-      const raw = localStorage.getItem("neram_application_draft_v1");
-      if (raw) {
-        const payload = JSON.parse(raw);
-        const [, setFormLocal] = formState;
-        const [, setAltPhoneLocal] = altPhoneState;
-        const [, setInstagramLocal] = instagramIdState;
-        const [, setSelectedLanguagesLocal] = selectedLanguagesState;
-        const [, setYoutubeSubscribedLocal] = youtubeSubscribedState;
-        const [, setSelectedCourseLocal] = selectedCourseState;
-        const [, setEducationTypeLocal] = educationTypeState;
-        const [, setSchoolStdLocal] = schoolStdState;
-        const [, setCollegeNameLocal] = collegeNameState;
-        const [, setCollegeYearLocal] = collegeYearState;
-        const [, setDiplomaCourseLocal] = diplomaCourseState;
-        const [, setDiplomaYearLocal] = diplomaYearState;
-        const [, setDiplomaCollegeLocal] = diplomaCollegeState;
-        const [, setOtherDescriptionLocal] = otherDescriptionState;
-        const [, setSoftwareCourseLocal] = softwareCourseState;
-        if (payload.form) setFormLocal(payload.form);
-        if (payload.altPhone) setAltPhoneLocal(payload.altPhone);
-        if (payload.instagramId) setInstagramLocal(payload.instagramId);
-        if (payload.selectedLanguages)
-          setSelectedLanguagesLocal(payload.selectedLanguages);
-        if (typeof payload.youtubeSubscribed !== "undefined")
-          setYoutubeSubscribedLocal(payload.youtubeSubscribed);
-        if (payload.selectedCourse)
-          setSelectedCourseLocal(payload.selectedCourse);
-        if (payload.educationType) setEducationTypeLocal(payload.educationType);
-        if (payload.schoolStd) setSchoolStdLocal(payload.schoolStd);
-        if (payload.collegeName) setCollegeNameLocal(payload.collegeName);
-        if (payload.collegeYear) setCollegeYearLocal(payload.collegeYear);
-        if (payload.diplomaCourse) setDiplomaCourseLocal(payload.diplomaCourse);
-        if (payload.diplomaYear) setDiplomaYearLocal(payload.diplomaYear);
-        if (payload.diplomaCollege)
-          setDiplomaCollegeLocal(payload.diplomaCollege);
-        if (payload.otherDescription)
-          setOtherDescriptionLocal(payload.otherDescription);
-        if (payload.softwareCourse)
-          setSoftwareCourseLocal(payload.softwareCourse);
-        const [, setDraftLoaded] = draftLoadedState;
-        setDraftLoaded(true);
+    let didSet = false;
+    (async () => {
+      try {
+        // Load local draft first
+        const raw = localStorage.getItem("neram_application_draft_v1");
+        if (raw) {
+          const payload = JSON.parse(raw);
+          const [, setFormLocal] = formState;
+          const [, setAltPhoneLocal] = altPhoneState;
+          const [, setInstagramLocal] = instagramIdState;
+          const [, setSelectedLanguagesLocal] = selectedLanguagesState;
+          const [, setYoutubeSubscribedLocal] = youtubeSubscribedState;
+          const [, setSelectedCourseLocal] = selectedCourseState;
+          const [, setEducationTypeLocal] = educationTypeState;
+          const [, setSchoolStdLocal] = schoolStdState;
+          const [, setCollegeNameLocal] = collegeNameState;
+          const [, setCollegeYearLocal] = collegeYearState;
+          const [, setDiplomaCourseLocal] = diplomaCourseState;
+          const [, setDiplomaYearLocal] = diplomaYearState;
+          const [, setDiplomaCollegeLocal] = diplomaCollegeState;
+          const [, setOtherDescriptionLocal] = otherDescriptionState;
+          const [, setSoftwareCourseLocal] = softwareCourseState;
+          if (payload.form) setFormLocal(payload.form);
+          if (payload.altPhone) setAltPhoneLocal(payload.altPhone);
+          if (payload.instagramId) setInstagramLocal(payload.instagramId);
+          if (payload.selectedLanguages)
+            setSelectedLanguagesLocal(payload.selectedLanguages);
+          if (typeof payload.youtubeSubscribed !== "undefined")
+            setYoutubeSubscribedLocal(payload.youtubeSubscribed);
+          if (payload.selectedCourse)
+            setSelectedCourseLocal(payload.selectedCourse);
+          if (payload.educationType)
+            setEducationTypeLocal(payload.educationType);
+          if (payload.schoolStd) setSchoolStdLocal(payload.schoolStd);
+          if (payload.collegeName) setCollegeNameLocal(payload.collegeName);
+          if (payload.collegeYear) setCollegeYearLocal(payload.collegeYear);
+          if (payload.diplomaCourse)
+            setDiplomaCourseLocal(payload.diplomaCourse);
+          if (payload.diplomaYear) setDiplomaYearLocal(payload.diplomaYear);
+          if (payload.diplomaCollege)
+            setDiplomaCollegeLocal(payload.diplomaCollege);
+          if (payload.otherDescription)
+            setOtherDescriptionLocal(payload.otherDescription);
+          if (payload.softwareCourse)
+            setSoftwareCourseLocal(payload.softwareCourse);
+          const [, setDraftLoaded] = draftLoadedState;
+          setDraftLoaded(true);
+          didSet = true;
+        }
+      } catch (err) {
+        // ignore parse errors
       }
-    } catch (err) {
-      // ignore parse errors
-    }
+      // Now fetch latest DB values and merge into form state
+      try {
+        const token = await auth.currentUser?.getIdToken();
+        if (token) {
+          const res = await fetch("/api/users/me", {
+            method: "GET",
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.user) {
+              // Overwrite form state with DB values only (ignore local draft for these fields)
+              const db = data.user;
+              const [, setFormLocal] = formState;
+              const [, setAltPhoneLocal] = altPhoneState;
+              const [, setInstagramLocal] = instagramIdState;
+              const [, setSelectedLanguagesLocal] = selectedLanguagesState;
+              const [, setYoutubeSubscribedLocal] = youtubeSubscribedState;
+              const [, setSelectedCourseLocal] = selectedCourseState;
+              const [, setEducationTypeLocal] = educationTypeState;
+              const [, setSchoolStdLocal] = schoolStdState;
+              const [, setCollegeNameLocal] = collegeNameState;
+              const [, setCollegeYearLocal] = collegeYearState;
+              const [, setDiplomaCourseLocal] = diplomaCourseState;
+              const [, setDiplomaYearLocal] = diplomaYearState;
+              const [, setDiplomaCollegeLocal] = diplomaCollegeState;
+              const [, setOtherDescriptionLocal] = otherDescriptionState;
+              const [, setSoftwareCourseLocal] = softwareCourseState;
+              setFormLocal({
+                studentName: db.student_name ?? "",
+                fatherName: db.father_name ?? "",
+                gender: db.gender ?? "",
+                zipCode: db.zip_code ?? "",
+                city: db.city ?? "",
+                state: db.state ?? "",
+                country: db.country ?? "",
+                email: db.email ?? "",
+              });
+              setAltPhoneLocal(db.alt_phone ?? "");
+              setInstagramLocal(db.instagram_handle ?? "");
+              setSelectedLanguagesLocal(db.selected_languages ?? []);
+              setYoutubeSubscribedLocal(db.youtube_subscribed ?? false);
+              setSelectedCourseLocal(db.selected_course ?? "nata-jee");
+              setEducationTypeLocal(db.education_type ?? "school");
+              setSchoolStdLocal(db.school_std ?? "12th");
+              setCollegeNameLocal(db.college_name ?? "");
+              setCollegeYearLocal(db.college_year ?? "1st Year");
+              setDiplomaCourseLocal(db.diploma_course ?? "");
+              setDiplomaYearLocal(db.diploma_year ?? "Third Year");
+              setDiplomaCollegeLocal(db.diploma_college ?? "");
+              setOtherDescriptionLocal(db.other_description ?? "");
+              setSoftwareCourseLocal(db.software_course ?? "Revit");
+            }
+          }
+        }
+      } catch (err) {
+        // ignore network errors
+      }
+    })();
     // run once on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

@@ -680,6 +680,7 @@ export async function POST(req: Request) {
       // insert new row
       const insertObj: Partial<UserRow> & Record<string, unknown> = {
         ...known,
+        account_type: "Free", // always set Free for new users
       };
       // allow database default to generate UUID id; as a fallback, generate one here if needed
       (insertObj as Partial<UserRow>).id = crypto.randomUUID();
