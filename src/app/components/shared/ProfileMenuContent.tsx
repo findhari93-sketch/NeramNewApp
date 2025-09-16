@@ -64,7 +64,7 @@ export default function ProfileMenuContent({
               {user?.name ?? "Guest User"}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              {user?.role ?? "Visitor"}
+              {user?.accountType ?? "Free"}
             </Typography>
           </Box>
           <Button

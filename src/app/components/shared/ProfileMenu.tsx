@@ -92,7 +92,7 @@ export default function ProfileMenu({ user, onSignOut }: ProfileMenuProps) {
             {demoName}
           </Typography>
           <Typography variant="caption" color="text.secondary">
-            {user?.role ?? "Visitor"}
+            {user?.accountType ?? "Free"}
           </Typography>
         </Box>
       </Button>
@@ -114,7 +114,7 @@ export default function ProfileMenu({ user, onSignOut }: ProfileMenuProps) {
               <Box sx={{ flex: 1 }}>
                 <Typography variant="subtitle1">{demoName}</Typography>
                 <Typography variant="body2" color="text.secondary">
-                  {user?.role ?? "Visitor"}
+                  {user?.accountType ?? "Free"}
                 </Typography>
               </Box>
               <Button

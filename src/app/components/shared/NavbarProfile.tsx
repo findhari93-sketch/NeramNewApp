@@ -55,7 +55,8 @@ export default function NavbarProfile({
   };
 
   const displayName = user?.name ?? "Guest";
-  const displayRole = user?.role ?? "Visitor";
+  // prefer explicit accountType returned from DB; fall back to role for compatibility
+  const displayRole = (user as any)?.accountType ?? user?.role ?? "Free"; // default to Free for accounts without explicit accountType
 
   return (
     <>

@@ -6,6 +6,11 @@ import Button from "@mui/material/Button";
 import TextField from "@mui/material/TextField";
 import Snackbar from "@mui/material/Snackbar";
 import Alert from "@mui/material/Alert";
+import Dialog from "@mui/material/Dialog";
+import DialogTitle from "@mui/material/DialogTitle";
+import DialogContent from "@mui/material/DialogContent";
+import DialogActions from "@mui/material/DialogActions";
+import IconButton from "@mui/material/IconButton";
 import Container from "@mui/material/Container";
 import Paper from "@mui/material/Paper";
 import CircularProgress from "@mui/material/CircularProgress";
@@ -17,39 +22,33 @@ import Chip from "@mui/material/Chip";
 import MenuItem from "@mui/material/MenuItem";
 import { Controller, useForm } from "react-hook-form";
 import { auth } from "../../lib/firebase";
-import { onAuthStateChanged, updateProfile } from "firebase/auth";
+import {
+  onAuthStateChanged,
+  updateProfile,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
+  updatePassword,
+  signInWithPopup,
+  GoogleAuthProvider,
+} from "firebase/auth";
 import TopNavBar from "../components/shared/TopNavBar";
 import { useRouter } from "next/navigation";
 import apiClient from "../../lib/apiClient";
 import HeaderCardDesign from "./components/HeaderCardDesign";
 import ProfilePictureCard from "./components/ProfilePictureCard";
+import { useSyncedUser } from "@/hooks/useSyncedUser";
 
 export default function ProfilePage() {
-  // All hooks must be inside the function and before any return
-  const [user, setUser] = React.useState<Record<string, unknown> | null>(() => {
-    try {
-      const cur =
-        (auth && (auth.currentUser as unknown as Record<string, unknown>)) ||
-        null;
-      if (!cur) return null;
-      const uid =
-        typeof (cur as any).uid === "string" ? (cur as any).uid : null;
-      if (!uid) return cur as Record<string, unknown>;
-      const raw = localStorage.getItem(`avatar-cache:${uid}`);
-      if (!raw) return cur as Record<string, unknown>;
-      try {
-        const parsed = JSON.parse(raw) as Record<string, any>;
-        const photo = parsed.dataUrl || parsed.url || null;
-        if (photo)
-          return { ...(cur as Record<string, unknown>), photoURL: photo };
-      } catch {
-        return cur as Record<string, unknown>;
-      }
-      return cur as Record<string, unknown>;
-    } catch {
-      return null;
-    }
-  });
+  // Set authChecked to true after Firebase auth state is checked
+  React.useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      // Optionally set user state here if needed
+      setAuthChecked(true);
+    });
+    return () => unsubscribe();
+  }, []);
+  const userId = auth.currentUser?.uid ?? "";
+  const [user, setUser] = useSyncedUser(userId);
   // (Removed unused initialPhoto state; we now write a global cache key below when we save cache.)
   const router = useRouter();
   const [authChecked, setAuthChecked] = React.useState(false);
@@ -93,6 +92,15 @@ export default function ProfilePage() {
     severity?: "success" | "error" | "info";
   }>({ open: false });
 
+  // Password change dialog state
+  const [pwdDialogOpen, setPwdDialogOpen] = React.useState(false);
+  const [pwdLoading, setPwdLoading] = React.useState(false);
+  const [oldPassword, setOldPassword] = React.useState("");
+  const [newPassword, setNewPassword] = React.useState("");
+  const [confirmPassword, setConfirmPassword] = React.useState("");
+  const [pwdError, setPwdError] = React.useState<string | null>(null);
+  const [reauthenticated, setReauthenticated] = React.useState(false);
+
   const { control, handleSubmit, reset } = useForm<Record<string, any>>({
     defaultValues: {},
   });
@@ -117,7 +125,7 @@ export default function ProfilePage() {
 
   // Field schemas for drawer (examples)
   const profileFields = [
-    { name: "father_name", label: "Father&apos;s Name", type: "text" },
+    { name: "father_name", label: "Father's Name", type: "text" },
     {
       name: "student_name",
       label: "Student Name",
@@ -130,8 +138,6 @@ export default function ProfilePage() {
       name: "gender",
       label: "Gender",
       type: "select",
-      // use normalized values for option.value to match server enum values;
-      // label is the human-friendly string shown to users.
       options: [
         { value: "male", label: "Male" },
         { value: "female", label: "Female" },
@@ -139,58 +145,246 @@ export default function ProfilePage() {
       ],
     },
     { name: "interests", label: "Interests", type: "chips" },
+    // Add dropdown for languages
+    {
+      name: "selected_languages",
+      label: "Languages",
+      type: "multi-select",
+      options: [
+        { value: "English", label: "English" },
+        { value: "Tamil", label: "Tamil" },
+        { value: "Hindi", label: "Hindi" },
+      ],
+    },
+    // Add cycling selector for youtubeSubscribed
+    {
+      name: "youtube_subscribed",
+      label: "Subscribed to YouTube?",
+      type: "cycle",
+      options: [
+        { value: true, label: "Yes" },
+        { value: false, label: "No" },
+      ],
+    },
+    // Add dropdown for selectedCourse
+    {
+      name: "selected_course",
+      label: "Course",
+      type: "select",
+      options: [
+        { value: "nata-jee", label: "NATA/JEE" },
+        { value: "barch", label: "B.Arch" },
+        { value: "other", label: "Other" },
+      ],
+    },
+    // Add dropdown for softwareCourse
+    {
+      name: "software_course",
+      label: "Software Course",
+      type: "select",
+      options: [
+        { value: "Revit", label: "Revit" },
+        { value: "AutoCAD", label: "AutoCAD" },
+        { value: "SketchUp", label: "SketchUp" },
+      ],
+    },
   ];
-
   const accountFields = [
     { name: "username", label: "Username", type: "text", required: true },
   ];
 
   const contactFields = [
     { name: "email", label: "Email", type: "email", required: true },
-    { name: "phone", label: "Phone", type: "text" },
-    { name: "city", label: "City", type: "text" },
+    { name: "phone", label: "Verified Number", type: "text" },
+    { name: "alternate_phone", label: "Alternate Number", type: "text" },
+    {
+      name: "city",
+      label: "City",
+      type: "select",
+      options: [
+        { value: "Chennai", label: "Chennai" },
+        { value: "Coimbatore", label: "Coimbatore" },
+        { value: "Madurai", label: "Madurai" },
+        { value: "Other", label: "Other" },
+      ],
+    },
+    {
+      name: "state",
+      label: "State",
+      type: "select",
+      options: [
+        { value: "Tamil Nadu", label: "Tamil Nadu" },
+        { value: "Kerala", label: "Kerala" },
+        { value: "Karnataka", label: "Karnataka" },
+        { value: "Other", label: "Other" },
+      ],
+    },
+    {
+      name: "country",
+      label: "Country",
+      type: "select",
+      options: [
+        { value: "India", label: "India" },
+        { value: "Other", label: "Other" },
+      ],
+    },
     { name: "zip_code", label: "Zip Code", type: "text" },
   ];
 
   const educationFields = [
-    { name: "education_type", label: "Education Type", type: "text" },
-    { name: "school_name", label: "School/College Name", type: "text" },
-    { name: "board", label: "Board / Course", type: "text" },
-    { name: "board_year", label: "Board Year", type: "text" },
-    { name: "nata_attempt_year", label: "NATA attempt Year", type: "text" },
+    {
+      name: "education_type",
+      label: "Education Type",
+      type: "select",
+      options: [
+        { value: "school", label: "School" },
+        { value: "college", label: "College" },
+        { value: "diploma", label: "Diploma" },
+        { value: "other", label: "Other" },
+      ],
+    },
+    {
+      name: "school_std",
+      label: "School Standard/Grade",
+      type: "cycle",
+      options: [
+        { value: "Below 10th", label: "Below 10th" },
+        { value: "10th", label: "10th" },
+        { value: "11th", label: "11th" },
+        { value: "12th", label: "12th" },
+      ],
+    },
+    {
+      name: "board",
+      label: "Education Board",
+      type: "select",
+      options: [
+        { value: "CBSE", label: "CBSE" },
+        { value: "State Board", label: "State Board" },
+        { value: "ICSE", label: "ICSE" },
+        { value: "Other", label: "Other" },
+      ],
+    },
+    {
+      name: "board_year",
+      label: "Board Exam Year",
+      type: "cycle",
+      options: [
+        { value: "2022-23", label: "2022-23" },
+        { value: "2023-24", label: "2023-24" },
+        { value: "2024-25", label: "2024-25" },
+        { value: "2025-26", label: "2025-26" },
+        { value: "2026-27", label: "2026-27" },
+        { value: "2027-28", label: "2027-28" },
+      ],
+    },
+    { name: "school_name", label: "School Name", type: "text" },
+    { name: "college_name", label: "College Name", type: "text" },
+    {
+      name: "college_year",
+      label: "College Year",
+      type: "cycle",
+      options: [
+        { value: "1st Year", label: "1st Year" },
+        { value: "2nd Year", label: "2nd Year" },
+        { value: "3rd Year", label: "3rd Year" },
+        { value: "Completed", label: "Completed" },
+      ],
+    },
+    { name: "diploma_course", label: "Diploma Course", type: "text" },
+    {
+      name: "diploma_year",
+      label: "Diploma Year",
+      type: "cycle",
+      options: [
+        { value: "2022-23", label: "2022-23" },
+        { value: "2023-24", label: "2023-24" },
+        { value: "2024-25", label: "2024-25" },
+        { value: "2025-26", label: "2025-26" },
+        { value: "2026-27", label: "2026-27" },
+        { value: "2027-28", label: "2027-28" },
+        { value: "Completed", label: "Completed" },
+      ],
+    },
+    { name: "diploma_college", label: "Diploma College Name", type: "text" },
+    {
+      name: "nata_attempt_year",
+      label: "NATA Attempt Year",
+      type: "cycle",
+      options: [
+        { value: "2022-23", label: "2022-23" },
+        { value: "2023-24", label: "2023-24" },
+        { value: "2024-25", label: "2024-25" },
+        { value: "2025-26", label: "2025-26" },
+        { value: "2026-27", label: "2026-27" },
+        { value: "2027-28", label: "2027-28" },
+      ],
+    },
+    {
+      name: "other_description",
+      label: "What I do ?",
+      type: "multiline",
+    },
   ];
+
+  // Helper function to determine which fields should be displayed based on education type
+  const getFieldsForEducationType = (educationType: string) => {
+    const normalizedType = (educationType || "school").toLowerCase();
+
+    const commonFields = ["education_type", "nata_attempt_year"];
+
+    switch (normalizedType) {
+      case "college":
+        return [...commonFields, "college_name", "college_year"];
+      case "school":
+        return [
+          ...commonFields,
+          "school_std",
+          "board",
+          "board_year",
+          "school_name",
+        ];
+      case "diploma":
+        return [
+          ...commonFields,
+          "diploma_college",
+          "diploma_year",
+          "diploma_course",
+        ];
+      case "other":
+        return [...commonFields, "other_description"];
+      default:
+        return [
+          ...commonFields,
+          "school_std",
+          "board",
+          "board_year",
+          "school_name",
+        ]; // default to school
+    }
+  };
 
   const openEditDrawer = (params: {
     title: string;
     fields: any[];
     values?: Record<string, any>;
   }) => {
-    // Build initial values for the form. Use provided values but
-    // fall back to other user fields so required fields (e.g. student_name)
-    // are prefilled when possible.
     const provided = params.values ?? {};
-    const initialValues: Record<string, any> = { ...provided };
+    const initialValues: Record<string, any> = { ...(provided ?? {}) };
     try {
-      // student_name fallback -> displayName
+      // student_name fallback -> displayName / email / phone
       if (
         (params.fields || []).some((f: any) => f.name === "student_name") &&
         !initialValues["student_name"]
       ) {
-        if (
-          typeof (provided as any).student_name === "string" &&
-          (provided as any).student_name
-        )
+        if ((provided as any).student_name)
           initialValues["student_name"] = (provided as any).student_name;
-        else if (
-          typeof (user as any)?.displayName === "string" &&
-          (user as any).displayName
-        )
+        else if ((user as any)?.displayName)
           initialValues["student_name"] = (user as any).displayName;
-        else if (
-          typeof (user as any)?.student_name === "string" &&
-          (user as any).student_name
-        )
-          initialValues["student_name"] = (user as any).student_name;
+        else if ((user as any)?.email)
+          initialValues["student_name"] = (user as any).email;
+        else if ((user as any)?.phoneNumber)
+          initialValues["student_name"] = (user as any).phoneNumber;
       }
 
       // father_name fallback -> profile.father_name or user.father_name
@@ -301,7 +495,29 @@ export default function ProfilePage() {
       // server returns { ok: true, user }
       const returnedUser = parsed && parsed.user ? parsed.user : parsed;
       if (returnedUser) {
-        setUser((prev) => ({ ...(prev as any), ...(returnedUser ?? {}) }));
+        // Merge education fields from profile into top-level for UI consistency
+        const educationKeys = [
+          "education_type",
+          "school_std",
+          "board",
+          "board_year",
+          "school_name",
+          "college_name",
+          "college_year",
+          "diploma_course",
+          "diploma_year",
+          "diploma_college",
+          "nata_attempt_year",
+          "other_description",
+        ];
+        if (returnedUser.profile) {
+          for (const k of educationKeys) {
+            if (returnedUser.profile[k] !== undefined) {
+              returnedUser[k] = returnedUser.profile[k];
+            }
+          }
+        }
+        setUser(returnedUser);
         try {
           const uid = String(userId);
           // write a local cache copy to avoid extra DB hits on reload
@@ -437,39 +653,7 @@ export default function ProfilePage() {
     }
   };
 
-  React.useEffect(() => {
-    // First try a synchronous currentUser read (safe only on client)
-    const current = auth.currentUser;
-    if (current) {
-      setUser(current as unknown as Record<string, unknown>);
-      deriveAndSetName(current as unknown as Record<string, unknown>);
-      setAuthChecked(true);
-    }
-
-    // Listen for auth changes
-    const unsub = onAuthStateChanged(auth, (u) => {
-      if (!u) {
-        setUser(null);
-        deriveAndSetName(null);
-        setAuthChecked(true);
-        return;
-      }
-      const asObj = u as unknown as Record<string, unknown>;
-      setUser(asObj);
-      deriveAndSetName(asObj);
-      setAuthChecked(true);
-    });
-
-    try {
-      const pv = localStorage.getItem("phone_verified");
-      if (pv && !user) setUser((prev) => prev || { phoneNumber: pv });
-    } catch {
-      /* ignore */
-    }
-
-    return () => unsub();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Removed: auth state sync and cache logic
 
   // studentName is initialized from auth state below to avoid running an
   // effect on every small `user` mutation (photoURL updates etc.) which
@@ -477,129 +661,8 @@ export default function ProfilePage() {
 
   // Avatar cache stored in localStorage under key `avatar-cache:<uid>`.
   // Value shape: { url?: string, fetchedAt?: number, expiresIn?: number, dataUrl?: string }
-  React.useEffect(() => {
-    const CACHE_MARGIN_MS = 15 * 1000; // safety margin
 
-    const getCache = (uid: string) => {
-      try {
-        const raw = localStorage.getItem(`avatar-cache:${uid}`);
-        if (!raw) return null;
-        return JSON.parse(raw) as Record<string, any> | null;
-      } catch {
-        return null;
-      }
-    };
-
-    const setCache = (uid: string, v: Record<string, any>) => {
-      try {
-        localStorage.setItem(`avatar-cache:${uid}`, JSON.stringify(v));
-      } catch {
-        // ignore quota errors
-      }
-    };
-
-    const fetchImageAsDataUrl = async (url: string) => {
-      try {
-        const r = await fetch(url);
-        if (!r.ok) return null;
-        const blob = await r.blob();
-        // only cache reasonably small images to avoid blowing localStorage
-        if (blob.size > 250 * 1024) return null;
-        return await new Promise<string | null>((resolve) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = () => resolve(null);
-          reader.readAsDataURL(blob);
-        });
-      } catch {
-        return null;
-      }
-    };
-
-    (async () => {
-      try {
-        if (!user) return;
-        const uid = (user as any)?.uid as string | undefined;
-        if (!uid) return;
-
-        const cached = getCache(uid);
-        const now = Date.now();
-
-        if (cached) {
-          // Use signed URL if it's still valid
-          if (cached.url && cached.fetchedAt && cached.expiresIn) {
-            const expiresAt = cached.fetchedAt + (cached.expiresIn * 1000 || 0);
-            if (now + CACHE_MARGIN_MS < expiresAt) {
-              setUser((prev) => {
-                // avoid creating a new object when photoURL is unchanged
-                if ((prev as any)?.photoURL === cached.url) return prev;
-                return { ...(prev as any), photoURL: cached.url };
-              });
-              return;
-            }
-          }
-
-          // If signed URL expired but we have a cached data URL, use it immediately
-          if (cached.dataUrl) {
-            setUser((prev) => {
-              if ((prev as any)?.photoURL === cached.dataUrl) return prev;
-              return { ...(prev as any), photoURL: cached.dataUrl };
-            });
-            // continue to fetch fresh signed URL in background
-          }
-        }
-
-        const res = await fetch(
-          `/api/avatar-url?userId=${encodeURIComponent(uid)}&expires=300`
-        );
-        if (!res.ok) return;
-        const j = await res.json();
-        if (j?.signedUrl) {
-          setUser((prev) => {
-            if ((prev as any)?.photoURL === j.signedUrl) return prev;
-            return { ...(prev as any), photoURL: j.signedUrl };
-          });
-
-          const newCache: Record<string, any> = {
-            url: j.signedUrl,
-            fetchedAt: Date.now(),
-            expiresIn: 300,
-            dataUrl: (cached && cached.dataUrl) || null,
-          };
-          setCache(uid, newCache);
-          try {
-            localStorage.setItem(
-              "avatar-cache:last",
-              JSON.stringify({ uid, photo: j.signedUrl, fetchedAt: Date.now() })
-            );
-            try {
-              window.dispatchEvent(
-                new CustomEvent("avatar-updated", {
-                  detail: { uid, photo: j.signedUrl },
-                })
-              );
-            } catch {}
-          } catch {}
-
-          // Try to fetch image and cache small images as base64 for instant loads
-          (async () => {
-            const data = await fetchImageAsDataUrl(j.signedUrl);
-            if (data) {
-              newCache.dataUrl = data;
-              setCache(uid, newCache);
-              // update UI to use the dataUrl for faster subsequent loads
-              setUser((prev) => {
-                if ((prev as any)?.photoURL === data) return prev;
-                return { ...(prev as any), photoURL: data };
-              });
-            }
-          })();
-        }
-      } catch {
-        // ignore network errors
-      }
-    })();
-  }, [user]);
+  // Removed: avatar cache logic and updater function
 
   // Save Google user details to Supabase on Google login
   React.useEffect(() => {
@@ -667,30 +730,32 @@ export default function ProfilePage() {
   );
 
   React.useEffect(() => {
+    // Always run this effect, but only fetch if conditions are met
     if (!authChecked || !user) return;
     const uid = (user as any)?.uid;
     if (!uid) return;
     if (fetchedMeForUid.current === uid) return; // already fetched for this uid
 
     // if we have a fresh cache, use it and avoid a network call
-    const cached = readUserCache(uid);
+    let cached = readUserCache(uid);
+    // Clear old cache that might not have education fields
+    if (
+      cached &&
+      !(cached as any).education_type &&
+      !(cached as any).school_std
+    ) {
+      localStorage.removeItem(`user-cache:${uid}`);
+      cached = null; // Force fresh fetch
+      console.log("Cleared old cache without education fields");
+    }
     if (cached) {
-      setUser((prev) => {
-        const prevObj = (prev as any) || {};
-        const merged = { ...prevObj, ...(cached || {}) } as Record<
-          string,
-          unknown
-        >;
-        try {
-          if (prevObj.profile && (cached as any).profile) {
-            merged.profile = {
-              ...(prevObj.profile || {}),
-              ...((cached as any).profile || {}),
-            };
-          }
-        } catch {}
-        return merged;
+      console.log("Using cached user data:", {
+        education_type: (cached as any).education_type,
+        school_std: (cached as any).school_std,
+        board: (cached as any).board,
+        has_education_fields: !!(cached as any).education_type,
       });
+      setUser(cached);
       fetchedMeForUid.current = uid;
       return;
     }
@@ -702,21 +767,22 @@ export default function ProfilePage() {
         const parsed = await res.json().catch(() => null);
         const dbUser = parsed && parsed.user ? parsed.user : parsed;
         if (dbUser) {
-          setUser((prev) => {
-            // merge top-level fields; preserve client auth properties like uid/email when present
-            const prevObj = (prev as any) || {};
-            const merged = { ...prevObj, ...dbUser } as Record<string, unknown>;
-            // deep-merge profile JSON if both exist to avoid losing client-side transient keys
-            try {
-              if (prevObj.profile && dbUser.profile) {
-                merged.profile = {
-                  ...(prevObj.profile || {}),
-                  ...(dbUser.profile || {}),
-                };
-              }
-            } catch {}
-            return merged;
+          // Debug: Log the education fields received from database
+          console.log("Education fields from DB:", {
+            education_type: dbUser.education_type,
+            school_std: dbUser.school_std,
+            board: dbUser.board,
+            board_year: dbUser.board_year,
+            school_name: dbUser.school_name,
+            college_name: dbUser.college_name,
+            college_year: dbUser.college_year,
+            diploma_course: dbUser.diploma_course,
+            diploma_year: dbUser.diploma_year,
+            diploma_college: dbUser.diploma_college,
+            nata_attempt_year: dbUser.nata_attempt_year,
+            other_description: dbUser.other_description,
           });
+          setUser(dbUser);
           // write to local cache for future reloads
           try {
             writeUserCache(uid, dbUser);
@@ -752,85 +818,8 @@ export default function ProfilePage() {
   }
 
   // Derived values are read inline in the JSX below; avoid duplicate
-  // local bindings here to reduce accidental unused-variable warnings.
-
-  // student name editing state (declared after derived `name`/`photo`)
-  // ...existing code...
-
-  // ...existing code...
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const saveStudentName = async () => {
-    // client-side validation: not empty and no digits
-    const trimmed = (studentName || "").trim();
-    if (!trimmed) {
-      setSnackMsg("Name cannot be empty");
-      setSnackOpen(true);
-      return;
-    }
-    if (/\d/.test(trimmed)) {
-      setSnackMsg("Name must not contain numbers");
-      setSnackOpen(true);
-      return;
-    }
-    if (!auth.currentUser) {
-      setSnackMsg("No authenticated user");
-      setSnackOpen(true);
-      return;
-    }
-
-    setSaving(true);
-    try {
-      await updateProfile(auth.currentUser, { displayName: trimmed });
-      // update local user object for immediate UI feedback
-      setUser((prev) => {
-        const copy = (prev && { ...(prev as Record<string, unknown>) }) || {};
-        copy.displayName = trimmed;
-        return copy as Record<string, unknown>;
-      });
-      // also update the application draft in localStorage so forms stay in sync
-      try {
-        const raw = localStorage.getItem("neram_application_draft_v1");
-        const draft = raw ? JSON.parse(raw) : {};
-        draft.form = draft.form || {};
-        draft.form.studentName = trimmed;
-        localStorage.setItem(
-          "neram_application_draft_v1",
-          JSON.stringify(draft)
-        );
-        // persist to Supabase user table via API route
-        try {
-          const payload = {
-            uid: auth.currentUser?.uid,
-            email: auth.currentUser?.email,
-            phone: auth.currentUser?.phoneNumber,
-            displayName: trimmed,
-            profile: { photoURL: auth.currentUser?.photoURL },
-          };
-          apiClient("/api/users/upsert", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          }).catch((e) => console.warn("upsert user failed", e));
-        } catch {}
-      } catch {}
-      setSnackMsg("Saved");
-      setSnackOpen(true);
-      // Close the persistent prompt since name has been provided
-      setRequireNameSnackOpen(false);
-      // redirect to home after successful save
-      router.push("/");
-    } catch {
-      console.error("saveStudentName error");
-      setSnackMsg("Failed to save");
-      setSnackOpen(true);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // safe derived fields to avoid `any` casts in JSX
-  // The following derived fields are useful for debugging and future UI
   // enhancements. They are intentionally unused for now; disable the
   // unused-vars rule for this block so typecheck stays clean.
   /* eslint-disable @typescript-eslint/no-unused-vars */
@@ -946,7 +935,7 @@ export default function ProfilePage() {
                   avatarSize={96}
                 />
                 <Typography variant="body2" sx={{ mb: 1 }}>
-                  {((user as any)?.bio ?? (user as any)?.profile?.bio) || "—"}
+                  {(user as any)?.bio || "—"}
                 </Typography>
 
                 <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
@@ -958,8 +947,8 @@ export default function ProfilePage() {
                   </Typography>
 
                   <Typography variant="body2">
-                    {((user as any)?.student_name ??
-                      (user as any)?.displayName) ||
+                    {(user as any)?.student_name ||
+                      (user as any)?.displayName ||
                       "—"}
                   </Typography>
                 </Stack>
@@ -972,9 +961,7 @@ export default function ProfilePage() {
                     Father&apos;s Name:
                   </Typography>
                   <Typography variant="body2">
-                    {(user as any)?.father_name ??
-                      (user as any)?.profile?.father_name ??
-                      "—"}
+                    {(user as any)?.father_name || "—"}
                   </Typography>
                 </Stack>
 
@@ -998,9 +985,7 @@ export default function ProfilePage() {
                     Gender:
                   </Typography>
                   <Typography variant="body2">
-                    {(user as any)?.gender ??
-                      (user as any)?.profile?.gender ??
-                      "—"}
+                    {(user as any)?.gender || "—"}
                   </Typography>
                 </Stack>
 
@@ -1053,7 +1038,93 @@ export default function ProfilePage() {
                       {(user as any)?.username || "—"}
                     </Typography>
                   </Stack>
-                  
+
+                  {/* Password row: masked with reveal and edit action */}
+                  <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                    <Typography
+                      variant="body2"
+                      sx={{ minWidth: 200, color: "text.secondary" }}
+                    >
+                      Password:
+                    </Typography>
+                    <Box sx={{ display: "flex", alignItems: "center" }}>
+                      <Typography variant="body2" sx={{ mr: 1 }}>
+                        {"••••••••"}
+                      </Typography>
+                      <IconButton
+                        size="small"
+                        onClick={() =>
+                          setSnack({
+                            open: true,
+                            message:
+                              "Password is hidden for security. Use Change to update your password.",
+                            severity: "info",
+                          })
+                        }
+                        aria-label="reveal-password"
+                      >
+                        {/* info / eye icon */}
+                        <svg
+                          width="18"
+                          height="18"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            d="M12 5C7 5 2.73 8.11 1 12c1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7z"
+                            stroke="currentColor"
+                            strokeWidth="1"
+                          />
+                          <circle
+                            cx="12"
+                            cy="12"
+                            r="3"
+                            stroke="currentColor"
+                            strokeWidth="1"
+                          />
+                        </svg>
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        onClick={() => setPwdDialogOpen(true)}
+                        aria-label="change-password"
+                      >
+                        <svg
+                          width="18"
+                          height="18"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z"
+                            fill="currentColor"
+                          />
+                          <path
+                            d="M20.71 7.04a1.003 1.003 0 0 0 0-1.41l-2.34-2.34a1.003 1.003 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"
+                            fill="currentColor"
+                          />
+                        </svg>
+                      </IconButton>
+                    </Box>
+                  </Stack>
+
+                  <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                    <Typography
+                      variant="body2"
+                      sx={{ minWidth: 200, color: "text.secondary" }}
+                    >
+                      Account Type:
+                    </Typography>
+                    <Typography variant="body2">
+                      {(user as any)?.accountType ||
+                        (user as any)?.account_type ||
+                        "Free"}
+                    </Typography>
+                  </Stack>
+
+                  {/* account type */}
                 </HeaderCardDesign>
               </Grid>
 
@@ -1085,10 +1156,65 @@ export default function ProfilePage() {
                       variant="body2"
                       sx={{ minWidth: 200, color: "text.secondary" }}
                     >
-                      Phone:
+                      Verified Number:
                     </Typography>
                     <Typography variant="body2">
                       {(user as any)?.phone || "—"}
+                    </Typography>
+                  </Stack>
+                  <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                    <Typography
+                      variant="body2"
+                      sx={{ minWidth: 200, color: "text.secondary" }}
+                    >
+                      Alternate Number:
+                    </Typography>
+                    <Typography variant="body2">
+                      {(user as any)?.alternate_phone || "—"}
+                    </Typography>
+                  </Stack>
+                  <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                    <Typography
+                      variant="body2"
+                      sx={{ minWidth: 200, color: "text.secondary" }}
+                    >
+                      City:
+                    </Typography>
+                    <Typography variant="body2">
+                      {(user as any)?.city || "—"}
+                    </Typography>
+                  </Stack>
+                  <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                    <Typography
+                      variant="body2"
+                      sx={{ minWidth: 200, color: "text.secondary" }}
+                    >
+                      State:
+                    </Typography>
+                    <Typography variant="body2">
+                      {(user as any)?.state || "—"}
+                    </Typography>
+                  </Stack>
+                  <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                    <Typography
+                      variant="body2"
+                      sx={{ minWidth: 200, color: "text.secondary" }}
+                    >
+                      Country:
+                    </Typography>
+                    <Typography variant="body2">
+                      {(user as any)?.country || "—"}
+                    </Typography>
+                  </Stack>
+                  <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                    <Typography
+                      variant="body2"
+                      sx={{ minWidth: 200, color: "text.secondary" }}
+                    >
+                      Zip Code:
+                    </Typography>
+                    <Typography variant="body2">
+                      {(user as any)?.zip_code || "—"}
                     </Typography>
                   </Stack>
                 </HeaderCardDesign>
@@ -1098,36 +1224,239 @@ export default function ProfilePage() {
                 <HeaderCardDesign
                   title="Education Details"
                   icon={null}
-                  onEdit={() =>
+                  onEdit={() => {
+                    const educationType =
+                      (user as any)?.education_type ?? "school";
+                    const fieldsToShow =
+                      getFieldsForEducationType(educationType);
+                    const filteredFields = educationFields.filter((field) =>
+                      fieldsToShow.includes(field.name)
+                    );
                     openEditDrawer({
                       title: "Education Details",
-                      fields: educationFields,
+                      fields: filteredFields,
                       values: (user as any) ?? {},
-                    })
-                  }
+                    });
+                  }}
                 >
-                  <Stack direction="row" spacing={1}>
-                    <Typography
-                      variant="body2"
-                      sx={{ minWidth: 200, color: "text.secondary" }}
-                    >
-                      School/College:
-                    </Typography>
-                    <Typography variant="body2">
-                      {(user as any)?.school_name || "—"}
-                    </Typography>
-                  </Stack>
-                  <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                    <Typography
-                      variant="body2"
-                      sx={{ minWidth: 200, color: "text.secondary" }}
-                    >
-                      Board:
-                    </Typography>
-                    <Typography variant="body2">
-                      {(user as any)?.board || "—"}
-                    </Typography>
-                  </Stack>
+                  <Grid container spacing={3}>
+                    <Grid item xs={12} md={6}>
+                      <Stack spacing={2}>
+                        <Stack direction="row" spacing={1}>
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              minWidth: 160,
+                              color: "text.secondary",
+                              fontWeight: 500,
+                            }}
+                          >
+                            Education Type:
+                          </Typography>
+                          <Typography variant="body2">
+                            {(user as any)?.education_type ?? "school"}
+                          </Typography>
+                        </Stack>
+                        {(() => {
+                          const educationType =
+                            (user as any)?.education_type ?? "school";
+                          const fieldsToShow =
+                            getFieldsForEducationType(educationType);
+                          return (
+                            <>
+                              {fieldsToShow.includes("school_std") && (
+                                <Stack direction="row" spacing={1}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      minWidth: 160,
+                                      color: "text.secondary",
+                                      fontWeight: 500,
+                                    }}
+                                  >
+                                    School Standard / Grade:
+                                  </Typography>
+                                  <Typography variant="body2">
+                                    {(user as any)?.school_std ?? "—"}
+                                  </Typography>
+                                </Stack>
+                              )}
+                              {fieldsToShow.includes("board") && (
+                                <Stack direction="row" spacing={1}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      minWidth: 160,
+                                      color: "text.secondary",
+                                      fontWeight: 500,
+                                    }}
+                                  >
+                                    Education Board:
+                                  </Typography>
+                                  <Typography variant="body2">
+                                    {(user as any)?.board ?? "—"}
+                                  </Typography>
+                                </Stack>
+                              )}
+                              {fieldsToShow.includes("board_year") && (
+                                <Stack direction="row" spacing={1}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      minWidth: 160,
+                                      color: "text.secondary",
+                                      fontWeight: 500,
+                                    }}
+                                  >
+                                    Board Exam Year:
+                                  </Typography>
+                                  <Typography variant="body2">
+                                    {(user as any)?.board_year ?? "—"}
+                                  </Typography>
+                                </Stack>
+                              )}
+                              {fieldsToShow.includes("school_name") && (
+                                <Stack direction="row" spacing={1}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      minWidth: 160,
+                                      color: "text.secondary",
+                                      fontWeight: 500,
+                                    }}
+                                  >
+                                    School Name:
+                                  </Typography>
+                                  <Typography variant="body2">
+                                    {(user as any)?.school_name ?? "—"}
+                                  </Typography>
+                                </Stack>
+                              )}
+                              {fieldsToShow.includes("college_name") && (
+                                <Stack direction="row" spacing={1}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      minWidth: 160,
+                                      color: "text.secondary",
+                                      fontWeight: 500,
+                                    }}
+                                  >
+                                    College Name:
+                                  </Typography>
+                                  <Typography variant="body2">
+                                    {(user as any)?.college_name ?? "—"}
+                                  </Typography>
+                                </Stack>
+                              )}
+                              {fieldsToShow.includes("college_year") && (
+                                <Stack direction="row" spacing={1}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      minWidth: 160,
+                                      color: "text.secondary",
+                                      fontWeight: 500,
+                                    }}
+                                  >
+                                    College Year:
+                                  </Typography>
+                                  <Typography variant="body2">
+                                    {(user as any)?.college_year ?? "—"}
+                                  </Typography>
+                                </Stack>
+                              )}
+                              {fieldsToShow.includes("diploma_course") && (
+                                <Stack direction="row" spacing={1}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      minWidth: 160,
+                                      color: "text.secondary",
+                                      fontWeight: 500,
+                                    }}
+                                  >
+                                    Diploma Course:
+                                  </Typography>
+                                  <Typography variant="body2">
+                                    {(user as any)?.diploma_course ?? "—"}
+                                  </Typography>
+                                </Stack>
+                              )}
+                              {fieldsToShow.includes("diploma_year") && (
+                                <Stack direction="row" spacing={1}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      minWidth: 160,
+                                      color: "text.secondary",
+                                      fontWeight: 500,
+                                    }}
+                                  >
+                                    Diploma Year:
+                                  </Typography>
+                                  <Typography variant="body2">
+                                    {(user as any)?.diploma_year ?? "—"}
+                                  </Typography>
+                                </Stack>
+                              )}
+                              {fieldsToShow.includes("diploma_college") && (
+                                <Stack direction="row" spacing={1}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      minWidth: 160,
+                                      color: "text.secondary",
+                                      fontWeight: 500,
+                                    }}
+                                  >
+                                    Diploma College Name:
+                                  </Typography>
+                                  <Typography variant="body2">
+                                    {(user as any)?.diploma_college ?? "—"}
+                                  </Typography>
+                                </Stack>
+                              )}
+                              {fieldsToShow.includes("other_description") && (
+                                <Stack direction="row" spacing={1}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      minWidth: 160,
+                                      color: "text.secondary",
+                                      fontWeight: 500,
+                                    }}
+                                  >
+                                    What I do ?:
+                                  </Typography>
+                                  <Typography variant="body2">
+                                    {(user as any)?.other_description ?? "—"}
+                                  </Typography>
+                                </Stack>
+                              )}
+                              {fieldsToShow.includes("nata_attempt_year") && (
+                                <Stack direction="row" spacing={1}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      minWidth: 160,
+                                      color: "text.secondary",
+                                      fontWeight: 500,
+                                    }}
+                                  >
+                                    NATA Attempt Year:
+                                  </Typography>
+                                  <Typography variant="body2">
+                                    {(user as any)?.nata_attempt_year ?? "—"}
+                                  </Typography>
+                                </Stack>
+                              )}
+                            </>
+                          );
+                        })()}
+                      </Stack>
+                    </Grid>
+                  </Grid>
                 </HeaderCardDesign>
               </Grid>
             </Grid>
@@ -1347,6 +1676,55 @@ export default function ProfilePage() {
               );
             }
 
+            if (f.type === "cycle") {
+              return (
+                <Controller
+                  key={f.name}
+                  name={f.name}
+                  control={control}
+                  defaultValue={
+                    (drawer.values ?? {})[f.name] ?? f.options?.[0]?.value ?? ""
+                  }
+                  render={({ field }) => {
+                    const options = f.options ?? [];
+                    const currentIdx = options.findIndex(
+                      (opt: any) => opt.value === field.value
+                    );
+                    const prevIdx =
+                      (currentIdx - 1 + options.length) % options.length;
+                    const nextIdx = (currentIdx + 1) % options.length;
+                    return (
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                      >
+                        <IconButton
+                          aria-label={`Previous ${f.label}`}
+                          onClick={() => field.onChange(options[prevIdx].value)}
+                          size="small"
+                        >
+                          &#8592;
+                        </IconButton>
+                        <TextField
+                          label={f.label}
+                          value={field.value ?? ""}
+                          onChange={(e) => field.onChange(e.target.value)}
+                          fullWidth
+                          InputProps={{ readOnly: true }}
+                        />
+                        <IconButton
+                          aria-label={`Next ${f.label}`}
+                          onClick={() => field.onChange(options[nextIdx].value)}
+                          size="small"
+                        >
+                          &#8594;
+                        </IconButton>
+                      </Box>
+                    );
+                  }}
+                />
+              );
+            }
+
             if (f.type === "chips") {
               return (
                 <Controller
@@ -1425,6 +1803,165 @@ export default function ProfilePage() {
           })}
         </Box>
       </Drawer>
+
+      {/* Change Password Dialog */}
+      <Dialog open={pwdDialogOpen} onClose={() => setPwdDialogOpen(false)}>
+        <DialogTitle>Change Password</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}>
+            <TextField
+              label="Current password"
+              type="password"
+              value={oldPassword}
+              onChange={(e) => setOldPassword(e.target.value)}
+              fullWidth
+            />
+            <TextField
+              label="New password"
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              fullWidth
+            />
+            <TextField
+              label="Confirm new password"
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              fullWidth
+            />
+            {pwdError ? (
+              <Typography color="error" variant="body2">
+                {pwdError}
+              </Typography>
+            ) : null}
+            <Box>
+              <Button
+                size="small"
+                onClick={async () => {
+                  setPwdError(null);
+                  try {
+                    const googleProvider = new GoogleAuthProvider();
+                    await signInWithPopup(auth, googleProvider);
+                    setReauthenticated(true);
+                    setSnack({
+                      open: true,
+                      message: "Reauthenticated via Google",
+                      severity: "success",
+                    });
+                  } catch (e) {
+                    setPwdError("Google reauthentication failed: " + String(e));
+                  }
+                }}
+              >
+                Sign in with Google
+              </Button>
+            </Box>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPwdDialogOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            disabled={pwdLoading}
+            onClick={async () => {
+              setPwdError(null);
+
+              // basic validation for new password
+              if (!newPassword) return setPwdError("Please enter new password");
+              if (newPassword.length < 6)
+                return setPwdError(
+                  "New password must be at least 6 characters"
+                );
+              if (newPassword !== confirmPassword)
+                return setPwdError("Passwords do not match");
+
+              setPwdLoading(true);
+              try {
+                const current = auth.currentUser;
+                if (!current) {
+                  setPwdError("No authenticated user to change password for");
+                  setPwdLoading(false);
+                  return;
+                }
+
+                const providerIds = Array.isArray((current as any).providerData)
+                  ? ((current as any).providerData as any[]).map(
+                      (p) => p.providerId
+                    )
+                  : [];
+
+                const hasPasswordProvider = providerIds.includes("password");
+                const hasGoogleProvider = providerIds.includes("google.com");
+
+                if (hasPasswordProvider) {
+                  // require old password and validate it
+                  if (!oldPassword) {
+                    setPwdError("Please enter current password");
+                    setPwdLoading(false);
+                    return;
+                  }
+                  try {
+                    const cred = EmailAuthProvider.credential(
+                      current.email ?? "",
+                      oldPassword
+                    );
+                    await reauthenticateWithCredential(current, cred);
+                  } catch (reauthErr) {
+                    setPwdError(
+                      "Current password incorrect: " +
+                        ((reauthErr as any)?.message ?? String(reauthErr))
+                    );
+                    setPwdLoading(false);
+                    return;
+                  }
+                } else if (hasGoogleProvider) {
+                  // require explicit Google reauthentication via the dialog button
+                  if (!reauthenticated) {
+                    setPwdError(
+                      "This account uses Google sign-in. Please click 'Sign in with Google' to reauthenticate first."
+                    );
+                    setPwdLoading(false);
+                    return;
+                  }
+                } else {
+                  setPwdError(
+                    "Unable to reauthenticate this account. Contact support."
+                  );
+                  setPwdLoading(false);
+                  return;
+                }
+
+                // Finally update password
+                try {
+                  await updatePassword(auth.currentUser as any, newPassword);
+                  setSnack({
+                    open: true,
+                    message: "Password changed",
+                    severity: "success",
+                  });
+                  setPwdDialogOpen(false);
+                  setOldPassword("");
+                  setNewPassword("");
+                  setConfirmPassword("");
+                  setReauthenticated(false);
+                } catch (uErr) {
+                  setPwdError(
+                    "Failed to update password: " +
+                      ((uErr as any)?.message ?? String(uErr))
+                  );
+                }
+              } catch (err) {
+                setPwdError("Unexpected error: " + String(err));
+              } finally {
+                setPwdLoading(false);
+              }
+            }}
+          >
+            Change
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Snackbar
         open={snack.open}
