@@ -1,20 +1,3 @@
-/**
- * ProfileCard.tsx
- *
- * Reusable card with a pastel/pink header, left icon, title, and optional Edit button.
- *
- * Example usage:
- * <ProfileCard
- *   title="Contact Details"
- *   icon={<PersonOutlineIcon />}
- *   onEdit={() => openEditDrawer({ title: 'Contact Details', fields: contactFields, values: user }) }
- * >
- *   <Typography>...content...</Typography>
- * </ProfileCard>
- *
- * Props exported: ProfileCardProps
- */
-
 import React, { ReactNode } from "react";
 import Card from "@mui/material/Card";
 import Box from "@mui/material/Box";
@@ -32,7 +15,7 @@ export type ProfileCardProps = {
   sx?: SxProps<Theme>;
 };
 
-export function ProfileCard({
+export function HeaderCardDesign({
   title,
   icon,
   children,
@@ -93,4 +76,4 @@ export function ProfileCard({
   );
 }
 
-export default ProfileCard;
+export default HeaderCardDesign;

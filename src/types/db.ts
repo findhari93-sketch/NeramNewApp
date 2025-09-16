@@ -13,6 +13,9 @@ export type UserRow = {
   country?: string | null;
   instagram_handle?: string | null;
   education_type?: string | null;
+  dob?: string | null;
+  bio?: string | null;
+  interests?: unknown;
   selected_course?: string | null;
   // Education details (dedicated columns)
   // Now stored as an academic-year label (e.g., "2025-26")

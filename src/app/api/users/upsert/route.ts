@@ -198,6 +198,8 @@ export async function POST(req: Request) {
     const fieldMap: Record<string, string> = {
       father_name: "father_name",
       gender: "gender",
+      bio: "bio",
+      interests: "interests",
       zip_code: "zip_code",
       city: "city",
       state: "state",
@@ -239,6 +241,21 @@ export async function POST(req: Request) {
       return undefined;
     };
 
+    // dob handling: accept top-level or profile.dob and normalize to ISO
+    const dobIncoming = fromAny(
+      bodyAsRecord["dob"],
+      bodyAsRecord["dateOfBirth"],
+      (profileFromBody as Record<string, unknown>)["dob"],
+      (profileFromBody as Record<string, unknown>)["dateOfBirth"]
+    );
+    if (dobIncoming !== undefined && dobIncoming !== null) {
+      try {
+        const d = new Date(String(dobIncoming));
+        if (!isNaN(d.getTime()))
+          (known as Partial<UserRow>).dob = d.toISOString();
+      } catch {}
+    }
+
     // Gender normalizer to match enum gender_t
     const normalizeGender = (
       val: unknown
@@ -247,7 +264,7 @@ export async function POST(req: Request) {
       const s = val.trim().toLowerCase();
       if (["male", "m"].includes(s)) return "male";
       if (["female", "f"].includes(s)) return "female";
-      if (["nonbinary", "non-binary", "non binary", "nb"].includes(s))
+      if (["nonbinary", "non-binary", "non binary", "nb", "other"].includes(s))
         return "nonbinary";
       if (
         [
@@ -271,6 +288,26 @@ export async function POST(req: Request) {
     if (genderNormalized !== null)
       (known as Partial<UserRow>).gender =
         genderNormalized as UserRow["gender"];
+
+    // Final safety: ensure any value we intend to write for `gender` is a
+    // normalized enum value. If not, drop the key to avoid insert/update
+    // errors from Postgres enum type mismatches.
+    try {
+      if ((known as Record<string, unknown>).gender !== undefined) {
+        const final = normalizeGender(
+          (known as Record<string, unknown>).gender
+        );
+        if (final === null) {
+          // remove invalid gender to avoid DB enum errors
+          delete (known as Record<string, unknown>).gender;
+        } else {
+          (known as Partial<UserRow>).gender = final as UserRow["gender"];
+        }
+      }
+    } catch {
+      // ignore and proceed without gender
+      delete (known as Record<string, unknown>).gender;
+    }
 
     const fatherNameIncoming = fromAny(
       bodyRec["fatherName"],
