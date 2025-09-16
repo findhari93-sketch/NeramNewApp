@@ -119,7 +119,7 @@ export default function LoginPage() {
     username: string;
     password?: string;
     phone: string;
-  }) => {
+  }): Promise<boolean> => {
     setLoading(true);
     setError(null);
     try {
@@ -159,14 +159,14 @@ export default function LoginPage() {
               "Failed to mark email as verified. Please contact support."
             );
             setLoading(false);
-            return;
+            return false;
           }
           // Force ID token refresh
           await user.getIdToken(true);
           // Reload the page to update auth state, keep user signed in
           setShowGoogleModal(false);
           window.location.reload();
-          return;
+          return true;
         } catch (err) {
           // If already linked, ignore; else show error
           if (
@@ -178,14 +178,16 @@ export default function LoginPage() {
           } else {
             setError(err instanceof Error ? err.message : String(err));
             setLoading(false);
-            return;
+            return false;
           }
         }
       }
       setShowGoogleModal(false);
       router.replace("/?notice=login_success");
+      return true;
     } catch {
       setError("Failed to complete profile");
+      return false;
     } finally {
       setLoading(false);
     }
@@ -200,7 +202,7 @@ export default function LoginPage() {
     studentName?: string;
     username: string;
     phone: string;
-  }) => {
+  }): Promise<boolean> => {
     setLoading(true);
     setError(null);
     try {
@@ -222,16 +224,33 @@ export default function LoginPage() {
         await user.getIdToken(true);
       } catch {}
       router.replace("/?notice=login_success");
+      return true;
     } catch (e) {
       setError("Failed to save profile");
+      return false;
     } finally {
       setLoading(false);
     }
   };
 
   React.useEffect(() => {
+    // If a user is already signed in, redirect them to profile — they should
+    // never be able to view the login page while authenticated.
+    const current = auth.currentUser;
+    if (current) {
+      try {
+        router.replace("/profile");
+      } catch {}
+    }
+
     const unsub = onAuthStateChanged(auth, (u) => {
       setFirebaseUser(u || null);
+      if (u) {
+        // enforce redirect for any signed-in user who navigates to this page
+        try {
+          router.replace("/profile");
+        } catch {}
+      }
     });
     try {
       const pv = localStorage.getItem("phone_verified");
@@ -565,8 +584,8 @@ export default function LoginPage() {
                 if (j && Array.isArray(j.providers) && j.providers.length > 0)
                   methods = j.providers;
               }
-            } catch (e) {
-              console.warn("check-email fallback failed", e);
+            } catch {
+              console.warn("check-email fallback failed");
             }
           }
           // If any providers exist (for example google.com), block email/password sign-up and show helpful message.

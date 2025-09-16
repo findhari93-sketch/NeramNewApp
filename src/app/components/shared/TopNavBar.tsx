@@ -53,8 +53,20 @@ export default function TopNavBar({
 }: TopNavBarProps) {
   const [open, setOpen] = React.useState(false);
   const [userLabel, setUserLabel] = React.useState<string | null>(null);
-  const [avatarUrl, setAvatarUrl] = React.useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = React.useState<string | null>(() => {
+    try {
+      if (typeof window === "undefined") return null;
+      const raw = localStorage.getItem("avatar-cache:last");
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as Record<string, any>;
+      return parsed?.photo ?? null;
+    } catch {
+      return null;
+    }
+  });
   const [scrolled, setScrolled] = React.useState(false);
+  // Track small-screen state on client only to avoid SSR `window` access
+  const [isSmall, setIsSmall] = React.useState(false);
 
   type NavItem = { label: string; href: string; badge?: string };
   const menuItems: NavItem[] = [
@@ -92,7 +104,49 @@ export default function TopNavBar({
           (phone as string) ||
           null
       );
-      setAvatarUrl(photo);
+
+      // Optimistically set any photoURL from Firebase then try to fetch
+      // a fresh signed URL for the user's stored avatar_path (if any).
+      // Use a global last-avatar cache for instant loads across navigation.
+      try {
+        const raw = localStorage.getItem("avatar-cache:last");
+        if (raw) {
+          const parsed = JSON.parse(raw) as Record<string, any>;
+          if (parsed?.photo) {
+            setAvatarUrl(parsed.photo as string);
+          } else {
+            setAvatarUrl(photo);
+          }
+        } else {
+          setAvatarUrl(photo);
+        }
+      } catch {
+        setAvatarUrl(photo);
+      }
+
+      (async () => {
+        try {
+          const uid = (u as any).uid as string | undefined;
+          if (!uid) return;
+          const res = await fetch(
+            `/api/avatar-url?userId=${encodeURIComponent(uid)}&expires=300`
+          );
+          if (!res.ok) return;
+          const j = await res.json();
+          if (j?.signedUrl) {
+            setAvatarUrl(j.signedUrl as string);
+            try {
+              // update global last-avatar cache for faster subsequent loads
+              localStorage.setItem(
+                "avatar-cache:last",
+                JSON.stringify({ photo: j.signedUrl, fetchedAt: Date.now() })
+              );
+            } catch {}
+          }
+        } catch {
+          // ignore network errors and keep whatever avatarUrl we have
+        }
+      })();
     });
     return () => unsub();
   }, []);
@@ -101,6 +155,30 @@ export default function TopNavBar({
     const onScroll = () => setScrolled(window.scrollY > 8);
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
+
+    // matchMedia listener for small-screen detection
+    try {
+      if (
+        typeof window !== "undefined" &&
+        typeof window.matchMedia === "function"
+      ) {
+        const mq = window.matchMedia("(max-width:600px)");
+        const mqHandler = (ev: MediaQueryListEvent) => setIsSmall(ev.matches);
+        // set initial
+        setIsSmall(mq.matches);
+        if (mq.addEventListener) mq.addEventListener("change", mqHandler);
+        else mq.addListener(mqHandler as any);
+        return () => {
+          window.removeEventListener("scroll", onScroll);
+          if (mq.removeEventListener)
+            mq.removeEventListener("change", mqHandler);
+          else mq.removeListener(mqHandler as any);
+        };
+      }
+    } catch (e) {
+      // ignore; fallback to default
+    }
+
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
@@ -122,7 +200,7 @@ export default function TopNavBar({
       showBackButton = true,
       onBack,
     } = titleBar;
-    const isSmall = window?.matchMedia?.("(max-width:600px)")?.matches ?? false;
+    // use isSmall state set on the client by the effect above
     const visibleLimit = isSmall ? 1 : 2;
     const visibleActions = actions.slice(0, visibleLimit);
     const overflowActions = actions.slice(visibleLimit);

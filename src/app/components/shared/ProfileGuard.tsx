@@ -23,13 +23,40 @@ export default function ProfileGuard({
           const res = await fetch("/api/session", {
             headers: { Authorization: `Bearer ${idToken}` },
           });
+          if (!res.ok) {
+            // If the session endpoint failed, log and don't open the modal (avoid false positives)
+            console.warn(
+              "ProfileGuard: /api/session returned non-ok",
+              res.status
+            );
+            return;
+          }
+
           const j = await res.json().catch(() => ({}));
           const userRow = j?.user || null;
-          const missingName = !(userRow && userRow.student_name);
+
+          // Normalize values from several possible places the server may put them
+          const dbStudentName =
+            (userRow && (userRow.student_name ?? userRow.displayName)) ||
+            (userRow &&
+              userRow.profile &&
+              (userRow.profile.student_name ?? userRow.profile.displayName)) ||
+            null;
+          const dbUsername =
+            (userRow &&
+              (userRow.username ??
+                (userRow.profile && userRow.profile.username))) ||
+            null;
+          const dbPhone =
+            (userRow &&
+              (userRow.phone ?? (userRow.profile && userRow.profile.phone))) ||
+            null;
+
+          const missingName = !dbStudentName;
           // Consider Firebase-linked phone (u.phoneNumber) as proof of phone auth.
-          const hasPhone = Boolean((userRow && userRow.phone) || u.phoneNumber);
+          const hasPhone = Boolean(dbPhone || u.phoneNumber);
           const missingPhone = !hasPhone;
-          const missingUsername = !(userRow && userRow.username);
+          const missingUsername = !dbUsername;
           if (missingName || missingPhone || missingUsername) {
             // Determine if the currently-signed-in user originally used
             // email/password (providerId === 'password'); if so, hide the
