@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { Suspense, useState } from "react";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Typography from "@mui/material/Typography";
@@ -31,9 +31,10 @@ import { signInSchema, passwordSchema } from "../../../lib/auth/validation";
 import { Container } from "@mui/material";
 import GoogleProfileCompletionModal from "../../components/shared/GoogleProfileCompletionModal";
 
-export default function LoginPage() {
+export function LoginPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const nextTarget = searchParams?.get("next");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -58,6 +59,40 @@ export default function LoginPage() {
     return email || phone || null;
   };
 
+  // Helper to check profile completeness and redirect accordingly
+  const redirectAfterLogin = async (idToken: string) => {
+    try {
+      // Fetch user profile (from /api/users/me or /api/session)
+      const res = await fetch("/api/users/me", {
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      const userRow = data?.user || data;
+      // Assume profile completeness is a number 0-100 on userRow.profile_completeness or similar
+      // If not present, fallback to 0
+      let completeness = 0;
+      if (userRow && typeof userRow.profile_completeness === "number") {
+        completeness = userRow.profile_completeness;
+      } else if (
+        userRow &&
+        userRow.profile &&
+        typeof userRow.profile.completeness === "number"
+      ) {
+        completeness = userRow.profile.completeness;
+      }
+      if (completeness < 70) {
+        router.replace("/profile?notice=complete_profile");
+      } else if (nextTarget) {
+        router.replace(`${nextTarget}`);
+      } else {
+        router.replace("/?notice=login_success");
+      }
+    } catch {
+      // fallback: go to profile if error
+      router.replace("/profile?notice=complete_profile");
+    }
+  };
+
   const googleSignIn = async () => {
     setError(null);
     setLoading(true);
@@ -68,8 +103,6 @@ export default function LoginPage() {
       // Immediately upsert Google user data to Supabase
       const idToken = await user.getIdToken();
       try {
-        // store a short-lived id token to help with session restore across
-        // verification redirects (best-effort)
         localStorage.setItem("firebase_id_token", idToken);
       } catch {}
       await fetch("/api/users/upsert", {
@@ -99,7 +132,7 @@ export default function LoginPage() {
         setLoading(false);
         return;
       }
-      router.replace("/?notice=login_success");
+      await redirectAfterLogin(idToken);
     } catch (e) {
       const err = e as { message?: string } | undefined;
       setError(err?.message || String(e));
@@ -183,7 +216,10 @@ export default function LoginPage() {
         }
       }
       setShowGoogleModal(false);
-      router.replace("/?notice=login_success");
+      if (user) {
+        const idToken = await user.getIdToken();
+        await redirectAfterLogin(idToken);
+      }
       return true;
     } catch {
       setError("Failed to complete profile");
@@ -223,9 +259,12 @@ export default function LoginPage() {
       try {
         await user.getIdToken(true);
       } catch {}
-      router.replace("/?notice=login_success");
+      if (user) {
+        const idToken = await user.getIdToken();
+        await redirectAfterLogin(idToken);
+      }
       return true;
-    } catch (e) {
+    } catch {
       setError("Failed to save profile");
       return false;
     } finally {
@@ -349,14 +388,15 @@ export default function LoginPage() {
             }
             setRedirecting(true);
             setTimeout(() => {
-              router.replace("/?notice=already_logged_in");
+              if (nextTarget) router.replace(`${nextTarget}`);
+              else router.replace("/?notice=already_logged_in");
             }, 300);
             return;
           } catch {
             try {
               await signOut(auth);
-            } catch (e) {
-              console.warn("signOut failed cleanup", e);
+            } catch {
+              console.warn("signOut failed cleanup");
             }
             try {
               localStorage.removeItem("phone_verified");
@@ -373,7 +413,7 @@ export default function LoginPage() {
     return () => {
       mounted = false;
     };
-  }, [router, showGoogleModal, emailFlowPendingProfile]);
+  }, [router, showGoogleModal, emailFlowPendingProfile, nextTarget]);
 
   React.useEffect(() => {
     const n = searchParams?.get("notice");
@@ -395,6 +435,8 @@ export default function LoginPage() {
       setNotice("Signed in successfully.");
     } else if (n === "already_logged_in") {
       setNotice("You are already signed in.");
+    } else if (n === "login_required") {
+      setNotice("Please log in to continue.");
     } else {
       setNotice(null);
     }
@@ -456,8 +498,8 @@ export default function LoginPage() {
     setError(null);
     try {
       await signOut(auth);
-    } catch (e) {
-      console.warn("signOut error", e);
+    } catch {
+      console.warn("signOut error");
     }
     try {
       localStorage.removeItem("phone_verified");
@@ -724,7 +766,10 @@ export default function LoginPage() {
             console.warn("upsert after email/password login failed", e);
           }
         }
-        router.replace("/?notice=login_success");
+        if (u) {
+          const idToken = await u.getIdToken();
+          await redirectAfterLogin(idToken);
+        }
       } catch (err) {
         const code = (err as { code?: string } | undefined)?.code || "";
         // If login fails for a Google-linked email, show a helpful message
@@ -767,7 +812,11 @@ export default function LoginPage() {
       <Box
         component="form"
         onSubmit={handleSubmit}
-        sx={{ display: "flex", flexDirection: "column", gap: 1 }}
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          gap: { xs: 1.5, sm: 1 },
+        }}
       >
         <TextField
           size="small"
@@ -778,6 +827,12 @@ export default function LoginPage() {
           }
           fullWidth
           required
+          sx={{
+            "& .MuiInputBase-root": {
+              fontSize: { xs: "0.875rem", sm: "0.875rem" },
+              height: { xs: "40px", sm: "40px" },
+            },
+          }}
           helperText={
             form.identifier && /^\+?\d{10,15}$/.test(form.identifier)
               ? "Phone number detected - use phone OTP option below"
@@ -800,6 +855,12 @@ export default function LoginPage() {
               }
               fullWidth
               required
+              sx={{
+                "& .MuiInputBase-root": {
+                  fontSize: { xs: "0.875rem", sm: "0.875rem" },
+                  height: { xs: "40px", sm: "40px" },
+                },
+              }}
               InputProps={{
                 endAdornment: (
                   <InputAdornment position="end">
@@ -828,6 +889,12 @@ export default function LoginPage() {
                 }
                 fullWidth
                 required
+                sx={{
+                  "& .MuiInputBase-root": {
+                    fontSize: { xs: "0.875rem", sm: "0.875rem" },
+                    height: { xs: "40px", sm: "40px" },
+                  },
+                }}
               />
             )}
             {emailExists !== false && (
@@ -847,6 +914,10 @@ export default function LoginPage() {
           variant="contained"
           disabled={emailPasswordLoading || checkingEmail}
           fullWidth
+          sx={{
+            py: { xs: 1.5, sm: 1 },
+            fontSize: { xs: "1rem", sm: "0.875rem" },
+          }}
         >
           {emailPasswordLoading ? <CircularProgress size={20} /> : buttonLabel}
         </Button>
@@ -861,49 +932,67 @@ export default function LoginPage() {
     <>
       <TopNavBar backgroundMode="transparent" />
 
-      {/* Full-height gradient background, non-scrollable */}
+      {/* Full-height gradient background, responsive layout */}
       <Box
         sx={(theme) => ({
           backgroundImage: theme.gradients.brand(),
-          height: "100vh",
-          overflow: "hidden",
+          minHeight: "100vh",
           display: "flex",
           flexDirection: "column",
-          justifyContent: "flex-end",
-          alignItems: "flex-end",
+          justifyContent: { xs: "center", sm: "flex-end" },
+          alignItems: { xs: "center", sm: "flex-end" },
+          p: { xs: 2, sm: 0 },
         })}
       >
-        {/* Container positioned at bottom-right */}
+        {/* Container positioned responsively */}
         <Container
           maxWidth={false}
           sx={{
-            position: "relative",
-            right: "8rem",
-            width: "460px",
+            position: { xs: "static", sm: "relative" },
+            right: { xs: 0, sm: "8rem" },
+            width: { xs: "100%", sm: "460px" },
+            maxWidth: { xs: "400px", sm: "460px" },
             m: 0,
             p: 0,
           }}
         >
-          {/* White card with internal scroll if needed */}
+          {/* White card with responsive design */}
           <Box
             sx={{
               width: "100%",
               bgcolor: "background.paper",
-              boxShadow: 6,
-              px: 4,
-              pt: 4,
-              pb: 2,
-              borderTopLeftRadius: 15,
-              borderTopRightRadius: 15,
+              boxShadow: { xs: 3, sm: 6 },
+              px: { xs: 3, sm: 4 },
+              pt: { xs: 3, sm: 4 },
+              pb: { xs: 2, sm: 2 },
+              borderRadius: { xs: 3, sm: 0 },
+              borderTopLeftRadius: { xs: 15, sm: 15 },
+              borderTopRightRadius: { xs: 15, sm: 15 },
+              borderBottomLeftRadius: { xs: 15, sm: 0 },
+              borderBottomRightRadius: { xs: 15, sm: 0 },
               display: "flex",
               flexDirection: "column",
-              // Ensure there is vertical room so the bottom text sits at the card bottom
-              minHeight: { xs: 0, sm: 480 },
+              // Responsive min-height
+              minHeight: { xs: "auto", sm: 480 },
+              maxHeight: { xs: "85vh", sm: "none" },
+              overflowY: { xs: "auto", sm: "visible" },
             }}
           >
-            <Box sx={{ display: "flex", flexDirection: "column", mb: 6 }}>
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                mb: { xs: 4, sm: 6 },
+              }}
+            >
               <Typography variant="caption">WELCOME BACK</Typography>
-              <Typography variant="caption" sx={{ fontWeight: 700 }}>
+              <Typography
+                variant="caption"
+                sx={{
+                  fontWeight: 700,
+                  fontSize: { xs: "0.875rem", sm: "0.75rem" },
+                }}
+              >
                 Log In to your Account
               </Typography>
             </Box>
@@ -932,7 +1021,7 @@ export default function LoginPage() {
               )
             )}
 
-            <Stack spacing={2} sx={{ mb: 2 }}>
+            <Stack spacing={{ xs: 1.5, sm: 2 }} sx={{ mb: { xs: 1.5, sm: 2 } }}>
               {notice && <Alert severity="success">{notice}</Alert>}
               {error && <Alert severity="error">{error}</Alert>}
 
@@ -1055,7 +1144,8 @@ export default function LoginPage() {
                   color: "#3c4043",
                   borderColor: "#dadce0",
                   borderRadius: 999,
-                  py: 1,
+                  py: { xs: 1.5, sm: 1 },
+                  fontSize: { xs: "1rem", sm: "0.875rem" },
                   "&:hover": {
                     bgcolor: "#fff",
                     borderColor: "#dadce0",
@@ -1073,8 +1163,8 @@ export default function LoginPage() {
               {/* Reserved inline message area below social buttons to avoid card height jump */}
               <Box
                 sx={{
-                  mt: 1,
-                  minHeight: 56, // reserve ~ one alert height
+                  mt: { xs: 0.5, sm: 1 },
+                  minHeight: { xs: 32, sm: 56 }, // reduced for mobile
                   display: "flex",
                   flexDirection: "column",
                   justifyContent: "center",
@@ -1088,34 +1178,6 @@ export default function LoginPage() {
                 )}
               </Box>
             </Stack>
-            {/* Sign up link at the bottom of the card */}
-            <Box
-              sx={{
-                display: "flex",
-                justifyContent: "center",
-                mt: "auto", // push to bottom remaining space
-                pt: 2,
-              }}
-            >
-              <Typography variant="body2" color="text.secondary">
-                Don&apos;t have an account?{" "}
-                <Button
-                  variant="text"
-                  size="small"
-                  onClick={() => router.push("/auth/register")}
-                  sx={{
-                    p: 0,
-                    minWidth: "auto",
-                    ml: 0.5,
-                    textTransform: "uppercase",
-                    fontWeight: 600,
-                    color: "neramPurple.main",
-                  }}
-                >
-                  Create One
-                </Button>
-              </Typography>
-            </Box>
           </Box>
         </Container>
       </Box>
@@ -1143,5 +1205,14 @@ export default function LoginPage() {
         }
       />
     </>
+  );
+}
+
+export default function LoginPage() {
+  // Wrap the client page in Suspense so hooks like useSearchParams bailouts are supported
+  return (
+    <Suspense fallback={null}>
+      <LoginPageInner />
+    </Suspense>
   );
 }

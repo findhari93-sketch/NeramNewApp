@@ -1,6 +1,13 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
+import {
+  Geist,
+  Geist_Mono,
+  Handlee,
+  Roboto,
+  Bakbak_One,
+  Poppins,
+  Suez_One,
+} from "next/font/google";
 import ThemeRegistry from "./ThemeRegistry";
 import ProfileGuard from "./components/shared/ProfileGuard";
 
@@ -12,6 +19,39 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+});
+
+// Additional fonts via next/font (preferred over <link> for performance)
+const handlee = Handlee({
+  variable: "--font-handlee",
+  subsets: ["latin"],
+  weight: "400",
+});
+
+const roboto = Roboto({
+  variable: "--font-roboto",
+  subsets: ["latin"],
+  weight: ["100", "300", "400", "500", "700", "900"],
+  style: ["normal", "italic"],
+});
+
+const bakbakOne = Bakbak_One({
+  variable: "--font-bakbak-one",
+  subsets: ["latin"],
+  weight: "400",
+});
+
+const poppins = Poppins({
+  variable: "--font-poppins",
+  subsets: ["latin"],
+  weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"],
+  style: ["normal", "italic"],
+});
+
+const suezOne = Suez_One({
+  variable: "--font-suez-one",
+  subsets: ["latin"],
+  weight: "400",
 });
 
 export const metadata: Metadata = {
@@ -29,7 +69,9 @@ export default function RootLayout({
       <head>
         <meta name="emotion-insertion-point" content="" />
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable}`}>
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} ${handlee.variable} ${roboto.variable} ${bakbakOne.variable} ${poppins.variable} ${suezOne.variable}`}
+      >
         <ThemeRegistry>
           <ProfileGuard>{children}</ProfileGuard>
         </ThemeRegistry>

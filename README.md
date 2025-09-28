@@ -30,6 +30,7 @@ bun dev
 ### Firebase Setup for Email/Password Authentication
 
 1. **Enable Email/Password Provider** in Firebase Console:
+
    - Go to Firebase Console → Authentication → Sign-in method
    - Enable "Email/Password" provider
    - Optionally enable "Email link (passwordless sign-in)" if desired
@@ -58,6 +59,7 @@ This app supports multiple sign-in methods:
 #### Account Management Features
 
 Navigate to `/account` to access:
+
 - Link email/password to existing phone account
 - Email verification (send/resend)
 - Change password (with re-authentication)
@@ -97,3 +99,15 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## YouTube section environment setup
+
+Add the following to your `.env.local` (do not commit this file):
+
+- `NEXT_PUBLIC_YOUTUBE_API_KEY` = Your YouTube Data API v3 key
+- `NEXT_PUBLIC_YOUTUBE_CHANNEL_ID` = Your channel ID (looks like `UCxxxxxxxxxxxxxxxx`)
+
+Notes:
+
+- The section will render even without keys, but it won’t fetch videos/subscriber counts.
+- Channel handle (e.g., `@neramclassesnata`) is used for the CTA button; fetching requires the channel ID.

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="50px" height="100px" enable-background="new 0 0 50 100" version="1.1" viewBox="0 0 50 100" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:cc="http://creativecommons.org/ns#" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><metadata><rdf:RDF><cc:Work rdf:about=""><dc:format>image/svg+xml</dc:format><dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/><dc:title/></cc:Work></rdf:RDF></metadata><defs><filter id="filter1141" color-interpolation-filters="sRGB"><feFlood flood-color="rgb(0,0,2)" flood-opacity=".47843" result="flood"/><feComposite in="SourceGraphic" in2="flood" operator="in" result="composite1"/><feGaussianBlur in="composite1" result="blur" stdDeviation="0.8"/><feOffset dx="-1.2" dy="2.2" result="offset"/><feComposite in="SourceGraphic" in2="offset" result="composite2"/></filter><linearGradient id="SVGID_1_-4" x1="35.092" x2="49.777" y1="22.718" y2="22.718" gradientUnits="userSpaceOnUse"><stop stop-color="#FF9BFF" offset=".011429"/><stop stop-color="#B762FF" offset="1"/></linearGradient><filter id="filter1141-9" color-interpolation-filters="sRGB"><feFlood flood-color="rgb(0,0,2)" flood-opacity=".47843" result="flood"/><feComposite in="SourceGraphic" in2="flood" operator="in" result="composite1"/><feGaussianBlur in="composite1" result="blur" stdDeviation="0.8"/><feOffset dx="-1.2" dy="2.2" result="offset"/><feComposite in="SourceGraphic" in2="offset" result="composite2"/></filter></defs>
+<style type="text/css">
+	.st0{fill:url(#SVGID_1_);}
+	.st1{fill:url(#SVGID_2_);}
+	.st2{fill:url(#SVGID_3_);}
+	.st3{fill:url(#SVGID_4_);}
+</style>
+<linearGradient id="SVGID_1_" x1="35.092" x2="49.777" y1="22.718" y2="22.718" gradientUnits="userSpaceOnUse">
+	<stop stop-color="#FF9BFF" offset=".011429"/>
+	<stop stop-color="#B762FF" offset="1"/>
+</linearGradient>
+<polygon class="st0" points="35.1 10.7 37.5 22.7 35.1 34.7 49.8 22.7" filter="url(#filter1141)"/>
+<linearGradient id="SVGID_2_" x1="33.614" x2="48.299" y1="22.718" y2="22.718" gradientTransform="matrix(-1 0 0 1 48.848 0)" gradientUnits="userSpaceOnUse">
+	<stop stop-color="#FF9BFF" offset=".011429"/>
+	<stop stop-color="#B762FF" offset="1"/>
+</linearGradient>
+
+<linearGradient id="SVGID_3_" x1="35.092" x2="49.777" y1="76" y2="76" gradientUnits="userSpaceOnUse">
+	<stop stop-color="#FFE31C" offset=".011429"/>
+	<stop stop-color="#FF318D" offset="1"/>
+</linearGradient>
+<polygon class="st2" points="35.1 64 37.5 76 35.1 88 49.8 76"/>
+<linearGradient id="SVGID_4_" x1="33.614" x2="48.299" y1="76" y2="76" gradientTransform="matrix(-1 0 0 1 48.848 0)" gradientUnits="userSpaceOnUse">
+	<stop stop-color="#FFE31C" offset=".011429"/>
+	<stop stop-color="#FF318D" offset="1"/>
+</linearGradient>
+<polygon class="st3" points="15.2 64 13.1 76 15.2 88 0.5 76"/>
+<polygon class="st0" transform="matrix(-.95976 0 0 1 48.154 -.46471)" points="37.5 22.7 35.1 34.7 49.8 22.7 35.1 10.7" fill="url(#SVGID_1_-4)" filter="url(#filter1141-9)"/></svg>

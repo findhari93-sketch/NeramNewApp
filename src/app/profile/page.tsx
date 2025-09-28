@@ -12,8 +12,9 @@ import DialogContent from "@mui/material/DialogContent";
 import DialogActions from "@mui/material/DialogActions";
 import IconButton from "@mui/material/IconButton";
 import Container from "@mui/material/Container";
-import Paper from "@mui/material/Paper";
 import CircularProgress from "@mui/material/CircularProgress";
+import LinearProgress from "@mui/material/LinearProgress";
+import Paper from "@mui/material/Paper";
 import GridOrig from "@mui/material/Grid";
 const Grid: any = GridOrig;
 import Drawer from "@mui/material/Drawer";
@@ -23,8 +24,6 @@ import MenuItem from "@mui/material/MenuItem";
 import { Controller, useForm } from "react-hook-form";
 import { auth } from "../../lib/firebase";
 import {
-  onAuthStateChanged,
-  updateProfile,
   reauthenticateWithCredential,
   EmailAuthProvider,
   updatePassword,
@@ -41,8 +40,7 @@ import { useSyncedUser } from "@/hooks/useSyncedUser";
 export default function ProfilePage() {
   // Set authChecked to true after Firebase auth state is checked
   React.useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((user) => {
-      // Optionally set user state here if needed
+    const unsubscribe = auth.onAuthStateChanged(() => {
       setAuthChecked(true);
     });
     return () => unsubscribe();
@@ -52,30 +50,11 @@ export default function ProfilePage() {
   // (Removed unused initialPhoto state; we now write a global cache key below when we save cache.)
   const router = useRouter();
   const [authChecked, setAuthChecked] = React.useState(false);
-  const [studentName, setStudentName] = React.useState<string>("");
-  // Keep a ref of the last derived name to avoid re-setting state when
-  // the same value is produced repeatedly by effects that mutate `user`.
-  const lastDerivedNameRef = React.useRef<string | null>(null);
-
-  const deriveAndSetName = (u: Record<string, unknown> | null | undefined) => {
-    const name =
-      typeof u?.displayName === "string"
-        ? (u!.displayName as string)
-        : typeof u?.email === "string"
-        ? (u!.email as string)
-        : typeof u?.phoneNumber === "string"
-        ? (u!.phoneNumber as string)
-        : "";
-    const next = typeof name === "string" ? name : "";
-    if (lastDerivedNameRef.current === next) return;
-    lastDerivedNameRef.current = next;
-    setTimeout(() => setStudentName(next), 0);
-  };
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [_saving, setSaving] = React.useState(false);
+  // Removed unused studentName logic.
+  // Removed unused saving state
   const [snackOpen, setSnackOpen] = React.useState(false);
-  const [snackMsg, setSnackMsg] = React.useState<string | null>(null);
-  const [requireNameSnackOpen, setRequireNameSnackOpen] = React.useState(false);
+  const [snackMsg] = React.useState<string | null>(null);
+  const [requireNameSnackOpen] = React.useState(false);
 
   // Drawer/edit state + form (single shared drawer for page)
   const [drawer, setDrawer] = React.useState<{
@@ -104,6 +83,37 @@ export default function ProfilePage() {
   const { control, handleSubmit, reset } = useForm<Record<string, any>>({
     defaultValues: {},
   });
+
+  // Compute a simple profile completeness score (0-100)
+  const completeness = React.useMemo(() => {
+    const u: any = user || {};
+    const p: any = (u && u.profile) || {};
+    const checks: Array<boolean> = [
+      Boolean(u.student_name || u.displayName),
+      Boolean(u.username),
+      Boolean(u.email),
+      Boolean(u.phone || p.phone),
+      Boolean(u.photoURL || (p && p.photoURL)),
+      Boolean(u.gender || p.gender),
+      Boolean(u.dob || p.dob),
+      Boolean(p.city),
+      Boolean(p.state),
+      Boolean(p.country),
+      // education: consider filled if any primary education field exists
+      Boolean(
+        u.education_type ||
+          p.education_type ||
+          u.school_std ||
+          u.college_year ||
+          u.diploma_year
+      ),
+      // course selection hints intent
+      Boolean(p.selected_course || u.selected_course),
+    ];
+    const total = checks.length;
+    const done = checks.filter(Boolean).length;
+    return Math.round((done / total) * 100);
+  }, [user]);
 
   // Ensure the form is reset whenever the drawer opens or its values change.
   // This fixes a bug where controlled inputs (notably the `chips` text field)
@@ -793,33 +803,30 @@ export default function ProfilePage() {
         // ignore network errors
       }
     })();
-  }, [authChecked, user, readUserCache, writeUserCache]);
+  }, [authChecked, user, readUserCache, writeUserCache, setUser]);
 
-  if (authChecked && !user) {
+  // Redirect unauthenticated users to the login page with a notice instead of rendering a 401 page.
+  React.useEffect(() => {
+    if (authChecked && !auth.currentUser) {
+      try {
+        const next = encodeURIComponent(window.location.pathname);
+        router.replace(`/auth/login?notice=login_required&next=${next}`);
+      } catch {
+        router.replace(`/auth/login?notice=login_required`);
+      }
+    }
+  }, [authChecked, router]);
+
+  if (authChecked && !auth.currentUser) {
     return (
-      <Container maxWidth="sm" sx={{ mt: 8 }}>
-        <Paper elevation={3} sx={{ p: 4, textAlign: "center" }}>
-          <Typography variant="h4" color="error" gutterBottom>
-            401 Unauthorized
-          </Typography>
-          <Typography variant="body1" sx={{ mb: 3 }}>
-            User not logged in. Please log in to access your profile.
-          </Typography>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={() => router.push("/auth/login")}
-          >
-            Login
-          </Button>
-        </Paper>
+      <Container maxWidth="sm" sx={{ mt: 8, textAlign: "center" }}>
+        <CircularProgress />
       </Container>
     );
   }
 
   // Derived values are read inline in the JSX below; avoid duplicate
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   // enhancements. They are intentionally unused for now; disable the
   // unused-vars rule for this block so typecheck stays clean.
   /* eslint-disable @typescript-eslint/no-unused-vars */
@@ -911,6 +918,35 @@ export default function ProfilePage() {
       />
 
       <Container maxWidth="lg" sx={{ mt: "101px", mb: 6 }}>
+        {/* Profile completeness card */}
+        <Paper elevation={3} sx={{ p: 2, mb: 3, borderRadius: 2 }}>
+          <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
+            <Typography variant="subtitle1" fontWeight={700}>
+              Profile completeness
+            </Typography>
+            <Typography
+              variant="subtitle1"
+              color={completeness < 70 ? "warning.main" : "success.main"}
+            >
+              {completeness}%
+            </Typography>
+          </Box>
+          <LinearProgress
+            variant="determinate"
+            value={Number.isFinite(completeness) ? completeness : 0}
+            sx={{ height: 8, borderRadius: 999 }}
+          />
+          {completeness < 70 && (
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ display: "block", mt: 1 }}
+            >
+              Complete at least 70% of your profile to unlock a smoother
+              experience.
+            </Typography>
+          )}
+        </Paper>
         <Grid container spacing={3}>
           <Grid item component="div" xs={12} md={4}>
             <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
