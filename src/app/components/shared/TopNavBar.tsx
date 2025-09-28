@@ -19,8 +19,8 @@ import Typography from "@mui/material/Typography";
 import Breadcrumbs from "@mui/material/Breadcrumbs";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import Link from "next/link";
-import Image from "next/image";
 import NavbarProfile from "./NavbarProfile";
+import { NeramLogo, MobileLogo } from "./NeramLogo/NeramLogo";
 import { signOut } from "firebase/auth";
 import NavLinkText from "./NavLinkText";
 
@@ -403,12 +403,15 @@ export default function TopNavBar({
         })}
       >
         <Toolbar sx={{ display: "flex", justifyContent: "space-between" }}>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
             <IconButton
               edge="start"
               color="inherit"
               aria-label="menu"
-              sx={{ display: { xs: "inline-flex", md: "none" } }}
+              sx={{
+                display: { xs: "inline-flex", md: "none" },
+                color: "#fff",
+              }}
               onClick={() => setOpen(true)}
             >
               <MenuIcon />
@@ -416,16 +419,18 @@ export default function TopNavBar({
 
             <Link
               href="/"
-              style={{ display: "inline-flex", alignItems: "center" }}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                textDecoration: "none",
+              }}
             >
-              <Image
-                src="/brand/neramclasses-logo.svg"
-                alt="Neram Classes"
-                width={140}
-                height={32}
-                priority
-                style={{ height: 32, width: "auto" }}
+              {/* Desktop Logo */}
+              <NeramLogo
+                sx={{ display: { xs: "none", md: "flex" }, height: 32 }}
               />
+              {/* Mobile Logo */}
+              <MobileLogo sx={{ display: { xs: "flex", md: "none" } }} />
             </Link>
           </Box>
 
@@ -442,14 +447,14 @@ export default function TopNavBar({
                 {idx < menuItems.length - 1 ? (
                   <Box
                     aria-hidden
-                    sx={(theme) => ({
-                      width: "1px",
-                      height: "2rem",
+                    sx={{
+                      width: "2px",
+                      height: "25px",
                       mx: 1,
-                      bgcolor: theme.palette.highlight.main,
-                      opacity: 0.4,
+                      bgcolor: "rgba(255,255,255,0.15)",
                       borderRadius: 0.5,
-                    })}
+                      alignSelf: "center",
+                    }}
                   />
                 ) : null}
               </React.Fragment>
@@ -509,7 +514,34 @@ export default function TopNavBar({
       </AppBar>
 
       <Drawer open={open} onClose={() => setOpen(false)}>
-        <Box sx={{ width: 260 }} role="presentation">
+        <Box
+          sx={(theme) => ({
+            width: 260,
+            backgroundImage: theme.gradients.brand(),
+            height: "100%",
+            color: "white",
+          })}
+          role="presentation"
+        >
+          {/* Logo section at the top */}
+          <Box
+            sx={{
+              p: 2,
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              borderBottom: "1px solid rgba(255,255,255,0.15)",
+            }}
+          >
+            <Link
+              href="/"
+              style={{ textDecoration: "none" }}
+              onClick={() => setOpen(false)}
+            >
+              <NeramLogo sx={{ height: 28 }} />
+            </Link>
+          </Box>
+
           <List>
             {menuItems.map((m) => (
               <ListItem key={m.href} disablePadding>
@@ -524,7 +556,15 @@ export default function TopNavBar({
               </ListItem>
             ))}
           </List>
-          <Divider />
+          <Divider
+            orientation="vertical"
+            sx={{
+              alignSelf: "center",
+              height: "25px",
+              borderRightWidth: "2px",
+              borderColor: "rgba(255,255,255,0.15)",
+            }}
+          />
           <Box sx={{ p: 2 }}>
             {userLabel ? (
               <Link
@@ -539,7 +579,6 @@ export default function TopNavBar({
               <Link href="/auth/login" style={{ textDecoration: "none" }}>
                 <Button
                   variant="outlined"
-                  color="primary"
                   fullWidth
                   startIcon={<LoginRounded />}
                   sx={{
@@ -547,6 +586,13 @@ export default function TopNavBar({
                     borderRadius: 999,
                     borderWidth: 1.5,
                     py: 1,
+                    borderColor: "white !important",
+                    color: "white !important",
+                    "&:hover": {
+                      borderColor: "white !important",
+                      backgroundColor: "rgba(255,255,255,0.08)",
+                      color: "white !important",
+                    },
                   }}
                 >
                   Sign In

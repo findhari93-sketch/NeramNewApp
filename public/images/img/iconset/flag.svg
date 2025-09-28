@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   version="1.1"
+   id="Capa_1"
+   x="0px"
+   y="0px"
+   width="512px"
+   height="512px"
+   viewBox="0 0 512 512"
+   style="enable-background:new 0 0 512 512;"
+   xml:space="preserve"
+   sodipodi:docname="flag SW.svg"
+   inkscape:version="1.0.2 (e86c870879, 2021-01-15)"><metadata
+   id="metadata44"><rdf:RDF><cc:Work
+       rdf:about=""><dc:format>image/svg+xml</dc:format><dc:type
+         rdf:resource="http://purl.org/dc/dcmitype/StillImage" /><dc:title></dc:title></cc:Work></rdf:RDF></metadata><defs
+   id="defs42"><filter
+     style="color-interpolation-filters:sRGB;"
+     inkscape:label="Drop Shadow"
+     id="filter2120"><feFlood
+       flood-opacity="0.352941"
+       flood-color="rgb(0,0,0)"
+       result="flood"
+       id="feFlood2110" /><feComposite
+       in="SourceGraphic"
+       in2="flood"
+       operator="in"
+       result="composite1"
+       id="feComposite2112" /><feGaussianBlur
+       in="composite1"
+       stdDeviation="3"
+       result="blur"
+       id="feGaussianBlur2114" /><feOffset
+       dx="-12.2754"
+       dy="19.7605"
+       result="offset"
+       id="feOffset2116" /><feComposite
+       in="SourceGraphic"
+       in2="offset"
+       operator="over"
+       result="composite2"
+       id="feComposite2118" /></filter><filter
+     style="color-interpolation-filters:sRGB;"
+     inkscape:label="Drop Shadow"
+     id="filter2132"><feFlood
+       flood-opacity="0.352941"
+       flood-color="rgb(0,0,0)"
+       result="flood"
+       id="feFlood2122" /><feComposite
+       in="SourceGraphic"
+       in2="flood"
+       operator="in"
+       result="composite1"
+       id="feComposite2124" /><feGaussianBlur
+       in="composite1"
+       stdDeviation="3"
+       result="blur"
+       id="feGaussianBlur2126" /><feOffset
+       dx="-12.2754"
+       dy="19.7605"
+       result="offset"
+       id="feOffset2128" /><feComposite
+       in="SourceGraphic"
+       in2="offset"
+       operator="over"
+       result="composite2"
+       id="feComposite2130" /></filter><filter
+     style="color-interpolation-filters:sRGB;"
+     inkscape:label="Drop Shadow"
+     id="filter2144"><feFlood
+       flood-opacity="0.352941"
+       flood-color="rgb(0,0,0)"
+       result="flood"
+       id="feFlood2134" /><feComposite
+       in="SourceGraphic"
+       in2="flood"
+       operator="in"
+       result="composite1"
+       id="feComposite2136" /><feGaussianBlur
+       in="composite1"
+       stdDeviation="3"
+       result="blur"
+       id="feGaussianBlur2138" /><feOffset
+       dx="-12.2754"
+       dy="19.7605"
+       result="offset"
+       id="feOffset2140" /><feComposite
+       in="SourceGraphic"
+       in2="offset"
+       operator="over"
+       result="composite2"
+       id="feComposite2142" /></filter></defs><sodipodi:namedview
+   pagecolor="#ffffff"
+   bordercolor="#666666"
+   borderopacity="1"
+   objecttolerance="10"
+   gridtolerance="10"
+   guidetolerance="10"
+   inkscape:pageopacity="0"
+   inkscape:pageshadow="2"
+   inkscape:window-width="1920"
+   inkscape:window-height="1017"
+   id="namedview40"
+   showgrid="false"
+   inkscape:zoom="0.58695387"
+   inkscape:cx="286.79024"
+   inkscape:cy="285.41553"
+   inkscape:window-x="-8"
+   inkscape:window-y="-8"
+   inkscape:window-maximized="1"
+   inkscape:current-layer="Capa_1" />
+<style
+   type="text/css"
+   id="style2">
+	.st0{fill:url(#SVGID_1_);}
+	.st1{fill:#9E0497;}
+	.st2{fill:url(#SVGID_2_);}
+	.st3{fill:url(#SVGID_3_);}
+</style>
+<g
+   id="g13">
+	<g
+   id="g11">
+		
+			<linearGradient
+   id="SVGID_1_"
+   gradientUnits="userSpaceOnUse"
+   x1="195.8023"
+   y1="434.2012"
+   x2="489.064"
+   y2="170.7169"
+   gradientTransform="matrix(1 0 0 -1 0 514)">
+			<stop
+   offset="0.2081"
+   style="stop-color:#FEA2CF"
+   id="stop4" />
+			<stop
+   offset="1"
+   style="stop-color:#A272FF"
+   id="stop6" />
+		</linearGradient>
+		<path
+   class="st0"
+   d="M419.6,202.9l34.1-85.2c1.6-4.2,1.2-8.9-1.4-12.6c-2.6-3.7-6.8-6-11.3-6H269.6c-7.5,0-13.5,6-13.5,13.5v121.8    h-31.6c-7.5,0-13.5,6-13.5,13.5v45.1c0,7.5,6,13.5,13.5,13.5h216.6c4.5,0,8.7-2.3,11.2-6s3.1-8.5,1.4-12.6L419.6,202.9z"
+   id="path9"
+   style="filter:url(#filter2120)" />
+	</g>
+</g>
+<path
+   class="st1"
+   d="M224.5,306.7c-1.7,0-3.5-0.4-5.1-1c-5.1-2.1-8.4-7-8.4-12.5V248c0-7.5,6-13.5,13.5-13.5h45.1  c5.5,0,10.4,3.3,12.5,8.4c2.1,5.1,0.9,10.9-3,14.7l-45.1,45.1C231.5,305.3,228,306.7,224.5,306.7z"
+   id="path15" />
+<g
+   id="g26"
+   style="filter:url(#filter2132)">
+	<g
+   id="g24">
+		
+			<linearGradient
+   id="SVGID_2_"
+   gradientUnits="userSpaceOnUse"
+   x1="18.3148"
+   y1="428.0826"
+   x2="335.9398"
+   y2="286.4146"
+   gradientTransform="matrix(1 0 0 -1 0 514)">
+			<stop
+   offset="0.4352"
+   style="stop-color:#FEA2CF"
+   id="stop17" />
+			<stop
+   offset="1"
+   style="stop-color:#A272FF"
+   id="stop19" />
+		</linearGradient>
+		<path
+   class="st2"
+   d="M269.6,54H89.2c-7.5,0-13.5,6-13.5,13.5V248c0,7.5,6,13.5,13.5,13.5h180.5c7.5,0,13.5-6,13.5-13.5V67.5    C283.2,60,277.1,54,269.6,54z"
+   id="path22" />
+	</g>
+</g>
+<g
+   id="g37"
+   style="filter:url(#filter2144)">
+	<g
+   id="g35">
+		
+			<linearGradient
+   id="SVGID_3_"
+   gradientUnits="userSpaceOnUse"
+   x1="-40.4655"
+   y1="387.5112"
+   x2="202.557"
+   y2="144.4888"
+   gradientTransform="matrix(1 0 0 -1 0 514)">
+			<stop
+   offset="0"
+   style="stop-color:#FFC08B"
+   id="stop28" />
+			<stop
+   offset="1"
+   style="stop-color:#FF8C7B"
+   id="stop30" />
+		</linearGradient>
+		<path
+   class="st3"
+   d="M81,479c-12,0-21.7-6-21.7-13.5V30.5C59.4,23,69,17,81,17s21.7,6,21.7,13.5v434.9C102.7,473,93,479,81,479z"
+   id="path33" />
+	</g>
+</g>
+</svg>
