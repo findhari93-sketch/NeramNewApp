@@ -137,6 +137,19 @@ export default function StepPayment({
                 );
               return;
             }
+            // best-effort: ask server to generate and email invoice (non-blocking)
+            try {
+              await apiFetch("/api/payments/invoice", {
+                method: "POST",
+                body: JSON.stringify({
+                  orderId: response.razorpay_order_id,
+                  paymentId: response.razorpay_payment_id,
+                  amount,
+                  currency: "INR",
+                  course,
+                }),
+              });
+            } catch {}
             if (onSuccess) onSuccess(response.razorpay_payment_id);
           } catch (e: any) {
             if (onFailure) onFailure(String(e?.message || e));

@@ -12,27 +12,30 @@ import TeamSection from "./homepage/sections/Team/TeamSection";
 import AdvantagesSection from "./homepage/sections/Advantages/AdvantagesSection";
 import HeroWaves from "./homepage/sections/Hero/HeroWaves";
 import Footer from "./components/shared/Footer/footer";
+import { Suspense } from "react";
 
 export default function Home() {
   return (
-    <div>
-      <TopNavBar />
-      <SnackbarNotice />
-      <HeroHome />
-      <TopperSection />
-      <AchievementsSection />
-      <ParentsSection />
-      <YouTubeSection />
-      <CardCoursesSection />
-      <AudiowhatsappSection />
-      <FaqsSection />
-      <TeamSection />
-      <AdvantagesSection />
+    <Suspense fallback={null}>
+      <div>
+        <TopNavBar />
+        <SnackbarNotice />
+        <HeroHome />
+        <TopperSection />
+        <AchievementsSection />
+        <ParentsSection />
+        <YouTubeSection />
+        <CardCoursesSection />
+        <AudiowhatsappSection />
+        <FaqsSection />
+        <TeamSection />
+        <AdvantagesSection />
 
-      <div style={{ position: "relative" }}>
-        <HeroWaves position="top" bgcolor="#fff" />
-        <Footer />
+        <div style={{ position: "relative" }}>
+          <HeroWaves position="top" bgcolor="#fff" />
+          <Footer />
+        </div>
       </div>
-    </div>
+    </Suspense>
   );
 }

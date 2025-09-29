@@ -5,7 +5,6 @@ import "react-phone-input-2/lib/style.css";
 import { auth } from "../../../lib/firebase";
 // client Supabase no longer used for persisting user; we call server upsert instead
 import saveUserProfile from "../../../lib/saveUserProfile";
-import apiClient from "../../../lib/apiClient";
 import {
   RecaptchaVerifier,
   signInWithPhoneNumber,
