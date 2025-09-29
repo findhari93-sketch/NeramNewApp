@@ -1,5 +1,5 @@
 "use client";
-import React from "react";
+import React, { Suspense } from "react";
 import ApplicationForm from "./components/ApplicationForm";
 import TopNavBar from "../components/shared/TopNavBar";
 import { auth } from "../../lib/firebase";
@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import Container from "@mui/material/Container";
 import CircularProgress from "@mui/material/CircularProgress";
 
-export default function Page() {
+function ApplicationFormPageInner() {
   const router = useRouter();
   const [authChecked, setAuthChecked] = React.useState(false);
 
@@ -56,5 +56,14 @@ export default function Page() {
       />
       <ApplicationForm />
     </div>
+  );
+}
+
+export default function Page() {
+  // Wrap in Suspense so hooks like useSearchParams in children can bail out safely
+  return (
+    <Suspense fallback={null}>
+      <ApplicationFormPageInner />
+    </Suspense>
   );
 }

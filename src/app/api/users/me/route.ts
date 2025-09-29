@@ -34,7 +34,7 @@ export async function GET(req: Request) {
     let decoded: admin.auth.DecodedIdToken | null = null;
     try {
       decoded = await admin.auth().verifyIdToken(idToken);
-    } catch (e) {
+    } catch {
       return new Response(
         JSON.stringify({ ok: false, error: "Invalid token" }),
         {

@@ -2,7 +2,7 @@ import { initialsForName } from "../ProfileMenu";
 import useAvatarColor from "../useAvatarColor";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import React from "react";
-import { renderHook } from "@testing-library/react-hooks";
+import { renderHook } from "@testing-library/react";
 
 describe("initialsForName", () => {
   it("returns first two letters for single name", () => {
