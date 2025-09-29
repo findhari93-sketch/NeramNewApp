@@ -17,6 +17,7 @@ export default function StepReview(props) {
     altPhone,
     instagramId,
     educationType,
+    schoolStd,
     collegeName,
     collegeYear,
     diplomaCourse,
@@ -107,8 +108,8 @@ export default function StepReview(props) {
   };
 
   return (
-    <Box sx={{ maxWidth: 520, m: 5 }}>
-      <StepHeader title="Review your details" steps="Step 4 of 5" />
+    <Box sx={{ maxWidth: 520, m: { xs: 2, md: 5 } }}>
+      <StepHeader title="Review your details" steps="Step 5 of 6" />
       <Box
         sx={{
           background: "#fff",
@@ -157,7 +158,7 @@ export default function StepReview(props) {
             educationItems.push([
               "classGrade",
               "Class / Standard",
-              form?.classGrade,
+              form?.classGrade || schoolStd,
             ]);
             educationItems.push(["board", "Board", form?.board]);
           } else if (educationType === "college") {
@@ -209,10 +210,28 @@ export default function StepReview(props) {
 
           if (selectedCourse === "nata-jee") {
             // Show simplified summary: inclusive fee, discount applied, and total payable
-            const totalInclusive = determineNataFee();
-            const discount =
+            // Prefer DB values mapped into form when present
+            const dbCourseFee = Number(form?.courseFee) || undefined;
+            const dbDiscount =
+              typeof form?.discount === "number"
+                ? form.discount
+                : Number(form?.discount) || undefined;
+            const dbTotal =
+              typeof form?.totalPayable === "number"
+                ? form.totalPayable
+                : Number(form?.totalPayable) || undefined;
+
+            const computedTotalInclusive = determineNataFee();
+            const computedDiscount =
               String(form?.paymentType || "part") === "full" ? 5000 : 0;
-            const discountedInclusive = Math.max(0, totalInclusive - discount);
+            const computedDiscountedInclusive = Math.max(
+              0,
+              computedTotalInclusive - computedDiscount
+            );
+
+            const totalInclusive = dbCourseFee ?? computedTotalInclusive;
+            const discount = dbDiscount ?? computedDiscount;
+            const discountedInclusive = dbTotal ?? computedDiscountedInclusive;
 
             courseItems.push([
               "courseTotal",
@@ -234,7 +253,9 @@ export default function StepReview(props) {
           courseItems.push([
             "amountPaidSoFar",
             "Amount paid (so far)",
-            form?.firstPayment || "-",
+            String(form?.paymentType || "part") === "part"
+              ? formatINR(16500)
+              : form?.firstPayment || "-",
           ]);
           sections.push({ title: "Course & Payment", items: courseItems });
 
@@ -375,16 +396,13 @@ export default function StepReview(props) {
                 // Save final application data to database
                 if (props.saveToDatabase) {
                   const result = await props.saveToDatabase();
-                  if (result.ok) {
-                    alert("Application submitted successfully!");
-                    // Here you could redirect to payment or another page
-                  } else {
+                  if (!result.ok) {
                     alert("Failed to submit application. Please try again.");
                     console.error("Final submission failed:", result.error);
                   }
                 } else {
-                  alert(
-                    "Application saved! (Database save function not available)"
+                  console.warn(
+                    "saveToDatabase not provided; cannot proceed to payment."
                   );
                 }
               }}

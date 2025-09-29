@@ -1,7 +1,6 @@
 "use client";
 import React, { useState, useRef, useEffect } from "react";
 import PhoneInput from "react-phone-input-2";
-import "react-phone-input-2/lib/style.css";
 import Box from "@mui/material/Box";
 import TextField from "@mui/material/TextField";
 import Select from "@mui/material/Select";
@@ -28,7 +27,12 @@ type FormData = {
   email?: string;
 };
 
-const genderOptions = ["Male", "Female", "Other"];
+// Use DB-friendly values with user-friendly labels
+const genderOptions: Array<{ value: string; label: string }> = [
+  { value: "male", label: "Male" },
+  { value: "female", label: "Female" },
+  { value: "nonbinary", label: "Other" },
+];
 
 interface StepBasicProps {
   form: FormData;
@@ -90,8 +94,25 @@ export default function StepBasic(props: StepBasicProps) {
   const [editField, setEditField] = useState<string | null>(null);
   const [hoverCsc, setHoverCsc] = useState<string | null>(null);
   const zipLookupController = useRef<AbortController | null>(null);
-  const [zipLoading, setZipLoading] = useState(false);
-  const [zipDebug, setZipDebug] = useState<string | null>(null);
+  // Removed zip lookup debug/loading UI state
+
+  const normalizeGender = (v?: string | null) => {
+    if (!v) return "";
+    const s = String(v).trim().toLowerCase();
+    const map: Record<string, string> = {
+      male: "male",
+      m: "male",
+      female: "female",
+      f: "female",
+      other: "nonbinary",
+      o: "nonbinary",
+      nonbinary: "nonbinary",
+      "non-binary": "nonbinary",
+      "non binary": "nonbinary",
+      nb: "nonbinary",
+    };
+    return map[s] ?? "";
+  };
 
   const inputStyle: React.CSSProperties = {
     width: "100%",
@@ -107,9 +128,6 @@ export default function StepBasic(props: StepBasicProps) {
   const fetchCityStateFromZip = async (zip: string, signal?: AbortSignal) => {
     const cleaned = String(zip || "").trim();
     if (!cleaned) return;
-    setZipDebug(`query:${cleaned}`);
-    setZipLoading(true);
-    console.log("zipLookup: starting lookup for", cleaned);
     try {
       // India PIN (6 digits)
       if (/^\d{6}$/.test(cleaned)) {
@@ -123,7 +141,6 @@ export default function StepBasic(props: StepBasicProps) {
             if (Array.isArray(json) && json[0]?.Status === "Success") {
               const post = json[0].PostOffice && json[0].PostOffice[0];
               if (post) {
-                console.log("zipLookup: postal api result", post);
                 try {
                   // update fields via provided handler
                   try {
@@ -138,13 +155,12 @@ export default function StepBasic(props: StepBasicProps) {
                     } as unknown as React.ChangeEvent<HTMLInputElement>);
                   } catch {}
                 } catch {}
-                setZipDebug(`We found: ${post.District}, ${post.State}, India`);
                 return;
               }
             }
           }
-        } catch (e) {
-          console.warn("zipLookup: postal api error", e);
+        } catch {
+          // swallow postal api errors
         }
       }
 
@@ -164,7 +180,6 @@ export default function StepBasic(props: StepBasicProps) {
           const results = await r.json();
           if (Array.isArray(results) && results.length > 0) {
             const addr = results[0].address || {};
-            console.log("zipLookup: nominatim hit", addr);
             try {
               try {
                 handleChange({
@@ -181,22 +196,15 @@ export default function StepBasic(props: StepBasicProps) {
                 } as unknown as React.ChangeEvent<HTMLInputElement>);
               } catch {}
             } catch {}
-            setZipDebug(
-              `found: ${addr.city || addr.town || addr.village || ""}, ${
-                addr.state || ""
-              }, ${addr.country || ""}`
-            );
             return;
           }
-        } catch (e) {
-          console.warn("zipLookup: nominatim error", e);
+        } catch {
+          // swallow nominatim errors and continue to next country code
           continue;
         }
       }
-
-      setZipDebug("no results");
     } finally {
-      setZipLoading(false);
+      // no-op
     }
   };
 
@@ -271,7 +279,7 @@ export default function StepBasic(props: StepBasicProps) {
   }, [parentEditField]);
 
   return (
-    <Box sx={{ maxWidth: 520, m: 5 }}>
+    <Box sx={{ maxWidth: 520, m: { xs: 2, md: 5 } }}>
       <Box component="form" onSubmit={(e) => e.preventDefault()}>
         {/* header */}
         {/* ...existing code... */}
@@ -302,9 +310,8 @@ export default function StepBasic(props: StepBasicProps) {
                       await updateProfile(auth.currentUser, {
                         displayName: trimmed,
                       });
-                    } catch (e) {
+                    } catch {
                       // non-fatal: proceed to DB save even if displayName update failed
-                      console.warn("updateProfile failed", e);
                     }
                   }
                 }
@@ -341,13 +348,13 @@ export default function StepBasic(props: StepBasicProps) {
             id="gender"
             size="small"
             name="gender"
-            value={form.gender || ""}
+            value={normalizeGender(form.gender)}
             label="Gender"
             onChange={handleSelectChange}
           >
-            {genderOptions.map((g) => (
-              <MenuItem key={g} value={g}>
-                {g}
+            {genderOptions.map((opt) => (
+              <MenuItem key={opt.value} value={opt.value}>
+                {opt.label}
               </MenuItem>
             ))}
           </Select>
@@ -369,12 +376,7 @@ export default function StepBasic(props: StepBasicProps) {
           autoComplete="off"
         />
 
-        {/* Debug / zip lookup status (visible on page) */}
-        {zipLoading || zipDebug ? (
-          <Typography sx={{ fontSize: 12, color: "#666", mt: 0.5 }}>
-            {zipLoading ? "Looking up postal code..." : zipDebug}
-          </Typography>
-        ) : null}
+        {/* zip lookup status UI removed */}
 
         <Box sx={{ mt: (form.zipCode || "").toString().trim() ? 0 : 2 }}>
           {(form.zipCode || "").toString().trim() ? (
@@ -799,7 +801,6 @@ export default function StepBasic(props: StepBasicProps) {
               if (saveToDatabase) {
                 const result = await saveToDatabase();
                 if (!result.ok) {
-                  console.error("Failed to save step data:", result.error);
                   // Continue to next step even if database save fails (data is in localStorage)
                 }
               }

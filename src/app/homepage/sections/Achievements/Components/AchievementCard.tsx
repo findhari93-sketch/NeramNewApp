@@ -27,10 +27,18 @@ export default function AchievementCard({
         alt={alt}
         sx={{ height: 52, mb: 1 }}
       />
-      <Typography variant="h6" component="div" sx={{ fontWeight: 800 }}>
+      <Typography
+        variant="h6"
+        component="div"
+        sx={{ fontWeight: 800, color: "neramPurple.main" }}
+      >
         {bigName}
       </Typography>
-      <Typography variant="body2" color="text.secondary">
+      <Typography
+        variant="body2"
+        color="text.secondary"
+        sx={{ color: "custom.lightViolet" }}
+      >
         {smallName}
       </Typography>
     </Stack>

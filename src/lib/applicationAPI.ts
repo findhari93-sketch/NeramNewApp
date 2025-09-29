@@ -62,6 +62,46 @@ export const saveApplicationStep = async (
     if (step === "education") {
       if (stepData.educationType)
         payload.educationType = stepData.educationType;
+
+      // Promote education fields to top-level columns so future reads reflect latest DB values
+      const type = stepData.educationType;
+      const form = (stepData.form || {}) as Record<string, unknown>;
+
+      // Helper to convert a start year (e.g., "2025") to label "2025-26"
+      const toAcademicLabel = (start?: unknown) => {
+        const s = Number(start);
+        if (!s || Number.isNaN(s)) return undefined;
+        const end = (s + 1) % 100;
+        return `${s}-${String(end).padStart(2, "0")}`;
+      };
+
+      // Common attempt year
+      const nataAttemptStart = form["nataAttemptYear"];
+      const nataAttemptLabel = toAcademicLabel(nataAttemptStart);
+      if (nataAttemptLabel) payload.nataAttemptYear = nataAttemptLabel;
+
+      if (type === "school") {
+        if (stepData.schoolStd) payload.schoolStd = stepData.schoolStd;
+        const board = form["board"] as string | undefined;
+        if (typeof board !== "undefined") payload.board = board;
+        const boardYearStart = form["boardYear"];
+        const boardYearLabel = toAcademicLabel(boardYearStart);
+        if (boardYearLabel) payload.boardYear = boardYearLabel;
+        const schoolName = form["schoolName"] as string | undefined;
+        if (typeof schoolName !== "undefined") payload.schoolName = schoolName;
+      } else if (type === "college") {
+        if (stepData.collegeName) payload.collegeName = stepData.collegeName;
+        if (stepData.collegeYear) payload.collegeYear = stepData.collegeYear;
+      } else if (type === "diploma") {
+        if (stepData.diplomaCourse)
+          payload.diplomaCourse = stepData.diplomaCourse;
+        if (stepData.diplomaYear) payload.diplomaYear = stepData.diplomaYear;
+        if (stepData.diplomaCollege)
+          payload.diplomaCollege = stepData.diplomaCollege;
+      } else if (type === "other") {
+        if (stepData.otherDescription)
+          payload.otherDescription = stepData.otherDescription;
+      }
     }
 
     if (step === "course") {
@@ -71,8 +111,10 @@ export const saveApplicationStep = async (
       if (stepData.form?.courseFee) payload.courseFee = stepData.form.courseFee;
       if (typeof stepData.form?.discount !== "undefined")
         payload.discount = stepData.form?.discount;
-      if (stepData.form?.paymentType)
-        payload.paymentType = stepData.form.paymentType;
+      // Only persist payment type when it's 'part'. If 'full', do not set (let server clear/ignore)
+      const pt = stepData.form?.paymentType as string | undefined;
+      if (pt === "part") payload.paymentType = pt;
+      // total payable always safe to compute and send
       if (stepData.form?.totalPayable)
         payload.totalPayable = stepData.form.totalPayable;
     }

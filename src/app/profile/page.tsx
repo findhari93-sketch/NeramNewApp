@@ -1,5 +1,5 @@
 "use client";
-import React from "react";
+import React, { Suspense } from "react";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
@@ -31,13 +31,13 @@ import {
   GoogleAuthProvider,
 } from "firebase/auth";
 import TopNavBar from "../components/shared/TopNavBar";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import apiClient from "../../lib/apiClient";
 import HeaderCardDesign from "./components/HeaderCardDesign";
 import ProfilePictureCard from "./components/ProfilePictureCard";
 import { useSyncedUser } from "@/hooks/useSyncedUser";
 
-export default function ProfilePage() {
+function ProfilePageInner() {
   // Set authChecked to true after Firebase auth state is checked
   React.useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(() => {
@@ -53,8 +53,31 @@ export default function ProfilePage() {
   // Removed unused studentName logic.
   // Removed unused saving state
   const [snackOpen, setSnackOpen] = React.useState(false);
-  const [snackMsg] = React.useState<string | null>(null);
+  const [snackMsg, setSnackMsg] = React.useState<string | null>(null);
   const [requireNameSnackOpen] = React.useState(false);
+  const searchParams = useSearchParams();
+  // Show payment success banner once and then clean URL
+  React.useEffect(() => {
+    try {
+      const paid = searchParams.get("paid");
+      const course = searchParams.get("course");
+      const pid = searchParams.get("pid");
+      if (paid === "1") {
+        const parts = ["Payment successful!"];
+        if (course) parts.push(`Course: ${course}`);
+        if (pid) parts.push(`Payment ID: ${pid}`);
+        setSnackMsg(parts.join(" \u2013 "));
+        setSnackOpen(true);
+        // Clean the URL after a short delay so banner doesn't reappear on refresh
+        const t = setTimeout(() => {
+          try {
+            router.replace("/profile");
+          } catch {}
+        }, 3000);
+        return () => clearTimeout(t);
+      }
+    } catch {}
+  }, [searchParams, router]);
 
   // Drawer/edit state + form (single shared drawer for page)
   const [drawer, setDrawer] = React.useState<{
@@ -83,6 +106,16 @@ export default function ProfilePage() {
   const { control, handleSubmit, reset } = useForm<Record<string, any>>({
     defaultValues: {},
   });
+
+  // Smaller MUI TextField styling for mobile inside the drawer
+  const textFieldMobileSx = React.useMemo(
+    () => ({
+      "& .MuiInputBase-input": { fontSize: { xs: 13, sm: 14 } },
+      "& .MuiInputLabel-root": { fontSize: { xs: 13, sm: 14 } },
+      "& .MuiFormHelperText-root": { fontSize: { xs: 11, sm: 12 } },
+    }),
+    []
+  );
 
   // Compute a simple profile completeness score (0-100)
   const completeness = React.useMemo(() => {
@@ -468,6 +501,26 @@ export default function ProfilePage() {
     changedFields: Record<string, any>
   ) => {
     if (!userId) throw new Error("No user id");
+    // If nothing changed, just refresh the user from server/cache and exit successfully
+    if (Object.keys(changedFields).length === 0) {
+      try {
+        const meRes = await apiClient(`/api/users/me`);
+        if (meRes && meRes.ok) {
+          const meParsed = await meRes.json().catch(() => null);
+          const fresh = meParsed && meParsed.user ? meParsed.user : meParsed;
+          if (fresh) {
+            setUser(fresh);
+            try {
+              localStorage.setItem(
+                `user-cache:${userId}`,
+                JSON.stringify({ user: fresh, fetchedAt: Date.now() })
+              );
+            } catch {}
+          }
+        }
+      } catch {}
+      return { ok: true } as const;
+    }
     const previous = { ...(user as any) };
     const optimistic = { ...(user as any), ...changedFields };
     setUser(optimistic);
@@ -482,8 +535,20 @@ export default function ProfilePage() {
       const payload: Record<string, any> = { uid: userId };
       const profilePayload: Record<string, any> = {};
       for (const k of Object.keys(changedFields)) {
-        // heuristics: promote known top-level columns
-        if (k === "dob" || k === "student_name" || k === "username") {
+        // heuristics: promote known top-level columns so the API can persist to dedicated columns
+        const promoteTopLevel = new Set([
+          "dob",
+          "student_name",
+          "username",
+          "email",
+          "phone",
+          "alternate_phone",
+          "city",
+          "state",
+          "country",
+          "zip_code",
+        ]);
+        if (promoteTopLevel.has(k)) {
           payload[k] = changedFields[k];
         } else {
           profilePayload[k] = changedFields[k];
@@ -502,8 +567,18 @@ export default function ProfilePage() {
         throw new Error(text);
       }
       const parsed = await res.json().catch(() => null);
-      // server returns { ok: true, user }
-      const returnedUser = parsed && parsed.user ? parsed.user : parsed;
+      // server returns { ok: true, user } in most cases; sometimes 204/empty
+      let returnedUser = parsed && parsed.user ? parsed.user : parsed;
+      if (!returnedUser) {
+        // Fallback: fetch the latest user row to ensure UI reflects saved state
+        try {
+          const meRes = await apiClient(`/api/users/me`);
+          if (meRes && meRes.ok) {
+            const meParsed = await meRes.json().catch(() => null);
+            returnedUser = meParsed && meParsed.user ? meParsed.user : meParsed;
+          }
+        } catch {}
+      }
       if (returnedUser) {
         // Merge education fields from profile into top-level for UI consistency
         const educationKeys = [
@@ -522,6 +597,21 @@ export default function ProfilePage() {
         ];
         if (returnedUser.profile) {
           for (const k of educationKeys) {
+            if (returnedUser.profile[k] !== undefined) {
+              returnedUser[k] = returnedUser.profile[k];
+            }
+          }
+          // Mirror commonly-used profile fields to top-level for current UI
+          const profileKeysToMirror = [
+            "interests",
+            "father_name",
+            "bio",
+            "selected_languages",
+            "youtube_subscribed",
+            "selected_course",
+            "software_course",
+          ];
+          for (const k of profileKeysToMirror) {
             if (returnedUser.profile[k] !== undefined) {
               returnedUser[k] = returnedUser.profile[k];
             }
@@ -706,6 +796,7 @@ export default function ProfilePage() {
   // Fetch the server-side Supabase user row once after auth so DB-backed
   // fields (father_name, gender, profile JSON, etc.) appear on refresh.
   const fetchedMeForUid = React.useRef<string | null>(null);
+  const isFetchingMe = React.useRef<boolean>(false);
   // Simple local cache for the full DB user row to avoid hitting the DB on
   // every reload. Cache key: `user-cache:<uid>` with shape { user, fetchedAt }.
   const USER_CACHE_TTL_MS_REF = React.useRef<number>(24 * 60 * 60 * 1000);
@@ -740,67 +831,49 @@ export default function ProfilePage() {
   );
 
   React.useEffect(() => {
-    // Always run this effect, but only fetch if conditions are met
-    if (!authChecked || !user) return;
-    const uid = (user as any)?.uid;
+    // Always run this effect; prefer showing cached data immediately but also fetch from server to refresh UI
+    if (!authChecked) return;
+    const uid =
+      auth.currentUser?.uid || ((user as any)?.uid ? (user as any).uid : null);
     if (!uid) return;
-    if (fetchedMeForUid.current === uid) return; // already fetched for this uid
+    if (fetchedMeForUid.current === uid && !isFetchingMe.current) return;
 
-    // if we have a fresh cache, use it and avoid a network call
+    // Use cache for instant paint (if present), but do NOT short-circuit the server fetch
     let cached = readUserCache(uid);
-    // Clear old cache that might not have education fields
     if (
       cached &&
       !(cached as any).education_type &&
       !(cached as any).school_std
     ) {
       localStorage.removeItem(`user-cache:${uid}`);
-      cached = null; // Force fresh fetch
+      cached = null;
       console.log("Cleared old cache without education fields");
     }
     if (cached) {
-      console.log("Using cached user data:", {
-        education_type: (cached as any).education_type,
-        school_std: (cached as any).school_std,
-        board: (cached as any).board,
-        has_education_fields: !!(cached as any).education_type,
-      });
       setUser(cached);
-      fetchedMeForUid.current = uid;
-      return;
+      // Do not set fetchedMeForUid here; we still fetch to get fresh data
     }
 
+    if (isFetchingMe.current) return;
+    isFetchingMe.current = true;
     (async () => {
       try {
         const res = await apiClient(`/api/users/me`);
-        if (!res || !res.ok) return;
-        const parsed = await res.json().catch(() => null);
-        const dbUser = parsed && parsed.user ? parsed.user : parsed;
-        if (dbUser) {
-          // Debug: Log the education fields received from database
-          console.log("Education fields from DB:", {
-            education_type: dbUser.education_type,
-            school_std: dbUser.school_std,
-            board: dbUser.board,
-            board_year: dbUser.board_year,
-            school_name: dbUser.school_name,
-            college_name: dbUser.college_name,
-            college_year: dbUser.college_year,
-            diploma_course: dbUser.diploma_course,
-            diploma_year: dbUser.diploma_year,
-            diploma_college: dbUser.diploma_college,
-            nata_attempt_year: dbUser.nata_attempt_year,
-            other_description: dbUser.other_description,
-          });
-          setUser(dbUser);
-          // write to local cache for future reloads
-          try {
-            writeUserCache(uid, dbUser);
-          } catch {}
+        if (res && res.ok) {
+          const parsed = await res.json().catch(() => null);
+          const dbUser = parsed && parsed.user ? parsed.user : parsed;
+          if (dbUser) {
+            setUser(dbUser);
+            try {
+              writeUserCache(uid, dbUser);
+            } catch {}
+          }
+          fetchedMeForUid.current = uid;
         }
-        fetchedMeForUid.current = uid;
       } catch {
         // ignore network errors
+      } finally {
+        isFetchingMe.current = false;
       }
     })();
   }, [authChecked, user, readUserCache, writeUserCache, setUser]);
@@ -868,11 +941,7 @@ export default function ProfilePage() {
           titleBar={{
             visible: true,
             title: "Profile Page",
-            breadcrumbs: [
-              { label: "Home", href: "/" },
-              { label: "Profile" },
-              { label: "Requests" },
-            ],
+            breadcrumbs: [{ label: "Home", href: "/" }, { label: "Profile" }],
             showBreadcrumbs: true,
             actions: [],
             showBackButton: true,
@@ -905,11 +974,7 @@ export default function ProfilePage() {
         titleBar={{
           visible: true,
           title: "Profile Page",
-          breadcrumbs: [
-            { label: "Home", href: "/" },
-            { label: "Profile" },
-            { label: "Requests" },
-          ],
+          breadcrumbs: [{ label: "Home", href: "/" }, { label: "Profile" }],
           showBreadcrumbs: true,
           actions: [],
           showBackButton: true,
@@ -917,7 +982,22 @@ export default function ProfilePage() {
         }}
       />
 
-      <Container maxWidth="lg" sx={{ mt: "101px", mb: 6 }}>
+      <Container maxWidth="lg" sx={{ mt: "101px", mb: 6, overflowX: "clip" }}>
+        <Snackbar
+          open={snackOpen}
+          autoHideDuration={4000}
+          onClose={() => setSnackOpen(false)}
+          anchorOrigin={{ vertical: "top", horizontal: "center" }}
+        >
+          <Alert
+            onClose={() => setSnackOpen(false)}
+            severity="success"
+            variant="filled"
+            sx={{ width: "100%" }}
+          >
+            {snackMsg || "Payment successful!"}
+          </Alert>
+        </Snackbar>
         {/* Profile completeness card */}
         <Paper elevation={3} sx={{ p: 2, mb: 3, borderRadius: 2 }}>
           <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
@@ -947,557 +1027,615 @@ export default function ProfilePage() {
             </Typography>
           )}
         </Paper>
-        <Grid container spacing={3}>
-          <Grid item component="div" xs={12} md={4}>
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              <HeaderCardDesign
-                title="Profile Details"
-                icon={null}
-                onEdit={() =>
-                  openEditDrawer({
-                    title: "Profile Details",
-                    fields: profileFields,
-                    values: (user as any) ?? {},
-                  })
-                }
-              >
-                <ProfilePictureCard
-                  user={
-                    (user as any) ?? {
-                      displayName: undefined,
-                    }
+        {/* Wrap Grid to compensate for spacing negative margins on small screens */}
+        <Box sx={{ px: { xs: 0, sm: 0 } }}>
+          <Grid container spacing={3}>
+            <Grid item component="div" xs={12} md={4}>
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                <HeaderCardDesign
+                  title="Profile Details"
+                  icon={null}
+                  onEdit={() =>
+                    openEditDrawer({
+                      title: "Profile Details",
+                      fields: profileFields,
+                      values: (user as any) ?? {},
+                    })
                   }
-                  onUpload={onUpload}
-                  avatarSize={96}
-                />
-                <Typography variant="body2" sx={{ mb: 1 }}>
-                  {(user as any)?.bio || "—"}
-                </Typography>
+                >
+                  <ProfilePictureCard
+                    user={
+                      (user as any) ?? {
+                        displayName: undefined,
+                      }
+                    }
+                    onUpload={onUpload}
+                    avatarSize={96}
+                  />
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    {(user as any)?.bio || "—"}
+                  </Typography>
 
-                <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                  <Typography
-                    variant="body2"
-                    sx={{ minWidth: 140, color: "text.secondary" }}
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    sx={{ mt: 1, minWidth: 0, flexWrap: "wrap" }}
                   >
-                    Student Name:
-                  </Typography>
+                    <Typography
+                      variant="body2"
+                      sx={{ minWidth: 140, color: "text.secondary" }}
+                    >
+                      Student Name:
+                    </Typography>
 
-                  <Typography variant="body2">
-                    {(user as any)?.student_name ||
-                      (user as any)?.displayName ||
-                      "—"}
-                  </Typography>
-                </Stack>
+                    <Typography variant="body2">
+                      {(user as any)?.student_name ||
+                        (user as any)?.displayName ||
+                        "—"}
+                    </Typography>
+                  </Stack>
 
-                <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                  <Typography
-                    variant="body2"
-                    sx={{ minWidth: 140, color: "text.secondary" }}
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    sx={{ mt: 1, minWidth: 0, flexWrap: "wrap" }}
                   >
-                    Father&apos;s Name:
-                  </Typography>
-                  <Typography variant="body2">
-                    {(user as any)?.father_name || "—"}
-                  </Typography>
-                </Stack>
+                    <Typography
+                      variant="body2"
+                      sx={{ minWidth: 140, color: "text.secondary" }}
+                    >
+                      Father&apos;s Name:
+                    </Typography>
+                    <Typography variant="body2">
+                      {(user as any)?.father_name || "—"}
+                    </Typography>
+                  </Stack>
 
-                <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                  <Typography
-                    variant="body2"
-                    sx={{ minWidth: 140, color: "text.secondary" }}
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    sx={{ mt: 1, minWidth: 0, flexWrap: "wrap" }}
                   >
-                    DOB:
-                  </Typography>
-                  <Typography variant="body2">
-                    {(user as any)?.dob || "—"}
-                  </Typography>
-                </Stack>
+                    <Typography
+                      variant="body2"
+                      sx={{ minWidth: 140, color: "text.secondary" }}
+                    >
+                      DOB:
+                    </Typography>
+                    <Typography variant="body2">
+                      {(user as any)?.dob || "—"}
+                    </Typography>
+                  </Stack>
 
-                <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                  <Typography
-                    variant="body2"
-                    sx={{ minWidth: 140, color: "text.secondary" }}
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    sx={{ mt: 1, minWidth: 0, flexWrap: "wrap" }}
                   >
-                    Gender:
-                  </Typography>
-                  <Typography variant="body2">
-                    {(user as any)?.gender || "—"}
-                  </Typography>
-                </Stack>
+                    <Typography
+                      variant="body2"
+                      sx={{ minWidth: 140, color: "text.secondary" }}
+                    >
+                      Gender:
+                    </Typography>
+                    <Typography variant="body2">
+                      {(user as any)?.gender || "—"}
+                    </Typography>
+                  </Stack>
 
-                <Box sx={{ mt: 2 }}>
-                  <Typography variant="subtitle2">Interests</Typography>
-                  <Box sx={{ mt: 1 }}>
-                    {Array.isArray((user as any)?.interests) &&
-                    (user as any).interests.length ? (
-                      (user as any).interests.map((t: string) => (
-                        <Chip
-                          key={t}
+                  <Box sx={{ mt: 2 }}>
+                    <Typography variant="subtitle2">Interests</Typography>
+                    <Box sx={{ mt: 1 }}>
+                      {Array.isArray((user as any)?.interests) &&
+                      (user as any).interests.length ? (
+                        (user as any).interests.map((t: string) => (
+                          <Chip
+                            key={t}
+                            size="small"
+                            label={t}
+                            sx={{ mr: 1, mb: 1 }}
+                          />
+                        ))
+                      ) : (
+                        <Typography variant="body2" color="text.secondary">
+                          —
+                        </Typography>
+                      )}
+                    </Box>
+                  </Box>
+                </HeaderCardDesign>
+              </Box>
+            </Grid>
+
+            <Grid item component="div" xs={12} md={8}>
+              <Grid container spacing={2} direction="column">
+                <Grid item xs={12}>
+                  <HeaderCardDesign
+                    title="Account Details"
+                    icon={null}
+                    onEdit={() =>
+                      openEditDrawer({
+                        title: "Account Details",
+                        fields: accountFields,
+                        values: (user as any) ?? {},
+                      })
+                    }
+                  >
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      sx={{ minWidth: 0, flexWrap: "wrap" }}
+                    >
+                      <Typography
+                        variant="body2"
+                        sx={{ minWidth: 200, color: "text.secondary" }}
+                      >
+                        Username:
+                      </Typography>
+                      <Typography variant="body2">
+                        {(user as any)?.username || "—"}
+                      </Typography>
+                    </Stack>
+
+                    {/* Password row: masked with reveal and edit action */}
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      sx={{ mt: 1, minWidth: 0, flexWrap: "wrap" }}
+                    >
+                      <Typography
+                        variant="body2"
+                        sx={{ minWidth: 200, color: "text.secondary" }}
+                      >
+                        Password:
+                      </Typography>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 1,
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <Typography variant="body2" sx={{ mr: 1 }}>
+                          {"••••••••"}
+                        </Typography>
+                        <Button
+                          variant="outlined"
                           size="small"
-                          label={t}
-                          sx={{ mr: 1, mb: 1 }}
-                        />
-                      ))
+                          onClick={() => setPwdDialogOpen(true)}
+                          aria-label="change-password"
+                        >
+                          Change password
+                        </Button>
+                      </Box>
+                    </Stack>
+
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      sx={{ mt: 1, minWidth: 0, flexWrap: "wrap" }}
+                    >
+                      <Typography
+                        variant="body2"
+                        sx={{ minWidth: 200, color: "text.secondary" }}
+                      >
+                        Account Type:
+                      </Typography>
+                      <Typography variant="body2">
+                        {(user as any)?.accountType ||
+                          (user as any)?.account_type ||
+                          "Free"}
+                      </Typography>
+                    </Stack>
+
+                    {/* account type */}
+                  </HeaderCardDesign>
+                </Grid>
+
+                {/* Purchases / Entitlements */}
+                <Grid item xs={12}>
+                  <HeaderCardDesign
+                    title="Purchases"
+                    icon={null}
+                    onEdit={undefined}
+                  >
+                    {Array.isArray((user as any)?.application?.purchases) &&
+                    (user as any).application.purchases.length > 0 ? (
+                      <Stack spacing={1}>
+                        {(user as any).application.purchases.map(
+                          (p: any, idx: number) => (
+                            <Box
+                              key={idx}
+                              sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}
+                            >
+                              <Chip
+                                size="small"
+                                label={(p.course || "general").toString()}
+                              />
+                              <Typography variant="body2">
+                                {p.amount != null
+                                  ? `₹${Number(p.amount).toLocaleString(
+                                      "en-IN"
+                                    )}`
+                                  : ""}{" "}
+                                {p.paymentId ? `• ${p.paymentId}` : ""}
+                              </Typography>
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                              >
+                                {p.granted_at
+                                  ? new Date(p.granted_at).toLocaleString()
+                                  : ""}
+                              </Typography>
+                            </Box>
+                          )
+                        )}
+                      </Stack>
                     ) : (
                       <Typography variant="body2" color="text.secondary">
-                        —
+                        No purchases yet.
                       </Typography>
                     )}
-                  </Box>
-                </Box>
-              </HeaderCardDesign>
-            </Box>
-          </Grid>
+                  </HeaderCardDesign>
+                </Grid>
 
-          <Grid item component="div" xs={12} md={8}>
-            <Grid container spacing={2} direction="column">
-              <Grid item xs={12}>
-                <HeaderCardDesign
-                  title="Account Details"
-                  icon={null}
-                  onEdit={() =>
-                    openEditDrawer({
-                      title: "Account Details",
-                      fields: accountFields,
-                      values: (user as any) ?? {},
-                    })
-                  }
-                >
-                  <Stack direction="row" spacing={1}>
-                    <Typography
-                      variant="body2"
-                      sx={{ minWidth: 200, color: "text.secondary" }}
+                <Grid item xs={12}>
+                  <HeaderCardDesign
+                    title="Contact Details"
+                    icon={null}
+                    onEdit={() =>
+                      openEditDrawer({
+                        title: "Contact Details",
+                        fields: contactFields,
+                        values: (user as any) ?? {},
+                      })
+                    }
+                  >
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      sx={{ minWidth: 0, flexWrap: "wrap" }}
                     >
-                      Username:
-                    </Typography>
-                    <Typography variant="body2">
-                      {(user as any)?.username || "—"}
-                    </Typography>
-                  </Stack>
-
-                  {/* Password row: masked with reveal and edit action */}
-                  <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                    <Typography
-                      variant="body2"
-                      sx={{ minWidth: 200, color: "text.secondary" }}
-                    >
-                      Password:
-                    </Typography>
-                    <Box sx={{ display: "flex", alignItems: "center" }}>
-                      <Typography variant="body2" sx={{ mr: 1 }}>
-                        {"••••••••"}
+                      <Typography
+                        variant="body2"
+                        sx={{ minWidth: 200, color: "text.secondary" }}
+                      >
+                        Email:
                       </Typography>
-                      <IconButton
-                        size="small"
-                        onClick={() =>
-                          setSnack({
-                            open: true,
-                            message:
-                              "Password is hidden for security. Use Change to update your password.",
-                            severity: "info",
-                          })
-                        }
-                        aria-label="reveal-password"
+                      <Typography variant="body2">
+                        {(user as any)?.email || "—"}
+                      </Typography>
+                    </Stack>
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      sx={{ mt: 1, minWidth: 0, flexWrap: "wrap" }}
+                    >
+                      <Typography
+                        variant="body2"
+                        sx={{ minWidth: 200, color: "text.secondary" }}
                       >
-                        {/* info / eye icon */}
-                        <svg
-                          width="18"
-                          height="18"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          xmlns="http://www.w3.org/2000/svg"
-                        >
-                          <path
-                            d="M12 5C7 5 2.73 8.11 1 12c1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7z"
-                            stroke="currentColor"
-                            strokeWidth="1"
-                          />
-                          <circle
-                            cx="12"
-                            cy="12"
-                            r="3"
-                            stroke="currentColor"
-                            strokeWidth="1"
-                          />
-                        </svg>
-                      </IconButton>
-                      <IconButton
-                        size="small"
-                        onClick={() => setPwdDialogOpen(true)}
-                        aria-label="change-password"
+                        Verified Number:
+                      </Typography>
+                      <Typography variant="body2">
+                        {(user as any)?.phone || "—"}
+                      </Typography>
+                    </Stack>
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      sx={{ mt: 1, minWidth: 0, flexWrap: "wrap" }}
+                    >
+                      <Typography
+                        variant="body2"
+                        sx={{ minWidth: 200, color: "text.secondary" }}
                       >
-                        <svg
-                          width="18"
-                          height="18"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          xmlns="http://www.w3.org/2000/svg"
-                        >
-                          <path
-                            d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z"
-                            fill="currentColor"
-                          />
-                          <path
-                            d="M20.71 7.04a1.003 1.003 0 0 0 0-1.41l-2.34-2.34a1.003 1.003 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"
-                            fill="currentColor"
-                          />
-                        </svg>
-                      </IconButton>
-                    </Box>
-                  </Stack>
+                        Alternate Number:
+                      </Typography>
+                      <Typography variant="body2">
+                        {(user as any)?.alternate_phone || "—"}
+                      </Typography>
+                    </Stack>
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      sx={{ mt: 1, minWidth: 0, flexWrap: "wrap" }}
+                    >
+                      <Typography
+                        variant="body2"
+                        sx={{ minWidth: 200, color: "text.secondary" }}
+                      >
+                        City:
+                      </Typography>
+                      <Typography variant="body2">
+                        {(user as any)?.city || "—"}
+                      </Typography>
+                    </Stack>
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      sx={{ mt: 1, minWidth: 0, flexWrap: "wrap" }}
+                    >
+                      <Typography
+                        variant="body2"
+                        sx={{ minWidth: 200, color: "text.secondary" }}
+                      >
+                        State:
+                      </Typography>
+                      <Typography variant="body2">
+                        {(user as any)?.state || "—"}
+                      </Typography>
+                    </Stack>
+                    <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                      <Typography
+                        variant="body2"
+                        sx={{ minWidth: 200, color: "text.secondary" }}
+                      >
+                        Country:
+                      </Typography>
+                      <Typography variant="body2">
+                        {(user as any)?.country || "—"}
+                      </Typography>
+                    </Stack>
+                    <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                      <Typography
+                        variant="body2"
+                        sx={{ minWidth: 200, color: "text.secondary" }}
+                      >
+                        Zip Code:
+                      </Typography>
+                      <Typography variant="body2">
+                        {(user as any)?.zip_code || "—"}
+                      </Typography>
+                    </Stack>
+                  </HeaderCardDesign>
+                </Grid>
 
-                  <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                    <Typography
-                      variant="body2"
-                      sx={{ minWidth: 200, color: "text.secondary" }}
-                    >
-                      Account Type:
-                    </Typography>
-                    <Typography variant="body2">
-                      {(user as any)?.accountType ||
-                        (user as any)?.account_type ||
-                        "Free"}
-                    </Typography>
-                  </Stack>
-
-                  {/* account type */}
-                </HeaderCardDesign>
-              </Grid>
-
-              <Grid item xs={12}>
-                <HeaderCardDesign
-                  title="Contact Details"
-                  icon={null}
-                  onEdit={() =>
-                    openEditDrawer({
-                      title: "Contact Details",
-                      fields: contactFields,
-                      values: (user as any) ?? {},
-                    })
-                  }
-                >
-                  <Stack direction="row" spacing={1}>
-                    <Typography
-                      variant="body2"
-                      sx={{ minWidth: 200, color: "text.secondary" }}
-                    >
-                      Email:
-                    </Typography>
-                    <Typography variant="body2">
-                      {(user as any)?.email || "—"}
-                    </Typography>
-                  </Stack>
-                  <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                    <Typography
-                      variant="body2"
-                      sx={{ minWidth: 200, color: "text.secondary" }}
-                    >
-                      Verified Number:
-                    </Typography>
-                    <Typography variant="body2">
-                      {(user as any)?.phone || "—"}
-                    </Typography>
-                  </Stack>
-                  <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                    <Typography
-                      variant="body2"
-                      sx={{ minWidth: 200, color: "text.secondary" }}
-                    >
-                      Alternate Number:
-                    </Typography>
-                    <Typography variant="body2">
-                      {(user as any)?.alternate_phone || "—"}
-                    </Typography>
-                  </Stack>
-                  <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                    <Typography
-                      variant="body2"
-                      sx={{ minWidth: 200, color: "text.secondary" }}
-                    >
-                      City:
-                    </Typography>
-                    <Typography variant="body2">
-                      {(user as any)?.city || "—"}
-                    </Typography>
-                  </Stack>
-                  <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                    <Typography
-                      variant="body2"
-                      sx={{ minWidth: 200, color: "text.secondary" }}
-                    >
-                      State:
-                    </Typography>
-                    <Typography variant="body2">
-                      {(user as any)?.state || "—"}
-                    </Typography>
-                  </Stack>
-                  <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                    <Typography
-                      variant="body2"
-                      sx={{ minWidth: 200, color: "text.secondary" }}
-                    >
-                      Country:
-                    </Typography>
-                    <Typography variant="body2">
-                      {(user as any)?.country || "—"}
-                    </Typography>
-                  </Stack>
-                  <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                    <Typography
-                      variant="body2"
-                      sx={{ minWidth: 200, color: "text.secondary" }}
-                    >
-                      Zip Code:
-                    </Typography>
-                    <Typography variant="body2">
-                      {(user as any)?.zip_code || "—"}
-                    </Typography>
-                  </Stack>
-                </HeaderCardDesign>
-              </Grid>
-
-              <Grid item xs={12}>
-                <HeaderCardDesign
-                  title="Education Details"
-                  icon={null}
-                  onEdit={() => {
-                    const educationType =
-                      (user as any)?.education_type ?? "school";
-                    const fieldsToShow =
-                      getFieldsForEducationType(educationType);
-                    const filteredFields = educationFields.filter((field) =>
-                      fieldsToShow.includes(field.name)
-                    );
-                    openEditDrawer({
-                      title: "Education Details",
-                      fields: filteredFields,
-                      values: (user as any) ?? {},
-                    });
-                  }}
-                >
-                  <Grid container spacing={3}>
-                    <Grid item xs={12} md={6}>
-                      <Stack spacing={2}>
-                        <Stack direction="row" spacing={1}>
-                          <Typography
-                            variant="body2"
-                            sx={{
-                              minWidth: 160,
-                              color: "text.secondary",
-                              fontWeight: 500,
-                            }}
-                          >
-                            Education Type:
-                          </Typography>
-                          <Typography variant="body2">
-                            {(user as any)?.education_type ?? "school"}
-                          </Typography>
+                <Grid item xs={12}>
+                  <HeaderCardDesign
+                    title="Education Details"
+                    icon={null}
+                    onEdit={() => {
+                      const educationType =
+                        (user as any)?.education_type ?? "school";
+                      const fieldsToShow =
+                        getFieldsForEducationType(educationType);
+                      const filteredFields = educationFields.filter((field) =>
+                        fieldsToShow.includes(field.name)
+                      );
+                      openEditDrawer({
+                        title: "Education Details",
+                        fields: filteredFields,
+                        values: (user as any) ?? {},
+                      });
+                    }}
+                  >
+                    <Grid container spacing={3}>
+                      <Grid item xs={12} md={6}>
+                        <Stack spacing={2}>
+                          <Stack direction="row" spacing={1}>
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                minWidth: 160,
+                                color: "text.secondary",
+                                fontWeight: 500,
+                              }}
+                            >
+                              Education Type:
+                            </Typography>
+                            <Typography variant="body2">
+                              {(user as any)?.education_type ?? "school"}
+                            </Typography>
+                          </Stack>
+                          {(() => {
+                            const educationType =
+                              (user as any)?.education_type ?? "school";
+                            const fieldsToShow =
+                              getFieldsForEducationType(educationType);
+                            return (
+                              <>
+                                {fieldsToShow.includes("school_std") && (
+                                  <Stack direction="row" spacing={1}>
+                                    <Typography
+                                      variant="body2"
+                                      sx={{
+                                        minWidth: 160,
+                                        color: "text.secondary",
+                                        fontWeight: 500,
+                                      }}
+                                    >
+                                      School Standard / Grade:
+                                    </Typography>
+                                    <Typography variant="body2">
+                                      {(user as any)?.school_std ?? "—"}
+                                    </Typography>
+                                  </Stack>
+                                )}
+                                {fieldsToShow.includes("board") && (
+                                  <Stack direction="row" spacing={1}>
+                                    <Typography
+                                      variant="body2"
+                                      sx={{
+                                        minWidth: 160,
+                                        color: "text.secondary",
+                                        fontWeight: 500,
+                                      }}
+                                    >
+                                      Education Board:
+                                    </Typography>
+                                    <Typography variant="body2">
+                                      {(user as any)?.board ?? "—"}
+                                    </Typography>
+                                  </Stack>
+                                )}
+                                {fieldsToShow.includes("board_year") && (
+                                  <Stack direction="row" spacing={1}>
+                                    <Typography
+                                      variant="body2"
+                                      sx={{
+                                        minWidth: 160,
+                                        color: "text.secondary",
+                                        fontWeight: 500,
+                                      }}
+                                    >
+                                      Board Exam Year:
+                                    </Typography>
+                                    <Typography variant="body2">
+                                      {(user as any)?.board_year ?? "—"}
+                                    </Typography>
+                                  </Stack>
+                                )}
+                                {fieldsToShow.includes("school_name") && (
+                                  <Stack direction="row" spacing={1}>
+                                    <Typography
+                                      variant="body2"
+                                      sx={{
+                                        minWidth: 160,
+                                        color: "text.secondary",
+                                        fontWeight: 500,
+                                      }}
+                                    >
+                                      School Name:
+                                    </Typography>
+                                    <Typography variant="body2">
+                                      {(user as any)?.school_name ?? "—"}
+                                    </Typography>
+                                  </Stack>
+                                )}
+                                {fieldsToShow.includes("college_name") && (
+                                  <Stack direction="row" spacing={1}>
+                                    <Typography
+                                      variant="body2"
+                                      sx={{
+                                        minWidth: 160,
+                                        color: "text.secondary",
+                                        fontWeight: 500,
+                                      }}
+                                    >
+                                      College Name:
+                                    </Typography>
+                                    <Typography variant="body2">
+                                      {(user as any)?.college_name ?? "—"}
+                                    </Typography>
+                                  </Stack>
+                                )}
+                                {fieldsToShow.includes("college_year") && (
+                                  <Stack direction="row" spacing={1}>
+                                    <Typography
+                                      variant="body2"
+                                      sx={{
+                                        minWidth: 160,
+                                        color: "text.secondary",
+                                        fontWeight: 500,
+                                      }}
+                                    >
+                                      College Year:
+                                    </Typography>
+                                    <Typography variant="body2">
+                                      {(user as any)?.college_year ?? "—"}
+                                    </Typography>
+                                  </Stack>
+                                )}
+                                {fieldsToShow.includes("diploma_course") && (
+                                  <Stack direction="row" spacing={1}>
+                                    <Typography
+                                      variant="body2"
+                                      sx={{
+                                        minWidth: 160,
+                                        color: "text.secondary",
+                                        fontWeight: 500,
+                                      }}
+                                    >
+                                      Diploma Course:
+                                    </Typography>
+                                    <Typography variant="body2">
+                                      {(user as any)?.diploma_course ?? "—"}
+                                    </Typography>
+                                  </Stack>
+                                )}
+                                {fieldsToShow.includes("diploma_year") && (
+                                  <Stack direction="row" spacing={1}>
+                                    <Typography
+                                      variant="body2"
+                                      sx={{
+                                        minWidth: 160,
+                                        color: "text.secondary",
+                                        fontWeight: 500,
+                                      }}
+                                    >
+                                      Diploma Year:
+                                    </Typography>
+                                    <Typography variant="body2">
+                                      {(user as any)?.diploma_year ?? "—"}
+                                    </Typography>
+                                  </Stack>
+                                )}
+                                {fieldsToShow.includes("diploma_college") && (
+                                  <Stack direction="row" spacing={1}>
+                                    <Typography
+                                      variant="body2"
+                                      sx={{
+                                        minWidth: 160,
+                                        color: "text.secondary",
+                                        fontWeight: 500,
+                                      }}
+                                    >
+                                      Diploma College Name:
+                                    </Typography>
+                                    <Typography variant="body2">
+                                      {(user as any)?.diploma_college ?? "—"}
+                                    </Typography>
+                                  </Stack>
+                                )}
+                                {fieldsToShow.includes("other_description") && (
+                                  <Stack direction="row" spacing={1}>
+                                    <Typography
+                                      variant="body2"
+                                      sx={{
+                                        minWidth: 160,
+                                        color: "text.secondary",
+                                        fontWeight: 500,
+                                      }}
+                                    >
+                                      What I do ?:
+                                    </Typography>
+                                    <Typography variant="body2">
+                                      {(user as any)?.other_description ?? "—"}
+                                    </Typography>
+                                  </Stack>
+                                )}
+                                {fieldsToShow.includes("nata_attempt_year") && (
+                                  <Stack direction="row" spacing={1}>
+                                    <Typography
+                                      variant="body2"
+                                      sx={{
+                                        minWidth: 160,
+                                        color: "text.secondary",
+                                        fontWeight: 500,
+                                      }}
+                                    >
+                                      NATA Attempt Year:
+                                    </Typography>
+                                    <Typography variant="body2">
+                                      {(user as any)?.nata_attempt_year ?? "—"}
+                                    </Typography>
+                                  </Stack>
+                                )}
+                              </>
+                            );
+                          })()}
                         </Stack>
-                        {(() => {
-                          const educationType =
-                            (user as any)?.education_type ?? "school";
-                          const fieldsToShow =
-                            getFieldsForEducationType(educationType);
-                          return (
-                            <>
-                              {fieldsToShow.includes("school_std") && (
-                                <Stack direction="row" spacing={1}>
-                                  <Typography
-                                    variant="body2"
-                                    sx={{
-                                      minWidth: 160,
-                                      color: "text.secondary",
-                                      fontWeight: 500,
-                                    }}
-                                  >
-                                    School Standard / Grade:
-                                  </Typography>
-                                  <Typography variant="body2">
-                                    {(user as any)?.school_std ?? "—"}
-                                  </Typography>
-                                </Stack>
-                              )}
-                              {fieldsToShow.includes("board") && (
-                                <Stack direction="row" spacing={1}>
-                                  <Typography
-                                    variant="body2"
-                                    sx={{
-                                      minWidth: 160,
-                                      color: "text.secondary",
-                                      fontWeight: 500,
-                                    }}
-                                  >
-                                    Education Board:
-                                  </Typography>
-                                  <Typography variant="body2">
-                                    {(user as any)?.board ?? "—"}
-                                  </Typography>
-                                </Stack>
-                              )}
-                              {fieldsToShow.includes("board_year") && (
-                                <Stack direction="row" spacing={1}>
-                                  <Typography
-                                    variant="body2"
-                                    sx={{
-                                      minWidth: 160,
-                                      color: "text.secondary",
-                                      fontWeight: 500,
-                                    }}
-                                  >
-                                    Board Exam Year:
-                                  </Typography>
-                                  <Typography variant="body2">
-                                    {(user as any)?.board_year ?? "—"}
-                                  </Typography>
-                                </Stack>
-                              )}
-                              {fieldsToShow.includes("school_name") && (
-                                <Stack direction="row" spacing={1}>
-                                  <Typography
-                                    variant="body2"
-                                    sx={{
-                                      minWidth: 160,
-                                      color: "text.secondary",
-                                      fontWeight: 500,
-                                    }}
-                                  >
-                                    School Name:
-                                  </Typography>
-                                  <Typography variant="body2">
-                                    {(user as any)?.school_name ?? "—"}
-                                  </Typography>
-                                </Stack>
-                              )}
-                              {fieldsToShow.includes("college_name") && (
-                                <Stack direction="row" spacing={1}>
-                                  <Typography
-                                    variant="body2"
-                                    sx={{
-                                      minWidth: 160,
-                                      color: "text.secondary",
-                                      fontWeight: 500,
-                                    }}
-                                  >
-                                    College Name:
-                                  </Typography>
-                                  <Typography variant="body2">
-                                    {(user as any)?.college_name ?? "—"}
-                                  </Typography>
-                                </Stack>
-                              )}
-                              {fieldsToShow.includes("college_year") && (
-                                <Stack direction="row" spacing={1}>
-                                  <Typography
-                                    variant="body2"
-                                    sx={{
-                                      minWidth: 160,
-                                      color: "text.secondary",
-                                      fontWeight: 500,
-                                    }}
-                                  >
-                                    College Year:
-                                  </Typography>
-                                  <Typography variant="body2">
-                                    {(user as any)?.college_year ?? "—"}
-                                  </Typography>
-                                </Stack>
-                              )}
-                              {fieldsToShow.includes("diploma_course") && (
-                                <Stack direction="row" spacing={1}>
-                                  <Typography
-                                    variant="body2"
-                                    sx={{
-                                      minWidth: 160,
-                                      color: "text.secondary",
-                                      fontWeight: 500,
-                                    }}
-                                  >
-                                    Diploma Course:
-                                  </Typography>
-                                  <Typography variant="body2">
-                                    {(user as any)?.diploma_course ?? "—"}
-                                  </Typography>
-                                </Stack>
-                              )}
-                              {fieldsToShow.includes("diploma_year") && (
-                                <Stack direction="row" spacing={1}>
-                                  <Typography
-                                    variant="body2"
-                                    sx={{
-                                      minWidth: 160,
-                                      color: "text.secondary",
-                                      fontWeight: 500,
-                                    }}
-                                  >
-                                    Diploma Year:
-                                  </Typography>
-                                  <Typography variant="body2">
-                                    {(user as any)?.diploma_year ?? "—"}
-                                  </Typography>
-                                </Stack>
-                              )}
-                              {fieldsToShow.includes("diploma_college") && (
-                                <Stack direction="row" spacing={1}>
-                                  <Typography
-                                    variant="body2"
-                                    sx={{
-                                      minWidth: 160,
-                                      color: "text.secondary",
-                                      fontWeight: 500,
-                                    }}
-                                  >
-                                    Diploma College Name:
-                                  </Typography>
-                                  <Typography variant="body2">
-                                    {(user as any)?.diploma_college ?? "—"}
-                                  </Typography>
-                                </Stack>
-                              )}
-                              {fieldsToShow.includes("other_description") && (
-                                <Stack direction="row" spacing={1}>
-                                  <Typography
-                                    variant="body2"
-                                    sx={{
-                                      minWidth: 160,
-                                      color: "text.secondary",
-                                      fontWeight: 500,
-                                    }}
-                                  >
-                                    What I do ?:
-                                  </Typography>
-                                  <Typography variant="body2">
-                                    {(user as any)?.other_description ?? "—"}
-                                  </Typography>
-                                </Stack>
-                              )}
-                              {fieldsToShow.includes("nata_attempt_year") && (
-                                <Stack direction="row" spacing={1}>
-                                  <Typography
-                                    variant="body2"
-                                    sx={{
-                                      minWidth: 160,
-                                      color: "text.secondary",
-                                      fontWeight: 500,
-                                    }}
-                                  >
-                                    NATA Attempt Year:
-                                  </Typography>
-                                  <Typography variant="body2">
-                                    {(user as any)?.nata_attempt_year ?? "—"}
-                                  </Typography>
-                                </Stack>
-                              )}
-                            </>
-                          );
-                        })()}
-                      </Stack>
+                      </Grid>
                     </Grid>
-                  </Grid>
-                </HeaderCardDesign>
+                  </HeaderCardDesign>
+                </Grid>
               </Grid>
             </Grid>
           </Grid>
-        </Grid>
+        </Box>
       </Container>
 
       {/* Drawer for editing */}
@@ -1505,33 +1643,103 @@ export default function ProfilePage() {
         anchor="right"
         open={drawer.open}
         onClose={closeDrawer}
-        PaperProps={{ sx: { width: { xs: "100%", sm: 420 }, p: 2 } }}
+        PaperProps={{
+          sx: { width: { xs: "100%", sm: 420 }, p: { xs: 1.5, sm: 2 } },
+        }}
       >
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            mb: 2,
-          }}
-        >
-          <Typography variant="h6">{drawer.title}</Typography>
+        <Box sx={{ display: "flex", alignItems: "center", mb: 2, gap: 1 }}>
+          <IconButton aria-label="close" onClick={closeDrawer} size="small">
+            {/* simple X icon */}
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M18 6L6 18"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+              <path
+                d="M6 6L18 18"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            </svg>
+          </IconButton>
+          <Typography
+            variant="h6"
+            sx={{
+              flex: "1 1 auto",
+              minWidth: 0,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {drawer.title}
+          </Typography>
+          <Button
+            size="small"
+            variant="text"
+            sx={{
+              height: 28,
+              mr: 1,
+              display: { xs: "none", sm: "inline-flex" },
+            }}
+            onClick={async () => {
+              try {
+                const res = await apiClient(`/api/users/me`);
+                if (res && res.ok) {
+                  const parsed = await res.json().catch(() => null);
+                  const dbUser = parsed && parsed.user ? parsed.user : parsed;
+                  if (dbUser) {
+                    setUser(dbUser);
+                    try {
+                      const uid = (dbUser as any)?.uid || auth.currentUser?.uid;
+                      if (uid) {
+                        localStorage.setItem(
+                          `user-cache:${uid}`,
+                          JSON.stringify({
+                            user: dbUser,
+                            fetchedAt: Date.now(),
+                          })
+                        );
+                      }
+                    } catch {}
+                    setSnack({
+                      open: true,
+                      message: "Refreshed",
+                      severity: "success",
+                    });
+                  }
+                }
+              } catch {}
+            }}
+          >
+            Refresh
+          </Button>
           <Button
             size="small"
             variant="contained"
             sx={{ height: 28 }}
             onClick={handleSubmit(async (vals) => {
-              if (!drawer.userId || !drawer.fields) return;
+              const uidAtSave =
+                drawer.userId || auth.currentUser?.uid || (user as any)?.uid;
+              if (!uidAtSave || !drawer.fields) {
+                setSnack({
+                  open: true,
+                  message: "Cannot save: missing user",
+                  severity: "error",
+                });
+                return;
+              }
               // basic validation
               for (const f of drawer.fields) {
-                if (f.required && !vals[f.name]) {
-                  setSnack({
-                    open: true,
-                    message: `${f.label} is required`,
-                    severity: "error",
-                  });
-                  return;
-                }
                 if (f.type === "email" && vals[f.name]) {
                   const ok = /^\S+@\S+\.\S+$/.test(vals[f.name]);
                   if (!ok) {
@@ -1651,18 +1859,17 @@ export default function ProfilePage() {
                   // leave as-is if conversion fails
                 }
               }
-              if (Object.keys(changed).length === 0) {
+              // Always upsert, even if nothing changed, to refresh from server and close
+              const res = await updateUserFields(
+                uidAtSave,
+                Object.keys(changed).length ? changed : {}
+              );
+              if (res.ok) {
                 setSnack({
                   open: true,
-                  message: "No changes",
-                  severity: "info",
+                  message: "Saved",
+                  severity: "success",
                 });
-                closeDrawer();
-                return;
-              }
-              const res = await updateUserFields(drawer.userId, changed);
-              if (res.ok) {
-                setSnack({ open: true, message: "Saved", severity: "success" });
                 closeDrawer();
               } else {
                 setSnack({
@@ -1679,9 +1886,70 @@ export default function ProfilePage() {
 
         <Box
           component="form"
-          sx={{ display: "flex", flexDirection: "column", gap: 2 }}
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            gap: { xs: 1.25, sm: 2 },
+          }}
         >
           {(drawer.fields ?? []).map((f) => {
+            // Multi-select field support
+            if (f.type === "multi-select") {
+              return (
+                <Controller
+                  key={f.name}
+                  name={f.name}
+                  control={control}
+                  defaultValue={(drawer.values ?? {})[f.name] ?? []}
+                  render={({ field }) => (
+                    <TextField
+                      id={`drawer-field-${String(f.name)}`}
+                      name={String(f.name)}
+                      select
+                      label={f.label}
+                      value={Array.isArray(field.value) ? field.value : []}
+                      onChange={(e) => field.onChange(e.target.value)}
+                      fullWidth
+                      size="small"
+                      sx={textFieldMobileSx}
+                      SelectProps={{
+                        multiple: true,
+                        labelId: `drawer-field-${String(f.name)}-label`,
+                        MenuProps: {
+                          PaperProps: {
+                            sx: {
+                              "& .MuiMenuItem-root": {
+                                fontSize: { xs: 13, sm: 14 },
+                                minHeight: { xs: 32, sm: 36 },
+                              },
+                            },
+                          },
+                        },
+                        renderValue: (selected) =>
+                          Array.isArray(selected) ? selected.join(", ") : "",
+                      }}
+                      InputLabelProps={{
+                        id: `drawer-field-${String(f.name)}-label`,
+                      }}
+                    >
+                      {(f.options ?? []).map((opt: any) => {
+                        const val = typeof opt === "string" ? opt : opt.value;
+                        const lbl = typeof opt === "string" ? opt : opt.label;
+                        return (
+                          <MenuItem
+                            sx={{ fontSize: { xs: 13, sm: 14 } }}
+                            key={String(val)}
+                            value={val}
+                          >
+                            {lbl}
+                          </MenuItem>
+                        );
+                      })}
+                    </TextField>
+                  )}
+                />
+              );
+            }
             if (f.type === "select") {
               return (
                 <Controller
@@ -1691,17 +1959,41 @@ export default function ProfilePage() {
                   defaultValue={(drawer.values ?? {})[f.name] ?? ""}
                   render={({ field }) => (
                     <TextField
+                      id={`drawer-field-${String(f.name)}`}
+                      name={String(f.name)}
                       select
                       label={f.label}
                       value={field.value ?? ""}
                       onChange={(e) => field.onChange(e.target.value)}
                       fullWidth
+                      size="small"
+                      sx={textFieldMobileSx}
+                      SelectProps={{
+                        labelId: `drawer-field-${String(f.name)}-label`,
+                        MenuProps: {
+                          PaperProps: {
+                            sx: {
+                              "& .MuiMenuItem-root": {
+                                fontSize: { xs: 13, sm: 14 },
+                                minHeight: { xs: 32, sm: 36 },
+                              },
+                            },
+                          },
+                        },
+                      }}
+                      InputLabelProps={{
+                        id: `drawer-field-${String(f.name)}-label`,
+                      }}
                     >
                       {(f.options ?? []).map((opt: any) => {
                         const val = typeof opt === "string" ? opt : opt.value;
                         const lbl = typeof opt === "string" ? opt : opt.label;
                         return (
-                          <MenuItem key={String(val)} value={val}>
+                          <MenuItem
+                            sx={{ fontSize: { xs: 13, sm: 14 } }}
+                            key={String(val)}
+                            value={val}
+                          >
                             {lbl}
                           </MenuItem>
                         );
@@ -1741,10 +2033,14 @@ export default function ProfilePage() {
                           &#8592;
                         </IconButton>
                         <TextField
+                          id={`drawer-field-${String(f.name)}`}
+                          name={String(f.name)}
                           label={f.label}
                           value={field.value ?? ""}
                           onChange={(e) => field.onChange(e.target.value)}
                           fullWidth
+                          size="small"
+                          sx={textFieldMobileSx}
                           InputProps={{ readOnly: true }}
                         />
                         <IconButton
@@ -1780,23 +2076,26 @@ export default function ProfilePage() {
                     return (
                       <Box>
                         <TextField
+                          id={`drawer-field-${String(f.name)}`}
+                          name={String(f.name)}
                           label={f.label + " (comma separated)"}
                           value={value.join(", ")}
                           onChange={(e) =>
                             field.onChange(
-                              e.target.value
-                                .split(",")
-                                .map((s) => s.trim())
-                                .filter(Boolean)
+                              e.target.value.split(",").map((s) => s.trim())
                             )
                           }
                           fullWidth
+                          size="small"
+                          sx={textFieldMobileSx}
                         />
                         <Box sx={{ mt: 1 }}>
-                          {value.length ? (
-                            value.map((c) => (
-                              <Chip key={c} label={c} sx={{ mr: 1, mb: 1 }} />
-                            ))
+                          {value.filter(Boolean).length ? (
+                            value
+                              .filter(Boolean)
+                              .map((c) => (
+                                <Chip key={c} label={c} sx={{ mr: 1, mb: 1 }} />
+                              ))
                           ) : (
                             <Typography variant="caption">No items</Typography>
                           )}
@@ -1816,10 +2115,14 @@ export default function ProfilePage() {
                 defaultValue={(drawer.values ?? {})[f.name] ?? ""}
                 render={({ field }) => (
                   <TextField
+                    id={`drawer-field-${String(f.name)}`}
+                    name={String(f.name)}
                     label={f.label}
                     value={field.value ?? ""}
                     onChange={(e) => field.onChange(e.target.value)}
                     fullWidth
+                    size="small"
+                    sx={textFieldMobileSx}
                     type={
                       f.type === "date"
                         ? "date"
@@ -1848,6 +2151,8 @@ export default function ProfilePage() {
             <TextField
               label="Current password"
               type="password"
+              id="pwd-current"
+              name="current_password"
               value={oldPassword}
               onChange={(e) => setOldPassword(e.target.value)}
               fullWidth
@@ -1855,6 +2160,8 @@ export default function ProfilePage() {
             <TextField
               label="New password"
               type="password"
+              id="pwd-new"
+              name="new_password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               fullWidth
@@ -1862,6 +2169,8 @@ export default function ProfilePage() {
             <TextField
               label="Confirm new password"
               type="password"
+              id="pwd-confirm"
+              name="confirm_new_password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               fullWidth
@@ -2031,5 +2340,19 @@ export default function ProfilePage() {
         </Alert>
       </Snackbar>
     </>
+  );
+}
+
+export default function ProfilePage() {
+  return (
+    <Suspense
+      fallback={
+        <Container maxWidth="sm" sx={{ mt: 8, textAlign: "center" }}>
+          <CircularProgress />
+        </Container>
+      }
+    >
+      <ProfilePageInner />
+    </Suspense>
   );
 }

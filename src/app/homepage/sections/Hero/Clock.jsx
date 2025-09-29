@@ -3,16 +3,20 @@ import React, { useEffect, useState } from "react";
 import Box from "@mui/material/Box";
 
 export default function Clock() {
-  const [time, setTime] = useState(new Date());
+  // Important: avoid time-based initial render during SSR to prevent hydration mismatches.
+  // We start with null (stable on server and client), then set the time after mount.
+  const [time, setTime] = useState(null);
 
   useEffect(() => {
+    // Set immediately on mount, then tick every second
+    setTime(new Date());
     const id = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(id);
   }, []);
 
-  const hours = time.getHours() % 12;
-  const minutes = time.getMinutes();
-  const seconds = time.getSeconds();
+  const hours = time ? time.getHours() % 12 : 0;
+  const minutes = time ? time.getMinutes() : 0;
+  const seconds = time ? time.getSeconds() : 0;
 
   const hourDeg = hours * 30 + minutes * 0.5;
   const minuteDeg = minutes * 6;

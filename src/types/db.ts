@@ -22,7 +22,7 @@ export type UserRow = {
   nata_attempt_year?: string | null;
   school_std?: string | null;
   board?: string | null;
-  board_year?: number | null;
+  board_year?: string | null;
   school_name?: string | null;
   college_name?: string | null;
   college_year?: string | null;

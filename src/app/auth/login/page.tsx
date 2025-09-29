@@ -31,7 +31,7 @@ import { signInSchema, passwordSchema } from "../../../lib/auth/validation";
 import { Container } from "@mui/material";
 import GoogleProfileCompletionModal from "../../components/shared/GoogleProfileCompletionModal";
 
-export function LoginPageInner() {
+function LoginPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const nextTarget = searchParams?.get("next");
@@ -936,12 +936,15 @@ export function LoginPageInner() {
       <Box
         sx={(theme) => ({
           backgroundImage: theme.gradients.brand(),
-          minHeight: "100vh",
+          // Prefer dynamic viewport height on mobile with fallback on larger screens
+          minHeight: { xs: "100dvh", sm: "100vh" },
           display: "flex",
           flexDirection: "column",
-          justifyContent: { xs: "center", sm: "flex-end" },
+          justifyContent: { xs: "flex-start", sm: "flex-end" },
           alignItems: { xs: "center", sm: "flex-end" },
-          p: { xs: 2, sm: 0 },
+          p: { xs: 1, sm: 0 },
+          pt: { xs: 8, sm: 0 }, // Add top padding on mobile for status bar
+          overflow: "hidden", // Prevent scroll on main container
         })}
       >
         {/* Container positioned responsively */}
@@ -951,9 +954,10 @@ export function LoginPageInner() {
             position: { xs: "static", sm: "relative" },
             right: { xs: 0, sm: "8rem" },
             width: { xs: "100%", sm: "460px" },
-            maxWidth: { xs: "400px", sm: "460px" },
+            maxWidth: { xs: "100%", sm: "460px" },
             m: 0,
-            p: 0,
+            p: { xs: 0, sm: 0 },
+            flex: { xs: "1 1 auto", sm: "none" }, // Allow flex growth on mobile
           }}
         >
           {/* White card with responsive design */}
@@ -962,27 +966,29 @@ export function LoginPageInner() {
               width: "100%",
               bgcolor: "background.paper",
               boxShadow: { xs: 3, sm: 6 },
-              px: { xs: 3, sm: 4 },
-              pt: { xs: 3, sm: 4 },
+              px: { xs: 2.5, sm: 4 },
+              pt: { xs: 2.5, sm: 4 },
               pb: { xs: 2, sm: 2 },
               borderRadius: { xs: 3, sm: 0 },
-              borderTopLeftRadius: { xs: 15, sm: 15 },
-              borderTopRightRadius: { xs: 15, sm: 15 },
-              borderBottomLeftRadius: { xs: 15, sm: 0 },
-              borderBottomRightRadius: { xs: 15, sm: 0 },
+              borderTopLeftRadius: { xs: 20, sm: 15 },
+              borderTopRightRadius: { xs: 20, sm: 15 },
+              borderBottomLeftRadius: { xs: 20, sm: 0 },
+              borderBottomRightRadius: { xs: 20, sm: 0 },
               display: "flex",
               flexDirection: "column",
-              // Responsive min-height
+              // Responsive height handling
               minHeight: { xs: "auto", sm: 480 },
-              maxHeight: { xs: "85vh", sm: "none" },
+              maxHeight: { xs: "calc(100vh - 80px)", sm: "none" }, // Better mobile height calculation
               overflowY: { xs: "auto", sm: "visible" },
+              flex: { xs: "1 1 auto", sm: "none" }, // Allow flexible sizing on mobile
             }}
           >
             <Box
               sx={{
                 display: "flex",
                 flexDirection: "column",
-                mb: { xs: 4, sm: 6 },
+                mb: { xs: 2.5, sm: 6 },
+                flexShrink: 0, // Prevent header from shrinking
               }}
             >
               <Typography variant="caption">WELCOME BACK</Typography>
@@ -1021,7 +1027,10 @@ export function LoginPageInner() {
               )
             )}
 
-            <Stack spacing={{ xs: 1.5, sm: 2 }} sx={{ mb: { xs: 1.5, sm: 2 } }}>
+            <Stack
+              spacing={{ xs: 1.2, sm: 2 }}
+              sx={{ mb: { xs: 1, sm: 2 }, flex: "1 1 auto" }}
+            >
               {notice && <Alert severity="success">{notice}</Alert>}
               {error && <Alert severity="error">{error}</Alert>}
 
@@ -1164,10 +1173,11 @@ export function LoginPageInner() {
               <Box
                 sx={{
                   mt: { xs: 0.5, sm: 1 },
-                  minHeight: { xs: 32, sm: 56 }, // reduced for mobile
+                  minHeight: { xs: 24, sm: 56 }, // Further reduced for mobile
                   display: "flex",
                   flexDirection: "column",
                   justifyContent: "center",
+                  flexShrink: 0, // Prevent shrinking
                 }}
               >
                 {/* Show resend status or general notice moved from above if desired */}

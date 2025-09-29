@@ -10,7 +10,7 @@ export default function StepPhoneVerify({
   onContinue,
 }) {
   return (
-    <Box sx={{ maxWidth: 520, m: 5 }}>
+    <Box sx={{ maxWidth: 520, m: { xs: 2, md: 5 } }}>
       <Box sx={{ mt: 1.5 }}>
         <PhoneAuth
           initialPhone={initialPhone}

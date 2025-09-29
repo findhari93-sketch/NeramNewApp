@@ -158,8 +158,26 @@ export default function StepEdu(props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Ensure boardYear has a default start year when educationType is 'school'
+  React.useEffect(() => {
+    try {
+      if (
+        educationType === "school" &&
+        form &&
+        typeof form.boardYear === "undefined"
+      ) {
+        const start = getAcademicStartYear();
+        handleChange({
+          target: { name: "boardYear", value: String(start) },
+        });
+      }
+    } catch {}
+    // run when educationType toggles to school; avoid depending on form to prevent loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [educationType]);
+
   return (
-    <Box sx={{ maxWidth: 520, m: 5 }}>
+    <Box sx={{ maxWidth: 520, m: { xs: 2, md: 5 } }}>
       <Box sx={{ mt: 1.5 }}>
         <StepHeader title="Education" steps="Step 2 of 5" />
         <FormControl component="fieldset" sx={{ mt: 1 }}>
@@ -195,15 +213,20 @@ export default function StepEdu(props) {
                 width: "100%",
                 gap: 1,
                 alignItems: "flex-start",
-                flexDirection: { xs: "column", sm: "row" },
+                // Keep row layout even on mobile; allow horizontal scroll if crowded
+                flexDirection: "row",
+                flexWrap: { xs: "nowrap", sm: "wrap" },
+                overflowX: { xs: "auto", sm: "visible" },
+                WebkitOverflowScrolling: "touch",
+                pr: { xs: 1, sm: 0 },
               }}
             >
               <Box
                 sx={{
                   display: "flex",
                   flexDirection: "column",
-                  flex: 1,
-                  minWidth: 0,
+                  flex: { xs: "0 0 auto", sm: 1 },
+                  minWidth: { xs: 200, sm: 0 },
                 }}
               >
                 <Typography component="label" sx={labelStyle}>
@@ -231,8 +254,8 @@ export default function StepEdu(props) {
                 sx={{
                   display: "flex",
                   flexDirection: "column",
-                  flex: 1,
-                  minWidth: 0,
+                  flex: { xs: "0 0 auto", sm: 1 },
+                  minWidth: { xs: 200, sm: 0 },
                 }}
               >
                 <Typography component="label" sx={labelStyle}>
@@ -262,8 +285,8 @@ export default function StepEdu(props) {
                 sx={{
                   display: "flex",
                   flexDirection: "column",
-                  flex: 1,
-                  minWidth: 0,
+                  flex: { xs: "0 0 auto", sm: 1 },
+                  minWidth: { xs: 200, sm: 0 },
                 }}
               >
                 <Typography component="label" sx={labelStyle}>
@@ -307,15 +330,19 @@ export default function StepEdu(props) {
               sx={{
                 display: "flex",
                 gap: 1,
-                flexDirection: { xs: "column", sm: "row" },
+                flexDirection: "row",
+                flexWrap: { xs: "nowrap", sm: "wrap" },
+                overflowX: { xs: "auto", sm: "visible" },
+                WebkitOverflowScrolling: "touch",
+                pr: { xs: 1, sm: 0 },
               }}
             >
               <Box
                 sx={{
                   display: "flex",
                   flexDirection: "column",
-                  flex: 1,
-                  minWidth: 0,
+                  flex: { xs: "0 0 auto", sm: 1 },
+                  minWidth: { xs: 240, sm: 0 },
                 }}
               >
                 <Typography component="label" sx={labelStyle}>
@@ -338,8 +365,8 @@ export default function StepEdu(props) {
                 sx={{
                   display: "flex",
                   flexDirection: "column",
-                  flex: 1,
-                  minWidth: 0,
+                  flex: { xs: "0 0 auto", sm: 1 },
+                  minWidth: { xs: 240, sm: 0 },
                 }}
               >
                 <Typography component="label" sx={labelStyle}>
@@ -437,15 +464,19 @@ export default function StepEdu(props) {
               sx={{
                 display: "flex",
                 gap: 1,
-                flexDirection: { xs: "column", sm: "row" },
+                flexDirection: "row",
+                flexWrap: { xs: "nowrap", sm: "wrap" },
+                overflowX: { xs: "auto", sm: "visible" },
+                WebkitOverflowScrolling: "touch",
+                pr: { xs: 1, sm: 0 },
               }}
             >
               <Box
                 sx={{
                   display: "flex",
                   flexDirection: "column",
-                  flex: 1,
-                  minWidth: 0,
+                  flex: { xs: "0 0 auto", sm: 1 },
+                  minWidth: { xs: 240, sm: 0 },
                 }}
               >
                 <Typography component="label" sx={labelStyle}>
@@ -467,8 +498,8 @@ export default function StepEdu(props) {
                 sx={{
                   display: "flex",
                   flexDirection: "column",
-                  flex: 1,
-                  minWidth: 0,
+                  flex: { xs: "0 0 auto", sm: 1 },
+                  minWidth: { xs: 240, sm: 0 },
                 }}
               >
                 <Typography component="label" sx={labelStyle}>
