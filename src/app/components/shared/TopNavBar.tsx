@@ -19,6 +19,7 @@ import Typography from "@mui/material/Typography";
 import Breadcrumbs from "@mui/material/Breadcrumbs";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import NavbarProfile from "./NavbarProfile";
 import { NeramLogo, MobileLogo } from "./NeramLogo/NeramLogo";
 import { signOut } from "firebase/auth";
@@ -35,6 +36,10 @@ type TopNavBarProps = {
     visible?: boolean;
     title: string;
     breadcrumbs?: Array<{ label: string; href?: string }>;
+    // If true, generate breadcrumbs automatically from the URL
+    autoBreadcrumbs?: boolean;
+    // Optional map to customize segment labels (e.g., { applicationform: "Application Form" })
+    segmentLabelMap?: Record<string, string>;
     showBreadcrumbs?: boolean;
     actions?: Array<{
       name: string;
@@ -56,10 +61,34 @@ export default function TopNavBar({
   const [avatarUrl, setAvatarUrl] = React.useState<string | null>(() => {
     try {
       if (typeof window === "undefined") return null;
-      const raw = localStorage.getItem("avatar-cache:last");
-      if (!raw) return null;
-      const parsed = JSON.parse(raw) as Record<string, any>;
-      return parsed?.photo ?? null;
+      // Prefer per-uid cache if we already have a currentUser; fall back to last or user.photoURL
+      const u = (auth as any)?.currentUser as any | null | undefined;
+      let used: string | null = null;
+      const uid = u?.uid as string | undefined;
+      if (uid) {
+        const rawUid = localStorage.getItem(`avatar-cache:${uid}`);
+        if (rawUid) {
+          try {
+            const parsed = JSON.parse(rawUid) as Record<string, any>;
+            used =
+              (parsed?.dataUrl as string) || (parsed?.url as string) || null;
+          } catch {}
+        }
+      }
+      if (!used) {
+        const rawLast = localStorage.getItem("avatar-cache:last");
+        if (rawLast) {
+          try {
+            const parsedLast = JSON.parse(rawLast) as Record<string, any>;
+            if (!parsedLast?.uid || (uid && parsedLast.uid === uid)) {
+              used = (parsedLast?.photo as string) ?? null;
+            }
+          } catch {}
+        }
+      }
+      if (!used && u && typeof u.photoURL === "string")
+        used = u.photoURL as string;
+      return used;
     } catch {
       return null;
     }
@@ -67,6 +96,7 @@ export default function TopNavBar({
   const [scrolled, setScrolled] = React.useState(false);
   // Track small-screen state on client only to avoid SSR `window` access
   const [isSmall, setIsSmall] = React.useState(false);
+  const pathname = usePathname();
 
   type NavItem = { label: string; href: string; badge?: string };
   const menuItems: NavItem[] = [
@@ -78,37 +108,23 @@ export default function TopNavBar({
   ];
 
   React.useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
-      if (!u) {
-        setUserLabel(null);
-        setAvatarUrl(null);
-        return;
-      }
-      const asObj = u as unknown as Record<string, unknown>;
-      const displayName =
-        typeof asObj.displayName === "string" && asObj.displayName
-          ? (asObj.displayName as string)
-          : null;
-      const email = typeof asObj.email === "string" ? asObj.email : null;
-      const phone =
-        typeof asObj.phoneNumber === "string"
-          ? (asObj.phoneNumber as string)
-          : null;
-      const photo =
-        typeof (asObj as Record<string, unknown>).photoURL === "string"
-          ? ((asObj as Record<string, unknown>).photoURL as string)
-          : null;
-      setUserLabel(
-        (displayName as string) ||
-          (email as string) ||
-          (phone as string) ||
-          null
-      );
-
-      // Prefer a uid-specific cache when available so we don't show another
-      // user's avatar when switching accounts. Fallback to the global
-      // `avatar-cache:last` only when it matches the current uid.
+    // Fast path: if we already have a current user, set state immediately (before waiting for auth events)
+    const primeFromUser = (u: any | null | undefined) => {
+      if (!u) return;
       try {
+        const asObj = u as Record<string, unknown>;
+        const displayName =
+          typeof asObj.displayName === "string" && asObj.displayName
+            ? (asObj.displayName as string)
+            : null;
+        const email =
+          typeof asObj.email === "string" ? (asObj.email as string) : null;
+        const phone =
+          typeof asObj.phoneNumber === "string"
+            ? (asObj.phoneNumber as string)
+            : null;
+        setUserLabel(displayName || email || phone || null);
+        // avatar from per-uid cache -> last -> photoURL
         const uid = (u as any)?.uid as string | undefined;
         let used: string | null = null;
         if (uid) {
@@ -116,7 +132,8 @@ export default function TopNavBar({
           if (rawUid) {
             try {
               const parsed = JSON.parse(rawUid) as Record<string, any>;
-              used = parsed?.dataUrl || parsed?.url || null;
+              used =
+                (parsed?.dataUrl as string) || (parsed?.url as string) || null;
             } catch {}
           }
         }
@@ -125,16 +142,30 @@ export default function TopNavBar({
           if (rawLast) {
             try {
               const parsedLast = JSON.parse(rawLast) as Record<string, any>;
-              if (!parsedLast?.uid || parsedLast.uid === (u as any)?.uid) {
-                used = parsedLast?.photo ?? null;
+              if (!parsedLast?.uid || (uid && parsedLast.uid === uid)) {
+                used = (parsedLast?.photo as string) ?? null;
               }
             } catch {}
           }
         }
-        setAvatarUrl(used ?? photo);
-      } catch {
-        setAvatarUrl(photo);
+        if (!used && typeof (asObj as any).photoURL === "string") {
+          used = (asObj as any).photoURL as string;
+        }
+        if (used) setAvatarUrl(used);
+      } catch {}
+    };
+
+    try {
+      primeFromUser((auth as any)?.currentUser as any);
+    } catch {}
+
+    const unsub = onAuthStateChanged(auth, (u) => {
+      if (!u) {
+        setUserLabel(null);
+        setAvatarUrl(null);
+        return;
       }
+      primeFromUser(u);
 
       (async () => {
         try {
@@ -148,7 +179,6 @@ export default function TopNavBar({
           if (j?.signedUrl) {
             setAvatarUrl(j.signedUrl as string);
             try {
-              // update global last-avatar cache for faster subsequent loads
               localStorage.setItem(
                 "avatar-cache:last",
                 JSON.stringify({
@@ -157,8 +187,6 @@ export default function TopNavBar({
                   fetchedAt: Date.now(),
                 })
               );
-              // also notify in-page listeners so other components (same tab)
-              // can react immediately to the new avatar
               try {
                 window.dispatchEvent(
                   new CustomEvent("avatar-updated", {
@@ -169,7 +197,7 @@ export default function TopNavBar({
             } catch {}
           }
         } catch {
-          // ignore network errors and keep whatever avatarUrl we have
+          // ignore network errors
         }
       })();
     });
@@ -253,11 +281,41 @@ export default function TopNavBar({
     const {
       title,
       breadcrumbs,
+      autoBreadcrumbs,
+      segmentLabelMap,
       showBreadcrumbs = true,
       actions = [],
       showBackButton = true,
       onBack,
     } = titleBar;
+    // Build breadcrumbs automatically from the current pathname if requested or when none provided
+    const computedCrumbs: Array<{ label: string; href?: string }> = (() => {
+      try {
+        const list: Array<{ label: string; href?: string }> = [];
+        // Always show Home
+        list.push({ label: "Home", href: "/" });
+        if (!pathname || pathname === "/") return list;
+        const parts = pathname.split("/").filter(Boolean).slice(0, 6); // cap length to avoid overly long crumbs
+        let acc = "";
+        parts.forEach((seg, idx) => {
+          acc += "/" + seg;
+          // Hide obvious dynamic IDs and common technical segments
+          const isIdLike = /^(?:[0-9a-fA-F-]{8,}|\[.*\]|id|\d+)$/.test(seg);
+          if (isIdLike) return;
+          const label =
+            (segmentLabelMap && segmentLabelMap[seg]) ||
+            seg.replace(/[-_]/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
+          list.push({ label, href: idx < parts.length - 1 ? acc : undefined });
+        });
+        // Prefer the provided page title as final crumb label if available
+        if (title && list.length > 0) {
+          list[list.length - 1] = { label: title, href: undefined };
+        }
+        return list;
+      } catch {
+        return (breadcrumbs as Array<{ label: string; href?: string }>) || [];
+      }
+    })();
     // use isSmall state set on the client by the effect above
     const visibleLimit = isSmall ? 1 : 2;
     const visibleActions = actions.slice(0, visibleLimit);
@@ -270,7 +328,6 @@ export default function TopNavBar({
           display: "flex",
           alignItems: "center",
           borderBottom: `1px solid ${theme.palette.divider}`,
-          px: 2,
           gap: 2,
           backgroundColor: theme.palette.background.paper,
         })}
@@ -279,7 +336,6 @@ export default function TopNavBar({
           sx={{
             display: "flex",
             alignItems: "center",
-            gap: 1,
             flex: "0 0 auto",
           }}
         >
@@ -301,41 +357,7 @@ export default function TopNavBar({
             minWidth: 0,
           }}
         >
-          {showBreadcrumbs && breadcrumbs && breadcrumbs.length > 0 && (
-            <Breadcrumbs
-              aria-label="breadcrumb"
-              separator="›"
-              sx={{
-                fontSize: `${TB_BC_FONT}px`,
-                color: "text.secondary",
-                display: isSmall ? "none" : "flex",
-              }}
-            >
-              {breadcrumbs.map((c, idx) =>
-                c.href ? (
-                  <Link
-                    key={idx}
-                    href={c.href}
-                    style={{
-                      color: "inherit",
-                      textDecoration: "none",
-                      fontSize: `${TB_BC_FONT}px`,
-                    }}
-                  >
-                    {c.label}
-                  </Link>
-                ) : (
-                  <Typography
-                    key={idx}
-                    sx={{ fontSize: `${TB_BC_FONT}px` }}
-                    color="text.secondary"
-                  >
-                    {c.label}
-                  </Typography>
-                )
-              )}
-            </Breadcrumbs>
-          )}
+          {" "}
           <Typography
             sx={{
               fontSize: `${TB_TITLE_FONT}px`,
@@ -344,11 +366,50 @@ export default function TopNavBar({
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
+              color: "neramPurple.main",
             }}
             title={title}
           >
             {title}
           </Typography>
+          {showBreadcrumbs && (
+            <Breadcrumbs
+              aria-label="breadcrumb"
+              separator="›"
+              sx={{
+                fontSize: { xs: "10px", sm: `${TB_BC_FONT}px` },
+                color: "neramPurple.light",
+                display: "flex",
+              }}
+            >
+              {(autoBreadcrumbs || !breadcrumbs || breadcrumbs.length === 0
+                ? computedCrumbs
+                : breadcrumbs
+              ).map((c, idx) =>
+                c.href ? (
+                  <Link
+                    key={idx}
+                    href={c.href}
+                    style={{
+                      color: "inherit",
+                      textDecoration: "none",
+                    }}
+                  >
+                    {c.label}
+                  </Link>
+                ) : (
+                  <Typography
+                    key={idx}
+                    component="span"
+                    variant="inherit"
+                    sx={{ fontSize: "inherit", color: "inherit" }}
+                  >
+                    {c.label}
+                  </Typography>
+                )
+              )}
+            </Breadcrumbs>
+          )}
         </Box>
         <Box
           sx={{

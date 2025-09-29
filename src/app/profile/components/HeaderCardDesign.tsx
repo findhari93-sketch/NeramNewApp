@@ -29,6 +29,15 @@ export function HeaderCardDesign({
       sx={{
         borderRadius: 2,
         overflow: "hidden",
+        // Ensure full-width behavior, especially on mobile and within flex layouts
+        width: "100%",
+        maxWidth: "100%",
+        minWidth: 0,
+        alignSelf: "stretch",
+        flex: "1 1 auto",
+        boxSizing: "border-box",
+        display: "flex",
+        flexDirection: "column",
         // keep header and body contained; header is full width
         ...((sx as any) || {}),
       }}
@@ -40,8 +49,10 @@ export function HeaderCardDesign({
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
+          gap: 1,
           px: 2,
           py: 1,
+          minWidth: 0, // allow children to shrink and avoid horizontal overflow
           background:
             theme.palette.mode === "light"
               ? "linear-gradient(180deg, #f8dfe9 0%, #f3d3e7 100%)"
@@ -49,11 +60,14 @@ export function HeaderCardDesign({
           borderBottom: `1px solid ${theme.palette.divider}`,
         })}
       >
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+        <Box
+          sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0 }}
+        >
           {icon ? <Box sx={{ display: "inline-flex" }}>{icon}</Box> : null}
           <Typography
             variant="subtitle1"
-            sx={{ fontWeight: 600, color: "text.primary" }}
+            noWrap
+            sx={{ fontWeight: 600, color: "text.primary", minWidth: 0 }}
           >
             {title}
           </Typography>
@@ -64,14 +78,16 @@ export function HeaderCardDesign({
             aria-label={`Edit ${title}`}
             size="small"
             onClick={onEdit}
-            sx={{ ml: 1 }}
+            sx={{ ml: 1, flexShrink: 0 }}
           >
             <EditIcon fontSize="small" />
           </IconButton>
         ) : null}
       </Box>
 
-      <Box sx={{ p: 2 }}>{children}</Box>
+      <Box sx={{ p: 2, width: "100%", boxSizing: "border-box" }}>
+        {children}
+      </Box>
     </Card>
   );
 }

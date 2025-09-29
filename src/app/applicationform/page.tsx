@@ -37,7 +37,23 @@ export default function Page() {
 
   return (
     <div>
-      <TopNavBar backgroundMode="gradient" />
+      <TopNavBar
+        backgroundMode="gradient"
+        titleBar={{
+          visible: true,
+          title: "Application Form",
+          autoBreadcrumbs: true,
+          segmentLabelMap: {
+            applicationform: "Application Form",
+            auth: "Auth",
+            profile: "Profile",
+          },
+          showBreadcrumbs: true,
+          actions: [],
+          showBackButton: true,
+          onBack: () => router.back(),
+        }}
+      />
       <ApplicationForm />
     </div>
   );

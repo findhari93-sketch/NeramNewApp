@@ -452,7 +452,10 @@ export async function POST(req: Request) {
             "board"
           ] as string;
         const by = parseStartYear(educationSection["boardYear"]);
-        if (by !== undefined) (known as Partial<UserRow>).board_year = by;
+        if (by !== undefined) {
+          const yy = String((by + 1) % 100).padStart(2, "0");
+          (known as Partial<UserRow>).board_year = `${by}-${yy}`;
+        }
         if (typeof educationSection["schoolName"] === "string")
           (known as Partial<UserRow>).school_name = educationSection[
             "schoolName"

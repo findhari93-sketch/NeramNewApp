@@ -6,14 +6,22 @@ import StepBasic from "./Steps/StepBasic";
 import StepCourse from "./Steps/StepCourse";
 import StepEdu from "./Steps/StepEdu";
 import StepReview from "./Steps/StepReview";
+import StepPayment from "./Steps/StepPayment";
 import StepPhoneVerify from "./Steps/StepPhoneVerify";
 import { saveApplicationStep } from "../../../lib/applicationAPI";
+import { Box } from "@mui/material";
+import Backdrop from "@mui/material/Backdrop";
+import CircularProgress from "@mui/material/CircularProgress";
+import { useRouter, useSearchParams } from "next/navigation";
 
 // small constants used by fee logic
 const currentYear = new Date().getFullYear();
 const SOFTWARE_FEE = 10000;
 
 export default function ApplicationForm() {
+  const STEP_STORAGE_KEY = "neram_application_step_v1";
+  const router = useRouter();
+  const searchParams = useSearchParams();
   // Lift core state used across steps here and pass tuples down to children.
   const formState = useState({});
   const altPhoneState = useState("");
@@ -52,6 +60,7 @@ export default function ApplicationForm() {
     }
   });
   const currentStepState = useState(1);
+  const stepLoadingState = useState(false);
   const fieldRefs = useRef({});
 
   // Keep form.classGrade in sync with schoolStd when form state is lifted here.
@@ -231,6 +240,47 @@ export default function ApplicationForm() {
   // Orchestrate steps here using currentStepState
   const [currentStep, setCurrentStep] = currentStepState;
   const [verifiedPhone, setVerifiedPhone] = verifiedPhoneState;
+  const [stepLoading, setStepLoading] = stepLoadingState;
+
+  // Map step indices to URL slugs and back for query param syncing
+  const stepToSlug = (n) => {
+    switch (Number(n)) {
+      case 1:
+        return "phone";
+      case 2:
+        return "personal";
+      case 3:
+        return "education";
+      case 4:
+        return "course";
+      case 5:
+        return "review";
+      case 6:
+        return "payment";
+      default:
+        return "phone";
+    }
+  };
+  const slugToStep = (s) => {
+    const t = String(s || "").toLowerCase();
+    if (t === "phone") return 1;
+    if (t === "personal" || t === "basic") return 2;
+    if (t === "education") return 3;
+    if (t === "course") return 4;
+    if (t === "review") return 5;
+    if (t === "payment") return 6;
+    const n = parseInt(t, 10);
+    return Number.isFinite(n) && n >= 1 && n <= 6 ? n : 1;
+  };
+
+  // Wrapper to change step and rely on effects to sync URL/local
+  const setStep = (n) => {
+    try {
+      setCurrentStep(n);
+    } catch {
+      setCurrentStep(n);
+    }
+  };
 
   // If user is already authenticated via Firebase, skip phone verification step
   React.useEffect(() => {
@@ -239,7 +289,19 @@ export default function ApplicationForm() {
       if (current) {
         // mark verifiedPhone if available and advance to step 2
         setVerifiedPhone(current.phoneNumber || verifiedPhone || null);
-        setCurrentStep(2);
+        // Prefer URL step if present, else saved step; never go below 2 when authenticated
+        try {
+          const urlStep = slugToStep(searchParams.get("step"));
+          const raw = localStorage.getItem(STEP_STORAGE_KEY);
+          const saved = raw ? parseInt(raw, 10) : NaN;
+          const preferred = Number.isFinite(urlStep) ? urlStep : saved;
+          const target = Number.isFinite(preferred)
+            ? Math.max(2, preferred)
+            : 2;
+          setStep(target);
+        } catch {
+          setStep(2);
+        }
       }
     } catch {}
 
@@ -247,7 +309,18 @@ export default function ApplicationForm() {
       try {
         if (u) {
           setVerifiedPhone(u.phoneNumber || verifiedPhone || null);
-          setCurrentStep(2);
+          try {
+            const urlStep = slugToStep(searchParams.get("step"));
+            const raw = localStorage.getItem(STEP_STORAGE_KEY);
+            const saved = raw ? parseInt(raw, 10) : NaN;
+            const preferred = Number.isFinite(urlStep) ? urlStep : saved;
+            const target = Number.isFinite(preferred)
+              ? Math.max(2, preferred)
+              : 2;
+            setStep(target);
+          } catch {
+            setStep(2);
+          }
         }
       } catch {}
     });
@@ -287,7 +360,19 @@ export default function ApplicationForm() {
 
   // If we know a phone is already verified (from localStorage), skip step 1
   React.useEffect(() => {
-    if (verifiedPhone) setCurrentStep(2);
+    if (verifiedPhone) {
+      try {
+        // Prefer URL step if present
+        const urlStep = slugToStep(searchParams.get("step"));
+        const raw = localStorage.getItem(STEP_STORAGE_KEY);
+        const saved = raw ? parseInt(raw, 10) : NaN;
+        const preferred = Number.isFinite(urlStep) ? urlStep : saved;
+        const target = Number.isFinite(preferred) ? Math.max(2, preferred) : 2;
+        setStep(target);
+      } catch {
+        setStep(2);
+      }
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [verifiedPhone]);
 
@@ -426,6 +511,35 @@ export default function ApplicationForm() {
                 state: db.state ?? "",
                 country: db.country ?? "",
                 email: db.email ?? "",
+                // StepEdu: board select and school name
+                board: db.board ?? "",
+                schoolName: db.school_name ?? "",
+                // StepEdu: restore academic-year controls from label strings
+                // Parse a label like "2025-26" back to start year "2025"
+                boardYear:
+                  typeof db.board_year === "string"
+                    ? (db.board_year.match(/(\d{4})/) || [])[1] || undefined
+                    : undefined,
+                nataAttemptYear:
+                  typeof db.nata_attempt_year === "string"
+                    ? (db.nata_attempt_year.match(/(\d{4})/) || [])[1] ||
+                      undefined
+                    : undefined,
+                // StepCourse: payment type selection
+                paymentType: db.payment_type || undefined,
+                // StepCourse totals from DB for Review
+                courseFee:
+                  typeof db.course_fee === "number"
+                    ? db.course_fee
+                    : Number(db.course_fee) || undefined,
+                discount:
+                  typeof db.discount === "number"
+                    ? db.discount
+                    : Number(db.discount) || undefined,
+                totalPayable:
+                  typeof db.total_payable === "number"
+                    ? db.total_payable
+                    : Number(db.total_payable) || undefined,
               });
               setAltPhoneLocal(db.alt_phone ?? "");
               setInstagramLocal(db.instagram_handle ?? "");
@@ -526,8 +640,156 @@ export default function ApplicationForm() {
     softwareCourseState,
   ]);
 
+  // Persist current step to localStorage whenever it changes
+  React.useEffect(() => {
+    try {
+      localStorage.setItem(STEP_STORAGE_KEY, String(currentStep));
+    } catch {}
+  }, [currentStep]);
+
+  // Restore last visited step on first mount (prefer URL ?step)
+  React.useEffect(() => {
+    try {
+      const urlSlug = searchParams.get("step");
+      const fromUrl = urlSlug ? slugToStep(urlSlug) : NaN;
+      const raw = localStorage.getItem(STEP_STORAGE_KEY);
+      const saved = raw ? parseInt(raw, 10) : NaN;
+      const pick = Number.isFinite(fromUrl) ? fromUrl : saved;
+      if (!Number.isFinite(pick)) return;
+      // Enforce minimum step based on verification status
+      const minStep = verifiedPhone ? 2 : 1;
+      const target = Math.min(6, Math.max(minStep, pick));
+      setStep(target);
+    } catch {}
+    // run once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // When the URL ?step changes (e.g., back/forward), sync state
+  React.useEffect(() => {
+    try {
+      const slug = searchParams.get("step");
+      if (!slug) return;
+      const next = slugToStep(slug);
+      if (!Number.isFinite(next)) return;
+      const minStep = verifiedPhone ? 2 : 1;
+      const target = Math.min(6, Math.max(minStep, next));
+      if (target !== currentStep) setCurrentStep(target);
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  // On step change, refresh latest data from DB so each step shows up-to-date values
+  React.useEffect(() => {
+    // Write step slug to URL so refresh/deep-linking works
+    try {
+      const slug = stepToSlug(currentStep);
+      const q = new URLSearchParams(Array.from(searchParams.entries()));
+      q.set("step", slug);
+      // Avoid scroll jump on replace
+      router.replace(`/applicationform?${q.toString()}`, { scroll: false });
+    } catch {}
+
+    let cancelled = false;
+    (async () => {
+      // Show overlay while we refresh data for the new step
+      setStepLoading(true);
+      try {
+        const token = await auth.currentUser?.getIdToken();
+        if (!token) return;
+        const res = await fetch("/api/users/me", {
+          method: "GET",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data || !data.user || cancelled) return;
+        const db = data.user;
+        const [, setFormLocal] = formState;
+        const [, setAltPhoneLocal] = altPhoneState;
+        const [, setInstagramLocal] = instagramIdState;
+        const [, setSelectedLanguagesLocal] = selectedLanguagesState;
+        const [, setYoutubeSubscribedLocal] = youtubeSubscribedState;
+        const [, setSelectedCourseLocal] = selectedCourseState;
+        const [, setEducationTypeLocal] = educationTypeState;
+        const [, setSchoolStdLocal] = schoolStdState;
+        const [, setCollegeNameLocal] = collegeNameState;
+        const [, setCollegeYearLocal] = collegeYearState;
+        const [, setDiplomaCourseLocal] = diplomaCourseState;
+        const [, setDiplomaYearLocal] = diplomaYearState;
+        const [, setDiplomaCollegeLocal] = diplomaCollegeState;
+        const [, setOtherDescriptionLocal] = otherDescriptionState;
+        const [, setSoftwareCourseLocal] = softwareCourseState;
+
+        setFormLocal({
+          studentName: db.student_name ?? "",
+          fatherName: db.father_name ?? "",
+          gender: db.gender ?? "",
+          zipCode: db.zip_code ?? "",
+          city: db.city ?? "",
+          state: db.state ?? "",
+          country: db.country ?? "",
+          email: db.email ?? "",
+          // StepEdu fields
+          board: db.board ?? "",
+          schoolName: db.school_name ?? "",
+          boardYear:
+            typeof db.board_year === "string"
+              ? (db.board_year.match(/(\d{4})/) || [])[1] || undefined
+              : undefined,
+          nataAttemptYear:
+            typeof db.nata_attempt_year === "string"
+              ? (db.nata_attempt_year.match(/(\d{4})/) || [])[1] || undefined
+              : undefined,
+          // StepCourse field
+          paymentType: db.payment_type || undefined,
+          courseFee:
+            typeof db.course_fee === "number"
+              ? db.course_fee
+              : Number(db.course_fee) || undefined,
+          discount:
+            typeof db.discount === "number"
+              ? db.discount
+              : Number(db.discount) || undefined,
+          totalPayable:
+            typeof db.total_payable === "number"
+              ? db.total_payable
+              : Number(db.total_payable) || undefined,
+        });
+        setAltPhoneLocal(db.alt_phone ?? "");
+        setInstagramLocal(db.instagram_handle ?? "");
+        setSelectedLanguagesLocal(db.selected_languages ?? []);
+        setYoutubeSubscribedLocal(db.youtube_subscribed ?? false);
+        setSelectedCourseLocal(db.selected_course ?? "nata-jee");
+        setEducationTypeLocal(db.education_type ?? "school");
+        setSchoolStdLocal(db.school_std ?? "12th");
+        setCollegeNameLocal(db.college_name ?? "");
+        setCollegeYearLocal(db.college_year ?? "1st Year");
+        setDiplomaCourseLocal(db.diploma_course ?? "");
+        setDiplomaYearLocal(db.diploma_year ?? "Third Year");
+        setDiplomaCollegeLocal(db.diploma_college ?? "");
+        setOtherDescriptionLocal(db.other_description ?? "");
+        setSoftwareCourseLocal(db.software_course ?? "Revit");
+      } catch {
+      } finally {
+        if (!cancelled) setStepLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+      setStepLoading(false);
+    };
+    // re-fetch when step switches
+  }, [currentStep]);
+
   return (
-    <div>
+    <Box sx={{ mt: "101px" }}>
+      <Backdrop
+        open={Boolean(stepLoading)}
+        sx={{ color: "#fff", zIndex: (theme) => theme.zIndex.modal + 1 }}
+      >
+        <CircularProgress color="inherit" />
+      </Backdrop>
       <h1 style={{ textAlign: "center", color: "#7c1fa0" }}>
         Application Form
       </h1>
@@ -636,6 +898,7 @@ export default function ApplicationForm() {
           altPhone={altPhone}
           instagramId={instagramId}
           educationType={educationType}
+          schoolStd={schoolStd}
           collegeName={collegeName}
           collegeYear={collegeYear}
           diplomaCourse={diplomaCourse}
@@ -650,7 +913,25 @@ export default function ApplicationForm() {
           setReviewMode={setReviewMode}
           setEditField={setEditField}
           setCurrentStep={setCurrentStep}
-          saveToDatabase={(overrides) => saveToDatabase("course", overrides)}
+          saveToDatabase={async (overrides) => {
+            const result = await saveToDatabase("course", overrides);
+            // On successful final save, move to payment step
+            if (result?.ok) {
+              setCurrentStep(6);
+              try {
+                // Immediately sync URL to payment to avoid any bounce from stale params
+                const q = new URLSearchParams(
+                  Array.from(searchParams.entries())
+                );
+                q.set("step", "payment");
+                router.replace(`/applicationform?${q.toString()}`);
+                try {
+                  localStorage.setItem(STEP_STORAGE_KEY, "6");
+                } catch {}
+              } catch {}
+            }
+            return result;
+          }}
           handleGoToStep={(stepIdx, fieldKey) => {
             try {
               // navigate to requested step
@@ -669,6 +950,35 @@ export default function ApplicationForm() {
           }}
         />
       )}
-    </div>
+
+      {currentStep === 6 && (
+        <StepPayment
+          amount={Number(form?.totalPayable) || 0}
+          studentName={form?.studentName}
+          email={form?.email}
+          phone={verifiedPhone || form?.phone}
+          course={selectedCourse || form?.selectedCourse || "nata-jee"}
+          onBack={() => setCurrentStep(5)}
+          onSuccess={(pid) => {
+            try {
+              const course =
+                selectedCourse || form?.selectedCourse || "nata-jee";
+              const q = new URLSearchParams({
+                paid: "1",
+                course,
+                pid: String(pid || ""),
+              });
+              router.replace(`/profile?${q.toString()}`);
+            } catch (e) {
+              // fallback: go to profile without params
+              router.replace("/profile");
+            }
+          }}
+          onFailure={(reason) => {
+            console.warn("Payment failed or dismissed:", reason);
+          }}
+        />
+      )}
+    </Box>
   );
 }

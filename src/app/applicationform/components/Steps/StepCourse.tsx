@@ -67,7 +67,7 @@ export default function StepCourse(props: StepCourseProps) {
   React.useEffect(() => {
     try {
       if (!form || !form.paymentType) {
-        setForm((prev = {}) => ({ ...(prev || {}), paymentType: "part" }));
+        setForm((prev = {}) => ({ ...(prev || {}), paymentType: "full" }));
       }
     } catch {
       // ignore
@@ -121,7 +121,7 @@ export default function StepCourse(props: StepCourseProps) {
 
   const paymentType: "full" | "part" = (((form as Record<string, unknown>)[
     "paymentType"
-  ] as "full" | "part") || "part") as "full" | "part";
+  ] as "full" | "part") || "full") as "full" | "part";
 
   const formatDate = (d: Date) => {
     try {
@@ -164,9 +164,18 @@ export default function StepCourse(props: StepCourseProps) {
     totalDiscount > 0 ? inclusiveAfterDiscount : inclusiveCourseFee;
   const savings = totalDiscount;
 
+  // For part payment, Order Summary should reflect the first installment only
+  const partInclusive =
+    selectedCourse === "nata-jee" ? 16500 : nataJeePart1 || 0;
+  const isPart = paymentType === "part";
+  const summaryInclusive = isPart ? partInclusive : displayInclusive;
+  const summarySplit = isPart ? splitInclusive(partInclusive) : displaySplit;
+  // Only show the 5k discount in summary for full payment; for part it should be 0
+  const summaryDiscount = isPart ? 0 : discount;
+
   return (
-    <Box sx={{ maxWidth: 920, m: 5 }}>
-      <StepHeader title="Choose course" steps="Step 3 of 5" />
+    <Box sx={{ maxWidth: 920, m: { xs: 2, md: 5 } }}>
+      <StepHeader title="Choose course" steps="Step 4 of 5" />
 
       <Box
         sx={{
@@ -253,14 +262,15 @@ export default function StepCourse(props: StepCourseProps) {
                 </Typography>
 
                 {paymentType === "full" ? (
-                  <Typography sx={{ mt: 1, color: "green" }}>
-                    Congratulations — you save {formatINR(5000)} from actual
-                    fees on selection of full payment.
+                  <Typography sx={{ mt: 1, color: "green", fontWeight: 600 }}>
+                    Congratulations — you get a discount of {formatINR(5000)}{" "}
+                    for full payment and your fees will be{" "}
+                    {formatINR(Math.max(0, (inclusiveCourseFee || 0) - 5000))}.
                   </Typography>
                 ) : (
                   <Typography sx={{ mt: 1, color: "#666" }}>
                     You have an option to get {formatINR(5000)} discount if full
-                    payment made.
+                    payment is made.
                   </Typography>
                 )}
 
@@ -309,14 +319,14 @@ export default function StepCourse(props: StepCourseProps) {
                     }
                   >
                     <FormControlLabel
-                      value="part"
-                      control={<Radio />}
-                      label="Part payment"
-                    />
-                    <FormControlLabel
                       value="full"
                       control={<Radio />}
                       label="Full payment"
+                    />
+                    <FormControlLabel
+                      value="part"
+                      control={<Radio />}
+                      label="Part payment"
                     />
                   </RadioGroup>
                 </FormControl>
@@ -366,16 +376,8 @@ export default function StepCourse(props: StepCourseProps) {
                 )}
 
                 <Box sx={{ mt: 2, color: "#666" }}>{nataJeeInfo}</Box>
-                <Box sx={{ mt: 2, fontSize: 13, color: "#444" }}>
-                  {((form as Record<string, unknown>)[
-                    "paymentType"
-                  ] as string) === "full" ? (
-                    <div>
-                      For full payment: we purchase a classroom license for 1
-                      year. Any additional license months after one year will be
-                      provided free if full payment was selected.
-                    </div>
-                  ) : (
+                {paymentType === "part" && (
+                  <Box sx={{ mt: 2, fontSize: 13, color: "#444" }}>
                     <div>
                       For part payment: we purchase a license for 3 months and
                       access will be automatically terminated after 3 months
@@ -383,8 +385,8 @@ export default function StepCourse(props: StepCourseProps) {
                       is completed, a year-long license will be purchased. No
                       more hidden fees.
                     </div>
-                  )}
-                </Box>
+                  </Box>
+                )}
               </>
             )}
           </Box>
@@ -407,7 +409,7 @@ export default function StepCourse(props: StepCourseProps) {
                   }}
                 >
                   <Typography sx={{ fontWeight: 600 }}>Course Fee</Typography>
-                  <Typography>{formatINR(displaySplit.excl)}</Typography>
+                  <Typography>{formatINR(summarySplit.excl)}</Typography>
                 </Box>
 
                 <Box
@@ -422,7 +424,7 @@ export default function StepCourse(props: StepCourseProps) {
                     Discount Applied
                   </Typography>
                   <Typography sx={{ color: "green", fontWeight: 700 }}>
-                    -{formatINR(discount)}
+                    -{formatINR(summaryDiscount)}
                   </Typography>
                 </Box>
 
@@ -437,7 +439,7 @@ export default function StepCourse(props: StepCourseProps) {
                   <Typography sx={{ fontWeight: 600 }}>
                     Tax (18% GST)
                   </Typography>
-                  <Typography>{formatINR(displaySplit.gst)}</Typography>
+                  <Typography>{formatINR(summarySplit.gst)}</Typography>
                 </Box>
 
                 <Box sx={{ mt: 2 }}>
@@ -456,7 +458,7 @@ export default function StepCourse(props: StepCourseProps) {
                     Total Payable
                   </Typography>
                   <Typography sx={{ fontSize: 18, fontWeight: 900 }}>
-                    {formatINR(displayInclusive)}
+                    {formatINR(summaryInclusive)}
                   </Typography>
                 </Box>
 
@@ -484,9 +486,9 @@ export default function StepCourse(props: StepCourseProps) {
                 // Ensure payment-related fields are present in payload
                 form: {
                   courseFee: inclusiveCourseFee,
-                  discount: savings,
+                  discount: summaryDiscount,
                   paymentType,
-                  totalPayable: displayInclusive,
+                  totalPayable: summaryInclusive,
                 },
                 selectedCourse,
               });

@@ -37,6 +37,7 @@ export default function HeroHome() {
               flexGrow: 0,
               display: "flex",
               justifyContent: { xs: "center", md: "flex-start" },
+              width: { xs: "100%", md: "auto" },
             }}
           >
             <Clock />
