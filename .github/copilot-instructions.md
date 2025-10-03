@@ -1,64 +1,58 @@
-# Copilot Project Instructions
+# NeramNextApp Copilot Instructions
 
-Short, repo-specific guidance for AI coding agents. Favor these concrete patterns over boilerplate.
+> This file guides AI coding agents to be productive in this codebase. It summarizes architecture, data flow, conventions, and critical workflows. **Favor these patterns over generic boilerplate.**
 
-## Stack and layout
+## Architecture & Data Flow
 
-- Next.js App Router in `src/app` (Next 15). API routes under `src/app/api/**`.
-- React 19 + MUI 7 + Emotion. Theme/provider is a client component: `src/app/ThemeRegistry.tsx`.
-- Data/auth: Firebase Auth on the client; Supabase (Postgres + Storage) as the primary store. Server/service-role client lives in `src/lib/supabaseServer.ts`; client anon in `src/lib/supabase.ts`.
-- Single main table: `public.users` (migrations in `supabase_migrations/**`, types in `src/types/db.ts`). Flexible fields live in `users.profile` and stepwise form data in `users.application` JSON.
+- **Next.js App Router** (Next 15) in `src/app`. API routes: `src/app/api/**`.
+- **React 19 + MUI 7 + Emotion**. Theme/provider: `src/app/ThemeRegistry.tsx` (client component).
+- **Data/auth:**
+  - **Firebase Auth** (client-side): user login, token acquisition.
+  - **Supabase (Postgres + Storage):** main data store. Service-role client: `src/lib/supabaseServer.ts` (server only); anon client: `src/lib/supabase.ts` (client only).
+  - **Single main table:** `public.users` (see migrations in `supabase_migrations/**`, types in `src/types/db.ts`). Flexible fields: `users.profile` (JSON), stepwise form data: `users.application` (JSON).
 
-## Auth and data flow
+## Auth, API, and Data Patterns
 
-- Client obtains a Firebase ID token; API routes verify with Firebase Admin before reading/writing `users`. Primary key is `firebase_uid` with fallbacks to `phone` then `email`.
-- All profile/application writes go through `POST /api/users/upsert` and return `{ ok, error?, user? }`.
-  - Normalizes inputs: camelCase→snake_case, `username` lowercasing, gender enum to allowed values, and academic-year labels (e.g. `2025-26`).
-  - Merges JSON safely: preserves existing `profile` and `application` fields instead of replacing.
-  - Never overwrite `student_name` with empty; strips unknown columns and retries to avoid Postgres “column does not exist”.
-  - Tracks `providers[]` and preserves `phone_auth_used` once true.
-- Client helper `src/lib/apiClient.ts` auto-attaches `Authorization: Bearer <token>` and retries once on `{ status: 401, error: "invalid_token" }`.
+- **Client** gets Firebase ID token, sends to API routes. API verifies with Firebase Admin. Primary key: `firebase_uid` (fallbacks: `phone`, `email`).
+- **All profile/application writes:** `POST /api/users/upsert` (see `src/app/api/users/upsert/route.ts`).
+  - Input normalization: camelCase→snake_case, lowercased `username`, gender enum, academic-year labels (e.g. `2025-26`).
+  - JSON merge: preserves existing `profile`/`application` fields.
+  - Never overwrite `student_name` with empty; strips unknown columns, retries on Postgres errors.
+  - Tracks `providers[]`, preserves `phone_auth_used` once true.
+- **API client helper:** `src/lib/apiClient.ts` auto-attaches `Authorization: Bearer <token>`, retries once on `{ status: 401, error: "invalid_token" }`.
 
-## Client vs server rules
+## Client vs Server Rules
 
-- Any component using MUI components/hooks, Emotion, React context, or `next/navigation` must start with `"use client"` (e.g., many under `src/app/components/**`).
-- Never import `lib/supabaseServer` on the client; use `lib/supabase.ts` on the client and `lib/supabaseServer.ts` on the server.
-- If a page uses `useSearchParams()` or `useRouter()`, wrap it in `<Suspense>` (see `src/app/auth/login/page.tsx`).
+- Any component using MUI, Emotion, React context, or `next/navigation` **must** start with `"use client"` (see `src/app/components/**`).
+- **Never** import `lib/supabaseServer` on the client; use `lib/supabase.ts` (client) and `lib/supabaseServer.ts` (server).
+- If a page uses `useSearchParams()` or `useRouter()`, wrap in `<Suspense>` (see `src/app/auth/login/page.tsx`).
 
-## API patterns and examples
+## Realtime, Caching, Sessions
 
-- Read-only routes return specific shapes (e.g., `GET /api/avatar-url` → `{ signedUrl }` or `204 No Content`).
-- Minimal secure write snippet:
-  ```ts
-  const token = req.headers.get("authorization")?.split(" ")[1];
-  const decoded = await admin.auth().verifyIdToken(token!);
-  const { data, error } = await supabaseServer
-    .from("users")
-    .update({ last_sign_in: new Date().toISOString() })
-    .eq("firebase_uid", decoded.uid)
-    .select()
-    .maybeSingle();
-  ```
-  See `src/app/api/users/upsert/route.ts` for normalization and merge patterns.
+- Local cache: keys prefixed `user-cache:` with TTL logic (`src/lib/userCache.ts`, tests: `src/lib/__tests__/user-cache.test.ts`).
+- Realtime: `src/hooks/useSyncedUser.ts` (subscribe with correct column filter: `id` or `firebase_uid`).
+- Middleware: `src/middleware.ts` guards `/dashboard/*` via HMAC-signed `neram_session` cookie (`SESSION_SECRET`). Extend `config.matcher` for new protected areas.
 
-## Realtime, caching, sessions
+## Avatars & Storage
 
-- Local cache keys are prefixed `user-cache:` with TTL logic (`src/lib/userCache.ts`; tests in `src/lib/__tests__/user-cache.test.ts`).
-- Realtime hook `src/hooks/useSyncedUser.ts` subscribes with a column filter; align the filter with actual schema (`id` or `firebase_uid`). Its current `uuid` filter is likely incorrect.
-- `src/middleware.ts` guards `/dashboard/*` via an HMAC-signed `neram_session` cookie (`SESSION_SECRET`). Reuse `validateSessionCookie` and extend `config.matcher` for new protected areas.
+- `GET /api/avatar-url`: checks `users.avatar_path`, then legacy `profiles.avatar_path`, then signs a URL from bucket `avatars` (service-role client).
 
-## Avatars and storage
+## Environment & Dev Workflow
 
-- `GET /api/avatar-url` checks `users.avatar_path`, then legacy `profiles.avatar_path`, then signs a URL from bucket `avatars` using the service-role client.
+- **Required envs:** Supabase (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`), Firebase client (`NEXT_PUBLIC_FIREBASE_*`), Firebase Admin (`FIREBASE_SERVICE_ACCOUNT_JSON` or discrete vars).
+- **Scripts:** `dev`, `build`, `start`, `lint`, `typecheck`, `test` (Jest + ts-jest, jsdom). Tests: `src/**/__tests__/**`.
+- **Windows:** keep import path casing consistent, avoid absolute filesystem import paths—use relative imports.
 
-## Environment and dev workflow
+## Key Files & Patterns
 
-- Required envs (examples): Supabase (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`), Firebase client (`NEXT_PUBLIC_FIREBASE_*`), and Firebase Admin either via `FIREBASE_SERVICE_ACCOUNT_JSON` or discrete vars (`FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`).
-- Scripts: `dev`, `build`, `start`, `lint`, `typecheck`, `test` (Jest + ts-jest, jsdom). Tests live under `src/**/__tests__/**`.
-- Windows gotchas: keep import path casing consistent and avoid absolute filesystem import paths—use relative imports (fix `src/app/api/avatar-url/route.ts`).
-
-## Files to study first
-
-- `src/app/api/users/upsert/route.ts` (trusted normalization/merge logic).
-- `src/lib/apiClient.ts`, `src/lib/supabaseServer.ts`, `src/lib/supabase.ts`.
+- `src/app/api/users/upsert/route.ts`: normalization/merge logic for user data.
+- `src/lib/apiClient.ts`, `src/lib/supabaseServer.ts`, `src/lib/supabase.ts`: data access patterns.
 - `src/middleware.ts`, `src/types/db.ts`, migrations in `supabase_migrations/**`.
+
+---
+
+**For AI agents:**
+
+- Always follow the normalization/merge patterns in `upsert/route.ts` for user data.
+- Use the correct Supabase client for client/server code.
+- When in doubt, check referenced files above for canonical patterns.

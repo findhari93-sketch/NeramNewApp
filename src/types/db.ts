@@ -43,6 +43,8 @@ export type UserRow = {
   profile?: Record<string, unknown> | null;
   application?: Record<string, unknown> | null;
   updated_at?: string | null;
+  // Option B (dedicated column, optional if migration applied):
+  nata_calculator_sessions?: Record<string, unknown> | null;
 };
 
 export type UserUpsertPayload = Partial<
@@ -75,3 +77,30 @@ export type UserUpsertPayload = Partial<
 > & { [key: string]: unknown };
 
 // types only
+
+// NATA Calculator session schema (Option A: stored under users.profile.nata_calculator_sessions)
+export type NataCalculatorSessionInput = {
+  markScored: number;
+  maxMark: number;
+  scores: [number | null, number | null, number | null];
+};
+
+export type NataCalculatorResult = {
+  academicPercentage: number; // 0-100 with 2-decimal typical precision
+  boardOutOf200: number; // academicPercentage * 2
+  bestNataScore: number; // max(scores)
+  finalCutoff: number; // boardOutOf200 + bestNataScore (out of 400)
+  eligibleBoard: boolean;
+  eligibleNata: boolean;
+  eligibleOverall: boolean;
+};
+
+export type NataCalculatorSession = {
+  id: string; // unique key (e.g., ISO timestamp)
+  createdAt: string; // ISO string
+  source?: string; // optional tag like "/nata-cutoff-calculator"
+  input: NataCalculatorSessionInput;
+  result: NataCalculatorResult;
+};
+
+export type NataCalculatorSessionsMap = Record<string, NataCalculatorSession>;

@@ -59,9 +59,9 @@ function ProfilePageInner() {
   // Show payment success banner once and then clean URL
   React.useEffect(() => {
     try {
-      const paid = searchParams.get("paid");
-      const course = searchParams.get("course");
-      const pid = searchParams.get("pid");
+      const paid = searchParams?.get("paid");
+      const course = searchParams?.get("course");
+      const pid = searchParams?.get("pid");
       if (paid === "1") {
         const parts = ["Payment successful!"];
         if (course) parts.push(`Course: ${course}`);

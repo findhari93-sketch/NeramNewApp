@@ -9,7 +9,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 export default function SnackbarNotice() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const notice = searchParams.get("notice");
+  const notice = searchParams?.get("notice") ?? null;
   const [open, setOpen] = React.useState(false);
 
   React.useEffect(() => {

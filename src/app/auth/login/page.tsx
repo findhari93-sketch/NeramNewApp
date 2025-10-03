@@ -62,6 +62,11 @@ function LoginPageInner() {
   // Helper to check profile completeness and redirect accordingly
   const redirectAfterLogin = async (idToken: string) => {
     try {
+      // Always respect explicit next=... if present (e.g., from calculator)
+      if (nextTarget) {
+        router.replace(`${nextTarget}`);
+        return;
+      }
       // Fetch user profile (from /api/users/me or /api/session)
       const res = await fetch("/api/users/me", {
         headers: { Authorization: `Bearer ${idToken}` },
@@ -82,14 +87,13 @@ function LoginPageInner() {
       }
       if (completeness < 70) {
         router.replace("/profile?notice=complete_profile");
-      } else if (nextTarget) {
-        router.replace(`${nextTarget}`);
       } else {
         router.replace("/?notice=login_success");
       }
     } catch {
-      // fallback: go to profile if error
-      router.replace("/profile?notice=complete_profile");
+      // fallback: respect next first, else go to profile
+      if (nextTarget) router.replace(`${nextTarget}`);
+      else router.replace("/profile?notice=complete_profile");
     }
   };
 
@@ -120,17 +124,38 @@ function LoginPageInner() {
           provider: "google.com",
         }),
       });
-
-      // Now check for missing fields and show modal if needed
-      const missingName = !user.displayName;
-      const missingPhone = !user.phoneNumber;
-      // TODO: fetch username from DB if needed
-      const missingUsername = true; // Always true for demo; replace with real check
-      if (missingName || missingPhone || missingUsername) {
-        setGoogleProfile(user);
-        setShowGoogleModal(true);
-        setLoading(false);
-        return;
+      // Check for missing fields from the DB to avoid false positives
+      try {
+        const sessionRes = await fetch("/api/session", {
+          headers: { Authorization: `Bearer ${idToken}` },
+        });
+        const j = await sessionRes.json().catch(() => ({} as any));
+        const userRow = (j?.user ?? j) || null;
+        if (sessionRes.ok && userRow) {
+          const studentName =
+            (userRow.student_name as string | undefined) ??
+            (userRow.profile?.student_name as string | undefined) ??
+            null;
+          const phoneVal =
+            (userRow.phone as string | undefined) ??
+            (userRow.profile?.phone as string | undefined) ??
+            null;
+          const usernameVal =
+            (userRow.username as string | undefined) ??
+            (userRow.profile?.username as string | undefined) ??
+            null;
+          const missingName = !studentName || studentName.trim() === "";
+          const missingPhone = !phoneVal || phoneVal.trim() === "";
+          const missingUsername = !usernameVal || usernameVal.trim() === "";
+          if (missingName || missingPhone || missingUsername) {
+            setGoogleProfile(user);
+            setShowGoogleModal(true);
+            setLoading(false);
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn("googleSignIn profile check failed", e);
       }
       await redirectAfterLogin(idToken);
     } catch (e) {
@@ -278,7 +303,11 @@ function LoginPageInner() {
     const current = auth.currentUser;
     if (current) {
       try {
-        router.replace("/profile");
+        // If a specific redirect target is provided (e.g. next=/calculator),
+        // do not override it here. Let the targeted redirect flow handle it.
+        if (!nextTarget) {
+          router.replace("/profile");
+        }
       } catch {}
     }
 
@@ -287,7 +316,10 @@ function LoginPageInner() {
       if (u) {
         // enforce redirect for any signed-in user who navigates to this page
         try {
-          router.replace("/profile");
+          // Respect next=... param when present and avoid forcing /profile
+          if (!nextTarget) {
+            router.replace("/profile");
+          }
         } catch {}
       }
     });
@@ -296,7 +328,7 @@ function LoginPageInner() {
       if (pv) setPhoneVerified(true);
     } catch {}
     return () => unsub();
-  }, [router, showGoogleModal, emailFlowPendingProfile]);
+  }, [router, showGoogleModal, emailFlowPendingProfile, nextTarget]);
 
   // If a verified Firebase user signs in (for example after verification),
   // ensure their Supabase profile has required fields before allowing
@@ -315,11 +347,26 @@ function LoginPageInner() {
               headers: { Authorization: `Bearer ${idToken}` },
             });
             if (!mounted) return;
-            const j = await res.json().catch(() => ({}));
-            const userRow = j?.user || null;
-            const missingName = !(userRow && userRow.student_name);
-            const missingPhone = !(userRow && userRow.phone);
-            const missingUsername = !(userRow && userRow.username);
+            const j = await res.json().catch(() => ({} as any));
+            // Only proceed if the response was OK and a user row exists
+            if (!res.ok) return;
+            const userRow = (j?.user ?? j) || null;
+            if (!userRow) return;
+            const studentName =
+              (userRow.student_name as string | undefined) ??
+              (userRow.profile?.student_name as string | undefined) ??
+              null;
+            const phoneVal =
+              (userRow.phone as string | undefined) ??
+              (userRow.profile?.phone as string | undefined) ??
+              null;
+            const usernameVal =
+              (userRow.username as string | undefined) ??
+              (userRow.profile?.username as string | undefined) ??
+              null;
+            const missingName = !studentName || studentName.trim() === "";
+            const missingPhone = !phoneVal || phoneVal.trim() === "";
+            const missingUsername = !usernameVal || usernameVal.trim() === "";
             if (missingName || missingPhone || missingUsername) {
               setGoogleProfile(u as any);
               setShowGoogleModal(true);
@@ -367,15 +414,34 @@ function LoginPageInner() {
                   },
                   body: JSON.stringify({}),
                 });
-                const j = await res.json().catch(() => ({}));
-                const userRow = j && j.user ? j.user : null;
-                const missingName = !(userRow && userRow.student_name);
-                const missingUsername = !(userRow && userRow.username);
-                const missingPhone = !(
-                  userRow &&
-                  (userRow.phone || (userRow.profile && userRow.profile.phone))
-                );
-                if (missingName || missingUsername || missingPhone) {
+                const j = await res.json().catch(() => ({} as any));
+                const userRow = (j && j.user ? j.user : null) || null;
+                if (res.ok && userRow) {
+                  const studentName =
+                    (userRow.student_name as string | undefined) ??
+                    (userRow.profile?.student_name as string | undefined) ??
+                    null;
+                  const phoneVal =
+                    (userRow.phone as string | undefined) ??
+                    (userRow.profile?.phone as string | undefined) ??
+                    null;
+                  const usernameVal =
+                    (userRow.username as string | undefined) ??
+                    (userRow.profile?.username as string | undefined) ??
+                    null;
+                  const missingName = !studentName || studentName.trim() === "";
+                  const missingPhone = !phoneVal || phoneVal.trim() === "";
+                  const missingUsername =
+                    !usernameVal || usernameVal.trim() === "";
+                  if (missingName || missingUsername || missingPhone) {
+                    setGoogleProfile(u as User);
+                    setShowGoogleModal(true);
+                    setEmailFlowPendingProfile(true);
+                    return;
+                  }
+                }
+                // If response not ok or no userRow, fall through to normal redirect
+                if (!res.ok) {
                   setGoogleProfile(u as User);
                   setShowGoogleModal(true);
                   setEmailFlowPendingProfile(true);

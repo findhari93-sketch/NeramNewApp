@@ -381,6 +381,14 @@ export async function POST(req: Request) {
         ? (bodyRec["application"] as Record<string, unknown>)
         : {};
 
+    // NATA sessions column (Option B): allow top-level nata_calculator_sessions map for merge-safe updates
+    const incomingNataSessions =
+      bodyRec["nata_calculator_sessions"] &&
+      typeof bodyRec["nata_calculator_sessions"] === "object" &&
+      !Array.isArray(bodyRec["nata_calculator_sessions"])
+        ? (bodyRec["nata_calculator_sessions"] as Record<string, unknown>)
+        : undefined;
+
     // Extract education section from application payload
     const educationSection: Record<string, unknown> | undefined =
       applicationFromBody &&
@@ -600,10 +608,38 @@ export async function POST(req: Request) {
       // merge extra into profile column
       const currentProfile: Record<string, unknown> =
         (existingRow.profile as Record<string, unknown>) || {};
-      (updateObj as Partial<UserRow>).profile = {
+      // Deep merge for specific known JSON keys that must be preserved, like nata_calculator_sessions
+      const nextProfile: Record<string, unknown> = {
         ...currentProfile,
         ...extra,
-      } as Record<string, unknown>;
+      };
+      // Merge profile.nata_calculator_sessions if present in incoming payload
+      const incomingNata = (extra as Record<string, unknown>)[
+        "nata_calculator_sessions"
+      ];
+      if (
+        incomingNata &&
+        typeof incomingNata === "object" &&
+        !Array.isArray(incomingNata)
+      ) {
+        const existingNata = (currentProfile as Record<string, unknown>)[
+          "nata_calculator_sessions"
+        ];
+        if (
+          existingNata &&
+          typeof existingNata === "object" &&
+          !Array.isArray(existingNata)
+        ) {
+          nextProfile["nata_calculator_sessions"] = {
+            ...(existingNata as Record<string, unknown>),
+            ...(incomingNata as Record<string, unknown>),
+          } as Record<string, unknown>;
+        }
+      }
+      (updateObj as Partial<UserRow>).profile = nextProfile as Record<
+        string,
+        unknown
+      >;
 
       // Merge application JSON if provided
       const currentApp: Record<string, unknown> =
@@ -658,6 +694,26 @@ export async function POST(req: Request) {
       };
 
       const attemptObj = updateObj;
+      // Deep-merge for nata_calculator_sessions column
+      if (incomingNataSessions) {
+        const existingSessions = (
+          existingRow as unknown as Record<string, unknown>
+        )["nata_calculator_sessions"];
+        if (
+          existingSessions &&
+          typeof existingSessions === "object" &&
+          !Array.isArray(existingSessions)
+        ) {
+          (attemptObj as Partial<UserRow>).nata_calculator_sessions = {
+            ...(existingSessions as Record<string, unknown>),
+            ...incomingNataSessions,
+          } as Record<string, unknown>;
+        } else {
+          (attemptObj as Partial<UserRow>).nata_calculator_sessions = {
+            ...incomingNataSessions,
+          } as Record<string, unknown>;
+        }
+      }
       let tries = 0;
       while (true) {
         const { updated, error } = await doUpdate(attemptObj);
@@ -687,6 +743,7 @@ export async function POST(req: Request) {
       };
       // allow database default to generate UUID id; as a fallback, generate one here if needed
       (insertObj as Partial<UserRow>).id = crypto.randomUUID();
+      // On insert, profile is just the provided extra object
       (insertObj as Partial<UserRow>).profile = { ...extra } as Record<
         string,
         unknown
@@ -695,6 +752,13 @@ export async function POST(req: Request) {
       if (Object.keys(applicationFromBody).length > 0) {
         (insertObj as Partial<UserRow>).application = {
           ...applicationFromBody,
+        } as Record<string, unknown>;
+      }
+
+      // nata_calculator_sessions on insert if provided
+      if (incomingNataSessions) {
+        (insertObj as Partial<UserRow>).nata_calculator_sessions = {
+          ...incomingNataSessions,
         } as Record<string, unknown>;
       }
 

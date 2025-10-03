@@ -100,7 +100,7 @@ export default function TopNavBar({
 
   type NavItem = { label: string; href: string; badge?: string };
   const menuItems: NavItem[] = [
-    { label: "Materials", href: "/", badge: "Free" },
+    { label: "Materials", href: "/freebooks", badge: "Free" },
     { label: "NATA", href: "/applicationform", badge: "Syllabus" },
     { label: "JEE B.arch", href: "/about", badge: "Paper 2" },
     { label: "Allumnus", href: "/contact", badge: "Neram Nata" },

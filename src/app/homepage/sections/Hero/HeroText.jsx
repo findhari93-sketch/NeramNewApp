@@ -10,7 +10,7 @@ import YouTubeIcon from "@mui/icons-material/YouTube";
 import InstagramIcon from "@mui/icons-material/Instagram";
 import { useTheme } from "@mui/material/styles";
 import { HilightBtn, MyButton } from "../../../components/shared/Buttons";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 // MUI version of ClockText, ClockSubText, NormalText
 const textSx = {
@@ -49,6 +49,7 @@ const subHeadlineSx = {
 
 export default function HeroText() {
   const theme = useTheme();
+  const router = useRouter();
 
   const highlightSx = {
     color: theme.palette.custom?.yellow ?? "#FFFB01",
@@ -143,11 +144,11 @@ export default function HeroText() {
         <Tooltip title="B.Arch Exam Cutoff calculation">
           <Box>
             <HilightBtn
-              onClick={() => (window.location.href = "/auth/login")}
+              onClick={() => router.push("/nata-cutoff-calculator")}
               variant="contained"
               size="large"
             >
-              Start Free
+              Calculator
             </HilightBtn>
           </Box>
         </Tooltip>

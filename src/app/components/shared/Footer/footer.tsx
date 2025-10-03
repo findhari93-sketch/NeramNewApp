@@ -3,6 +3,7 @@ import React from "react";
 import styled from "@emotion/styled";
 import FooterCard from "./Childrens/infocard";
 import AboutUs from "./aboutus";
+import { pt } from "zod/v4/locales";
 
 // Lightweight fallback Copyright block
 const CopyRight: React.FC = () => (
@@ -17,7 +18,7 @@ const FooterSection = styled.footer`
     #2b2d4e 1.557291666666667%,
     #e1148b 101.34895833333333%
   );
-  padding: 0 0 30px 0;
+  padding: 80px 30px 10px 30px;
   color: #fff;
   font-size: 11px;
   width: 100%;

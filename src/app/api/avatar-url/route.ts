@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { supabaseServer } from "c:/Users/Haribabu/Documents/AppsCopilot/Neram/NeramNextApp/neram-nextjs-app/src/lib/supabaseServer";
+import { supabaseServer } from "../../../lib/supabaseServer";
 
 // GET /api/avatar-url?userId=<id>&expires=60
 export async function GET(req: NextRequest) {
