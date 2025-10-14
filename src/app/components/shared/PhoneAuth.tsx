@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import PhoneInput from "react-phone-input-2";
 import "react-phone-input-2/lib/style.css";
 import { auth } from "../../../lib/firebase";
+import { friendlyFirebaseError } from "../../../lib/firebaseErrorMessages";
 // client Supabase no longer used for persisting user; we call server upsert instead
 import saveUserProfile from "../../../lib/saveUserProfile";
 import {
@@ -82,9 +83,11 @@ function getErrorMessage(err: unknown): string {
 export default function PhoneAuth({
   initialPhone,
   onVerified,
+  label = "on",
 }: {
   initialPhone?: string | null;
   onVerified?: (phone: string) => void;
+  label?: "on" | "off";
 }) {
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
@@ -268,7 +271,8 @@ export default function PhoneAuth({
         }
       }
     } catch (e) {
-      setError(getErrorMessage(e));
+      // Map Firebase errors to friendlier messages when possible
+      setError(friendlyFirebaseError(e));
     } finally {
       setLoading(false);
     }
@@ -321,7 +325,7 @@ export default function PhoneAuth({
         // Non-fatal: the user is verified; allow proceeding. The next profile save will retry.
       }
     } catch (e) {
-      setError(getErrorMessage(e) || "Invalid OTP. Try again.");
+      setError(friendlyFirebaseError(e) || "Invalid OTP. Try again.");
     } finally {
       setLoading(false);
     }
@@ -366,10 +370,14 @@ export default function PhoneAuth({
   }
 
   return (
-    <div style={{ maxWidth: 340, margin: "0 auto" }}>
+    <div style={{ maxWidth: 340, margin: "0 auto", width: "100%" }}>
       {step === "phone" && (
         <>
-          <label htmlFor="phone">Phone Number</label>
+          {label !== "off" && (
+            <Typography component="label" htmlFor="phone">
+              Phone Number
+            </Typography>
+          )}
           <PhoneInput
             country="in"
             value={phone}
@@ -383,7 +391,12 @@ export default function PhoneAuth({
               setPhone(full);
             }}
             inputProps={{ name: "phone", required: true, autoFocus: true }}
-            inputStyle={{ width: "100%", padding: 10, marginBottom: 12 }}
+            inputStyle={{
+              width: "100%",
+              padding: 10,
+              paddingLeft: 45,
+              marginBottom: 12,
+            }}
             specialLabel=""
             enableSearch
           />
@@ -438,7 +451,7 @@ export default function PhoneAuth({
 
       {step === "otp" && (
         <>
-          <Typography sx={{ mb: 1 }}>Enter OTP</Typography>
+          <Typography sx={{ mb: 1, color: "#fff" }}>Enter OTP</Typography>
           <Box
             sx={{ display: "flex", gap: 1, justifyContent: "center", mb: 1.5 }}
           >
@@ -449,7 +462,7 @@ export default function PhoneAuth({
                 inputProps={{
                   inputMode: "numeric",
                   maxLength: 1,
-                  style: { textAlign: "center" },
+                  style: { textAlign: "center", color: "#fff" },
                 }}
                 value={otp[i] || ""}
                 onChange={(e) => {
@@ -512,7 +525,18 @@ export default function PhoneAuth({
                     )?.focus();
                   }
                 }}
-                sx={{ width: 48 }}
+                sx={{
+                  width: 48,
+                  "& .MuiInputBase-input": {
+                    color: "#fff",
+                    textAlign: "center",
+                  },
+                  "& .MuiOutlinedInput-root": {
+                    "& fieldset": { borderColor: "rgba(255,255,255,0.6)" },
+                    "&:hover fieldset": { borderColor: "#fff" },
+                    "&.Mui-focused fieldset": { borderColor: "#fff" },
+                  },
+                }}
               />
             ))}
           </Box>

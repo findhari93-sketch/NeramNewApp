@@ -1,58 +1,68 @@
-# NeramNextApp Copilot Instructions
+# NeramNextApp — Copilot instructions (condensed)
 
-> This file guides AI coding agents to be productive in this codebase. It summarizes architecture, data flow, conventions, and critical workflows. **Favor these patterns over generic boilerplate.**
+This file gives focused, actionable rules so an AI coding agent can be productive quickly. Follow these repo-specific patterns and check the referenced files for examples.
 
-## Architecture & Data Flow
+- Stack & layout:
 
-- **Next.js App Router** (Next 15) in `src/app`. API routes: `src/app/api/**`.
-- **React 19 + MUI 7 + Emotion**. Theme/provider: `src/app/ThemeRegistry.tsx` (client component).
-- **Data/auth:**
-  - **Firebase Auth** (client-side): user login, token acquisition.
-  - **Supabase (Postgres + Storage):** main data store. Service-role client: `src/lib/supabaseServer.ts` (server only); anon client: `src/lib/supabase.ts` (client only).
-  - **Single main table:** `public.users` (see migrations in `supabase_migrations/**`, types in `src/types/db.ts`). Flexible fields: `users.profile` (JSON), stepwise form data: `users.application` (JSON).
+  - Next.js App Router (Next 15) under `src/app`. API routes live in `src/app/api/**`.
+  - React 19 with MUI 7 + Emotion. Theme/provider: `src/app/ThemeRegistry.tsx` (client component).
 
-## Auth, API, and Data Patterns
+- Auth & data flow (essential):
 
-- **Client** gets Firebase ID token, sends to API routes. API verifies with Firebase Admin. Primary key: `firebase_uid` (fallbacks: `phone`, `email`).
-- **All profile/application writes:** `POST /api/users/upsert` (see `src/app/api/users/upsert/route.ts`).
-  - Input normalization: camelCase→snake_case, lowercased `username`, gender enum, academic-year labels (e.g. `2025-26`).
-  - JSON merge: preserves existing `profile`/`application` fields.
-  - Never overwrite `student_name` with empty; strips unknown columns, retries on Postgres errors.
-  - Tracks `providers[]`, preserves `phone_auth_used` once true.
-- **API client helper:** `src/lib/apiClient.ts` auto-attaches `Authorization: Bearer <token>`, retries once on `{ status: 401, error: "invalid_token" }`.
+  - Client auth: Firebase (client SDK). Client code fetches a Firebase ID token and calls internal API routes.
+  - Server data: Supabase (Postgres + Storage). Use `src/lib/supabaseServer.ts` on server only (service-role key). Use `src/lib/supabase.ts` on the client (anon key).
+  - Main table: `public.users`. JSON columns used frequently: `users.profile` and `users.application` (see `src/types/db.ts` and `supabase_migrations/`).
 
-## Client vs Server Rules
+- Canonical API pattern:
 
-- Any component using MUI, Emotion, React context, or `next/navigation` **must** start with `"use client"` (see `src/app/components/**`).
-- **Never** import `lib/supabaseServer` on the client; use `lib/supabase.ts` (client) and `lib/supabaseServer.ts` (server).
-- If a page uses `useSearchParams()` or `useRouter()`, wrap in `<Suspense>` (see `src/app/auth/login/page.tsx`).
+  - All profile/application writes go through POST `/api/users/upsert` (see `src/app/api/users/upsert/route.ts`). Mirror its normalization/merge logic when creating new endpoints:
+    - Normalize input: camelCase → snake_case; lowercase `username`; map enums (gender, academic labels like `2025-26`).
+    - Merge JSON columns instead of replacing (preserve existing fields).
+    - Don’t overwrite `student_name` with empty values; preserve `providers[]`; keep `phone_auth_used` true once set.
 
-## Realtime, Caching, Sessions
+- Client/server rules (must-follow):
 
-- Local cache: keys prefixed `user-cache:` with TTL logic (`src/lib/userCache.ts`, tests: `src/lib/__tests__/user-cache.test.ts`).
-- Realtime: `src/hooks/useSyncedUser.ts` (subscribe with correct column filter: `id` or `firebase_uid`).
-- Middleware: `src/middleware.ts` guards `/dashboard/*` via HMAC-signed `neram_session` cookie (`SESSION_SECRET`). Extend `config.matcher` for new protected areas.
+  - Any React component using MUI, Emotion, context, or `next/navigation` must start with "use client".
+  - Never import `src/lib/supabaseServer.ts` into client code. If you need storage signing or admin actions, add a server API route or use `supabaseServer` inside `src/app/api/**`.
+  - Pages using `useSearchParams()` / `useRouter()` wrap their client UI in `<Suspense>` if needed (see `src/app/auth/login/page.tsx`).
 
-## Avatars & Storage
+- Realtime & caching:
 
-- `GET /api/avatar-url`: checks `users.avatar_path`, then legacy `profiles.avatar_path`, then signs a URL from bucket `avatars` (service-role client).
+  - Local cache keys prefix: `user-cache:` (see `src/lib/userCache.ts`).
+  - Realtime subscription helper: `src/hooks/useSyncedUser.ts` (subscribe using `id` or `firebase_uid`).
 
-## Environment & Dev Workflow
+- Middleware & sessions:
 
-- **Required envs:** Supabase (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`), Firebase client (`NEXT_PUBLIC_FIREBASE_*`), Firebase Admin (`FIREBASE_SERVICE_ACCOUNT_JSON` or discrete vars).
-- **Scripts:** `dev`, `build`, `start`, `lint`, `typecheck`, `test` (Jest + ts-jest, jsdom). Tests: `src/**/__tests__/**`.
-- **Windows:** keep import path casing consistent, avoid absolute filesystem import paths—use relative imports.
+  - `src/middleware.ts` protects `/dashboard/*` routes using an HMAC-signed `neram_session` cookie (`SESSION_SECRET`). If you protect new paths, update `config.matcher`.
 
-## Key Files & Patterns
+- Storage/avatars:
 
-- `src/app/api/users/upsert/route.ts`: normalization/merge logic for user data.
-- `src/lib/apiClient.ts`, `src/lib/supabaseServer.ts`, `src/lib/supabase.ts`: data access patterns.
-- `src/middleware.ts`, `src/types/db.ts`, migrations in `supabase_migrations/**`.
+  - `GET /api/avatar-url` checks `users.avatar_path` then legacy `profiles.avatar_path`, then signs a bucket URL (`avatars`) with `supabaseServer`.
 
----
+- Dev & CI quick commands (from `package.json`):
 
-**For AI agents:**
+  - dev: `npm run dev` (Next dev server)
+  - build: `npm run build` (Next build)
+  - start: `npm run start` (Next start)
+  - lint: `npm run lint`
+  - typecheck: `npm run typecheck` (tsc --noEmit)
+  - test: `npm run test` (Jest + ts-jest)
 
-- Always follow the normalization/merge patterns in `upsert/route.ts` for user data.
-- Use the correct Supabase client for client/server code.
-- When in doubt, check referenced files above for canonical patterns.
+- Environment reminders:
+
+  - Required envs: SUPABASE*URL, SUPABASE_SERVICE_ROLE_KEY, NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_FIREBASE*\*, and Firebase admin credentials (SERVICE_ACCOUNT JSON or discrete envs).
+  - On Windows, keep import path casing exact and prefer relative imports.
+
+- Where to look first (examples):
+
+  - Upsert normalization: `src/app/api/users/upsert/route.ts`
+  - API helper: `src/lib/apiClient.ts` (auto-attaches Authorization header, retries on invalid_token)
+  - Server/client supabase: `src/lib/supabaseServer.ts`, `src/lib/supabase.ts`
+  - Theme/provider: `src/app/ThemeRegistry.tsx`
+  - Cache & realtime: `src/lib/userCache.ts`, `src/hooks/useSyncedUser.ts`
+
+- For PRs and changes:
+  - Preserve existing normalization/merge semantics when touching user data.
+  - Add tests under `src/**/__tests__/**` for new behaviors; run `npm test`.
+
+If any area above is unclear or you want more examples (small code snippets showing the normalization or a sample API route), tell me which part and I’ll add it.

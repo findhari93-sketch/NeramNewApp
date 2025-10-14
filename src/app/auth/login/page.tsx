@@ -16,6 +16,7 @@ import VisibilityOff from "@mui/icons-material/VisibilityOff";
 import TopNavBar from "../../components/shared/TopNavBar";
 import { useRouter, useSearchParams } from "next/navigation";
 import { auth } from "../../../lib/firebase";
+import { friendlyFirebaseError } from "../../../lib/firebaseErrorMessages";
 import {
   GoogleAuthProvider,
   signInWithPopup,
@@ -30,6 +31,8 @@ import { signInWithEmailOrUsername } from "../../../lib/auth/firebaseAuth";
 import { signInSchema, passwordSchema } from "../../../lib/auth/validation";
 import { Container } from "@mui/material";
 import GoogleProfileCompletionModal from "../../components/shared/GoogleProfileCompletionModal";
+import Snackbar from "@mui/material/Snackbar";
+import MuiAlert from "@mui/material/Alert";
 
 function LoginPageInner() {
   const router = useRouter();
@@ -50,6 +53,10 @@ function LoginPageInner() {
   const [googleProfile, setGoogleProfile] = useState<User | null>(null);
   const [emailFlowPendingProfile, setEmailFlowPendingProfile] =
     useState<boolean>(false);
+  const [forceModalNonClosable, setForceModalNonClosable] =
+    useState<boolean>(false);
+  const [snackOpen, setSnackOpen] = useState(false);
+  const [snackMessage, setSnackMessage] = useState<string | null>(null);
 
   const getUserLabel = (u: unknown) => {
     if (!u || typeof u !== "object") return null;
@@ -149,6 +156,9 @@ function LoginPageInner() {
           const missingUsername = !usernameVal || usernameVal.trim() === "";
           if (missingName || missingPhone || missingUsername) {
             setGoogleProfile(user);
+            // If phone is missing, force the modal to be non-closable so we
+            // require phone verification before proceeding.
+            if (missingPhone) setForceModalNonClosable(true);
             setShowGoogleModal(true);
             setLoading(false);
             return;
@@ -159,12 +169,77 @@ function LoginPageInner() {
       }
       await redirectAfterLogin(idToken);
     } catch (e) {
-      const err = e as { message?: string } | undefined;
-      setError(err?.message || String(e));
+      setError(friendlyFirebaseError(e));
     } finally {
       setLoading(false);
     }
   };
+
+  // Handler used when modal only collects phone (Google sign-in flow)
+  const handlePhoneOnlyComplete = async (phone: string): Promise<boolean> => {
+    setLoading(true);
+    setError(null);
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error("No authenticated user");
+      const idToken = await user.getIdToken();
+      await fetch("/api/users/upsert", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ phone }),
+      });
+      setShowGoogleModal(false);
+      // Notify app that phone verification completed so other components can show a toast
+      try {
+        window.dispatchEvent(
+          new CustomEvent("neram:phoneVerified", {
+            detail: {
+              message:
+                "🎉 Phone Verification Successful! Check your WhatsApp — we’ve sent you the Q&A set of the 2024 NATA / JEE2 Exam along with bonus study materials!",
+            },
+          })
+        );
+      } catch {}
+      // delay redirect so toast is visible briefly
+      setTimeout(async () => {
+        try {
+          const fresh = await user.getIdToken();
+          await redirectAfterLogin(fresh);
+        } catch {
+          // ignore
+        }
+      }, 2800);
+      // refresh token/state and redirect
+      return true;
+    } catch (e) {
+      setError(friendlyFirebaseError(e));
+      return false;
+    } finally {
+      setLoading(false);
+      setForceModalNonClosable(false);
+    }
+  };
+
+  React.useEffect(() => {
+    const handler = (ev: Event) => {
+      try {
+        const ce = ev as CustomEvent<any>;
+        setSnackMessage(ce?.detail?.message || "Phone verified");
+        setSnackOpen(true);
+        // auto-hide after 3s
+        setTimeout(() => setSnackOpen(false), 3000);
+      } catch {}
+    };
+    window.addEventListener("neram:phoneVerified", handler as EventListener);
+    return () =>
+      window.removeEventListener(
+        "neram:phoneVerified",
+        handler as EventListener
+      );
+  }, []);
 
   // Handler for Google profile completion modal
   const handleGoogleProfileComplete = async ({
@@ -1259,27 +1334,23 @@ function LoginPageInner() {
       </Box>
       <GoogleProfileCompletionModal
         open={showGoogleModal}
-        onClose={() => setShowGoogleModal(false)}
-        onComplete={
-          emailFlowPendingProfile
-            ? handleEmailProfileComplete
-            : handleGoogleProfileComplete
-        }
+        onClose={() => {
+          setShowGoogleModal(false);
+          setForceModalNonClosable(false);
+        }}
+        onComplete={handlePhoneOnlyComplete}
         initialPhone={googleProfile?.phoneNumber ?? undefined}
-        forceComplete={emailFlowPendingProfile}
-        hidePasswordFields={
-          // If this modal was triggered by emailFlowPendingProfile (email/password sign-in), hide password creation
-          emailFlowPendingProfile ||
-          // As a fallback, check providerData on the current firebase user
-          Boolean(
-            auth.currentUser &&
-              Array.isArray(auth.currentUser.providerData) &&
-              auth.currentUser.providerData.some(
-                (p: any) => p.providerId === "password"
-              )
-          )
-        }
+        forceComplete={forceModalNonClosable}
       />
+      <Snackbar
+        open={snackOpen}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+        onClose={() => setSnackOpen(false)}
+      >
+        <MuiAlert elevation={6} variant="filled" severity="success">
+          {snackMessage}
+        </MuiAlert>
+      </Snackbar>
     </>
   );
 }
