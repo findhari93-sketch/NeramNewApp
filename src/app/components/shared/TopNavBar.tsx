@@ -12,7 +12,6 @@ import Box from "@mui/material/Box";
 import Drawer from "@mui/material/Drawer";
 import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
-// ListItemText not used; custom NavLinkText used instead
 import ListItemButton from "@mui/material/ListItemButton";
 import Divider from "@mui/material/Divider";
 import Typography from "@mui/material/Typography";
@@ -21,6 +20,7 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import NavbarProfile from "./NavbarProfile";
+import { titleCase } from "../../../lib/stringUtils";
 import { NeramLogo, MobileLogo } from "./NeramLogo/NeramLogo";
 import { signOut } from "firebase/auth";
 import NavLinkText from "./NavLinkText";
@@ -527,7 +527,7 @@ export default function TopNavBar({
               <NavbarProfile
                 user={{
                   id: userLabel,
-                  name: userLabel,
+                  name: titleCase(userLabel) ?? userLabel,
                   role: "Visitor",
                   avatarUrl: avatarUrl,
                 }}

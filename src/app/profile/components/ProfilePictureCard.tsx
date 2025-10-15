@@ -1,6 +1,7 @@
 /**
  * ProfilePictureCard.tsx
  *
+  student_name?: string | null;
  * Small card showing avatar + basic summary with an Edit overlay to upload a new avatar.
  *
  * Example usage:
@@ -9,7 +10,6 @@
  *   onUpload={async (file) => {
  *     // upload file to storage (Supabase / S3) and return { photoURL }
  *     // return await uploadAvatar(file);
- *   }}
  * />
  *
  * Props exported: ProfilePictureCardProps
@@ -20,9 +20,9 @@
  */
 
 import React, { useState, useRef, useEffect } from "react";
+import { titleCase } from "../../../lib/stringUtils";
 import {
   Box,
-  Avatar,
   IconButton,
   Dialog,
   DialogTitle,
@@ -37,9 +37,11 @@ import {
 import PhotoCamera from "@mui/icons-material/PhotoCamera";
 import EditIcon from "@mui/icons-material/Edit";
 import { SxProps, Theme } from "@mui/system";
+import UserAvatar from "../../components/shared/UserAvatar";
 
 export type UserShape = {
   id?: string;
+  student_name?: string | null;
   displayName?: string | null;
   email?: string | null;
   phone?: string | null;
@@ -83,14 +85,6 @@ export function ProfilePictureCard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.photoURL]);
 
-  // Generate initials fallback
-  const initials = (user?.displayName || user?.email || "U")
-    .split(" ")
-    .map((p) => p[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-
   const handleChoose = () => {
     inputRef.current?.click();
   };
@@ -131,8 +125,7 @@ export function ProfilePictureCard({
       setPreview(result.photoURL);
       setSnack({ open: true, message: "Avatar updated", severity: "success" });
       setOpen(false);
-    } catch (err) {
-      console.error("upload avatar failed", err);
+    } catch {
       setPreview(previous);
       setSnack({ open: true, message: "Upload failed", severity: "error" });
     } finally {
@@ -153,18 +146,7 @@ export function ProfilePictureCard({
         }}
       >
         <Box sx={{ position: "relative", display: "inline-block" }}>
-          <Avatar
-            alt={user?.displayName ?? "User"}
-            src={preview ?? undefined}
-            sx={{
-              width: avatarSize,
-              height: avatarSize,
-              fontSize: Math.max(avatarSize / 3.5, 16),
-              bgcolor: "primary.light",
-            }}
-          >
-            {!preview ? initials : null}
-          </Avatar>
+          <UserAvatar user={user} size={avatarSize} />
 
           <IconButton
             aria-label="Edit avatar"
@@ -181,14 +163,20 @@ export function ProfilePictureCard({
             <EditIcon fontSize="small" />
           </IconButton>
         </Box>
+        <Box>
+          <Typography variant="h6" sx={{ mt: 1 }}>
+            {titleCase(
+              user?.student_name ??
+                user?.displayName ??
+                user?.email ??
+                "Your account"
+            )}
+          </Typography>
 
-        <Typography variant="h6" sx={{ mt: 1 }}>
-          {user?.displayName ?? user?.email ?? "Your account"}
-        </Typography>
-
-        <Typography variant="body2" color="text.secondary">
-          {user?.email ?? "—"}
-        </Typography>
+          <Typography variant="body2" color="text.secondary">
+            {user?.email ?? "—"}
+          </Typography>
+        </Box>
       </Box>
 
       {/* Upload dialog */}
@@ -198,7 +186,7 @@ export function ProfilePictureCard({
         fullWidth
         maxWidth="sm"
       >
-        <DialogTitle>Upload avatar</DialogTitle>
+        <DialogTitle>Upload Profile Picture</DialogTitle>
         <DialogContent>
           <input
             ref={inputRef}
@@ -225,12 +213,7 @@ export function ProfilePictureCard({
 
               {/* Preview */}
               <Box sx={{ display: "flex", justifyContent: "center", mb: 1 }}>
-                <Avatar
-                  src={preview ?? undefined}
-                  sx={{ width: 120, height: 120 }}
-                >
-                  {!preview ? initials : null}
-                </Avatar>
+                <UserAvatar user={{ ...user, photoURL: preview }} size={120} />
               </Box>
 
               <Button
@@ -248,11 +231,6 @@ export function ProfilePictureCard({
                   - Example integration point: show Cropper component here and a 'Crop & Save' button.
               */}
             </Box>
-
-            <Typography variant="caption" color="text.secondary">
-              File will be uploaded to your storage provider. Make sure to
-              return a publicly accessible URL from `onUpload`.
-            </Typography>
           </Box>
         </DialogContent>
 

@@ -1,15 +1,15 @@
 "use client";
 import React from "react";
 import Box from "@mui/material/Box";
-import Avatar from "@mui/material/Avatar";
 import ButtonBase from "@mui/material/ButtonBase";
 import Typography from "@mui/material/Typography";
 import Popover from "@mui/material/Popover";
 import Skeleton from "@mui/material/Skeleton";
-import useAvatarColor from "./useAvatarColor";
 import ProfileMenuContent from "./ProfileMenuContent";
+import { titleCase } from "../../../lib/stringUtils";
 import { useRouter } from "next/navigation";
 import type { User } from "./types";
+import UserAvatar from "./UserAvatar";
 
 type Props = {
   user?: User | null;
@@ -18,13 +18,6 @@ type Props = {
   onSignOut?: () => Promise<void> | void;
   showDetails?: boolean; // controls whether to show name/role text
 };
-
-function initialsForName(name?: string) {
-  if (!name) return "";
-  const parts = name.trim().split(/\s+/);
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[1][0]).toUpperCase();
-}
 
 export default function NavbarProfile({
   user,
@@ -36,9 +29,6 @@ export default function NavbarProfile({
   const router = useRouter();
   const [anchorEl, setAnchorEl] = React.useState<HTMLElement | null>(null);
   const open = controlledOpen ?? Boolean(anchorEl);
-  const color = useAvatarColor(
-    typeof user?.name === "string" ? (user.name as string) : undefined
-  );
 
   const handleToggle = (e: React.MouseEvent<HTMLElement>) => {
     if (anchorEl) {
@@ -54,7 +44,7 @@ export default function NavbarProfile({
     onOpenChange?.(false);
   };
 
-  const displayName = user?.name ?? "Guest";
+  const displayName = titleCase(user?.name ?? "Guest") ?? "Guest";
   // prefer explicit accountType returned from DB; fall back to role for compatibility
   const displayRole = (user as any)?.accountType ?? user?.role ?? "Free"; // default to Free for accounts without explicit accountType
 
@@ -103,19 +93,7 @@ export default function NavbarProfile({
             aria-label="Open profile menu"
             sx={{ borderRadius: "50%" }}
           >
-            <Avatar
-              sx={{ width: 36, height: 36, bgcolor: color }}
-              src={user?.avatarUrl || undefined}
-              imgProps={{ referrerPolicy: "no-referrer" }}
-            >
-              {user?.avatarUrl
-                ? null
-                : initialsForName(
-                    typeof user?.name === "string"
-                      ? (user.name as string)
-                      : undefined
-                  )}
-            </Avatar>
+            <UserAvatar user={user} size={36} showRing />
           </ButtonBase>
         ) : (
           <Skeleton variant="circular" width={36} height={36} />

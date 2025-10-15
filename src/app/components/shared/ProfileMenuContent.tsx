@@ -57,7 +57,9 @@ export default function ProfileMenuContent({
   return (
     <Card elevation={0} sx={{ boxShadow: "none" }}>
       <CardContent sx={{ p: 0 }}>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 1 }}>
+        <Box
+          sx={{ display: "flex", alignItems: "center", gap: 2, my: 1, px: 2 }}
+        >
           {avatar}
           <Box sx={{ flex: 1 }}>
             <Typography variant="subtitle1">
@@ -70,6 +72,7 @@ export default function ProfileMenuContent({
           <Button
             variant="contained"
             onClick={() => onNavigate("/applicationform")}
+            size="small"
           >
             Join Class
           </Button>

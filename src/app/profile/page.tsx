@@ -1911,7 +1911,14 @@ function ProfilePageInner() {
                       onChange={(e) => field.onChange(e.target.value)}
                       fullWidth
                       size="small"
-                      sx={textFieldMobileSx}
+                      disabled={f.name === "email" || f.name === "phone"}
+                      sx={{
+                        ...textFieldMobileSx,
+                        "& .MuiInputBase-root.Mui-disabled": {
+                          backgroundColor: (theme) =>
+                            (theme as any).palette.action.disabledBackground,
+                        },
+                      }}
                       SelectProps={{
                         multiple: true,
                         labelId: `drawer-field-${String(f.name)}-label`,
@@ -1967,7 +1974,14 @@ function ProfilePageInner() {
                       onChange={(e) => field.onChange(e.target.value)}
                       fullWidth
                       size="small"
-                      sx={textFieldMobileSx}
+                      disabled={f.name === "email" || f.name === "phone"}
+                      sx={{
+                        ...textFieldMobileSx,
+                        "& .MuiInputBase-root.Mui-disabled": {
+                          backgroundColor: (theme) =>
+                            (theme as any).palette.action.disabledBackground,
+                        },
+                      }}
                       SelectProps={{
                         labelId: `drawer-field-${String(f.name)}-label`,
                         MenuProps: {
@@ -2087,7 +2101,14 @@ function ProfilePageInner() {
                           }
                           fullWidth
                           size="small"
-                          sx={textFieldMobileSx}
+                          sx={{
+                            ...textFieldMobileSx,
+                            "& .MuiInputBase-root.Mui-disabled": {
+                              backgroundColor: (theme) =>
+                                (theme as any).palette.action
+                                  .disabledBackground,
+                            },
+                          }}
                         />
                         <Box sx={{ mt: 1 }}>
                           {value.filter(Boolean).length ? (
@@ -2120,9 +2141,16 @@ function ProfilePageInner() {
                     label={f.label}
                     value={field.value ?? ""}
                     onChange={(e) => field.onChange(e.target.value)}
+                    disabled={f.name === "email" || f.name === "phone"}
                     fullWidth
                     size="small"
-                    sx={textFieldMobileSx}
+                    sx={{
+                      ...textFieldMobileSx,
+                      "& .MuiInputBase-root.Mui-disabled": {
+                        backgroundColor: (theme) =>
+                          (theme as any).palette.action.disabledBackground,
+                      },
+                    }}
                     type={
                       f.type === "date"
                         ? "date"
