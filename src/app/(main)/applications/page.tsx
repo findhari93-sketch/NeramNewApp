@@ -1,6 +1,6 @@
 "use client";
 // app/(main)/applications/page.tsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import apiClient from "../../../lib/apiClient";
 import { getAuth } from "firebase/auth";
@@ -16,7 +16,6 @@ import {
   Chip,
   Button,
   CircularProgress,
-  Divider,
   Alert,
 } from "@mui/material";
 import GridOrig from "@mui/material/Grid";
@@ -31,7 +30,7 @@ import {
 // Alias Grid to match other files' Grid2-style sizing usage
 const Grid: any = GridOrig;
 
-export default function ApplicationsPage() {
+function ApplicationsPageContent() {
   const [apps, setApps] = useState<any[]>([]);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -272,5 +271,24 @@ export default function ApplicationsPage() {
         })}
       </Grid>
     </Container>
+  );
+}
+
+export default function ApplicationsPage() {
+  return (
+    <Suspense
+      fallback={
+        <Box
+          display="flex"
+          justifyContent="center"
+          alignItems="center"
+          minHeight="60vh"
+        >
+          <CircularProgress />
+        </Box>
+      }
+    >
+      <ApplicationsPageContent />
+    </Suspense>
   );
 }
