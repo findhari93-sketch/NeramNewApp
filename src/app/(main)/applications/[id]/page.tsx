@@ -13,8 +13,8 @@ import {
   CircularProgress,
   Container,
   Divider,
+  Grid as MUIGrid,
 } from "@mui/material";
-import GridOrig from "@mui/material/Grid";
 import {
   CheckCircle as CheckCircleIcon,
   Pending as PendingIcon,
@@ -22,24 +22,13 @@ import {
   Payment as PaymentIcon,
 } from "@mui/icons-material";
 
-// Alias Grid for Grid2-style usage
-const Grid: any = GridOrig;
-
-export default function ApplicationDetail({
-  params,
-}: {
+type Props = {
   params: { id: string };
-}) {
+};
+
+export default function ApplicationDetail({ params }: Props) {
   const [app, setApp] = useState<any>(null);
-  // `params` can be a Promise-like in this Next.js version; unwrap with React.use when available
-  // React.use(params) will synchronously return the resolved params in this runtime.
-  // Fallback to using params directly for older environments.
-  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-  // @ts-ignore-next-line
-  const resolvedParams = (React as any).use
-    ? (React as any).use(params)
-    : params;
-  const { id } = resolvedParams || (params as any);
+  const { id } = params; // params in client page is a plain object
 
   const router = useRouter();
   const [checkingAuth, setCheckingAuth] = useState(true);
@@ -99,22 +88,18 @@ export default function ApplicationDetail({
       </Box>
     );
 
-  // approval (status) is admin-only and not available in this app; owners cannot change it here
-
   async function createPayment() {
     try {
       const res = await fetch(`/api/applications/${id}/payment`, {
         method: "POST",
       });
       const payload = await res.json();
-      // redirect to payment link or open checkout
       if (payload?.payment_url) window.location.href = payload.payment_url;
     } catch (err) {
       console.error("Failed to create payment", err);
     }
   }
 
-  // Helper: Categorize data into named sections
   const categorizeData = (data: Record<string, any>) => {
     const sections: Record<string, Array<[string, any]>> = {
       "Personal Information": [],
@@ -236,7 +221,6 @@ export default function ApplicationDetail({
       }
     }
 
-    // Remove empty sections
     return Object.fromEntries(
       Object.entries(sections).filter(([, items]) => items.length > 0)
     );
@@ -245,7 +229,6 @@ export default function ApplicationDetail({
   const appData = app.data && typeof app.data === "object" ? app.data : {};
   const sections = categorizeData(appData);
 
-  // Helper: Get status chip color and icon
   const getStatusChip = (status: string) => {
     const normalized = String(status || "pending").toLowerCase();
     if (normalized.includes("approve") || normalized.includes("accept")) {
@@ -292,7 +275,6 @@ export default function ApplicationDetail({
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
-      {/* Header with name and status badges */}
       <Box sx={{ mb: 3 }}>
         <Typography
           variant="h6"
@@ -320,10 +302,9 @@ export default function ApplicationDetail({
 
       <Divider sx={{ mb: 3 }} />
 
-      {/* Sectioned data cards */}
-      <Grid container spacing={3}>
+      <MUIGrid container spacing={3}>
         {Object.entries(sections).map(([sectionTitle, items]) => (
-          <Grid size={{ xs: 12, md: 6 }} key={sectionTitle}>
+          <MUIGrid item xs={12} md={6} key={`${sectionTitle}`}>
             <Card
               elevation={0}
               sx={{
@@ -375,18 +356,11 @@ export default function ApplicationDetail({
                 </Box>
               </CardContent>
             </Card>
-          </Grid>
+          </MUIGrid>
         ))}
-      </Grid>
+      </MUIGrid>
 
-      {/* Action button anchored bottom-right */}
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "flex-end",
-          mt: 4,
-        }}
-      >
+      <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 4 }}>
         <Button
           variant="contained"
           color="primary"
