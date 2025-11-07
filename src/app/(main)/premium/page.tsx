@@ -1,7 +1,8 @@
-"use client";
+﻿"use client";
 
 import React from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
+import SafeSearchParams from "@/components/SafeSearchParams";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import CircularProgress from "@mui/material/CircularProgress";
@@ -9,19 +10,17 @@ import Button from "@mui/material/Button";
 import Paper from "@mui/material/Paper";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 
-/**
- * Premium page - shown after successful payment
- * Validates the short-lived redirect token from /api/payments/razorpay/verify
- */
-export default function PremiumPage() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
+function PremiumContent({
+  searchParams,
+  router,
+}: {
+  searchParams: any;
+  router: any;
+}) {
   const token = searchParams?.get("token") || null;
-
   const [validating, setValidating] = React.useState(!!token);
   const [tokenValid, setTokenValid] = React.useState(false);
 
-  // Validate redirect token if present
   React.useEffect(() => {
     if (!token) {
       setValidating(false);
@@ -30,7 +29,6 @@ export default function PremiumPage() {
 
     (async () => {
       try {
-        // Decode and verify token (simple client-side check, not security-critical)
         const base64 = token.replace(/-/g, "+").replace(/_/g, "/");
         const jsonStr = Buffer.from(base64, "base64").toString("utf-8");
         const data = JSON.parse(jsonStr);
@@ -110,5 +108,16 @@ export default function PremiumPage() {
         </Box>
       </Paper>
     </Box>
+  );
+}
+
+export default function PremiumPage() {
+  const router = useRouter();
+  return (
+    <SafeSearchParams>
+      {(searchParams) => (
+        <PremiumContent searchParams={searchParams} router={router} />
+      )}
+    </SafeSearchParams>
   );
 }
