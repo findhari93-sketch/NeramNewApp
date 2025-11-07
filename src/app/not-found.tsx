@@ -7,7 +7,7 @@ import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
 import Stack from "@mui/material/Stack";
 import TopNavBar from "./components/shared/TopNavBar";
-import HeroWaves from "./homepage/sections/Hero/HeroWaves";
+import HeroWaves from "./(main)/homepage/sections/Hero/HeroWaves";
 import Footer from "./components/shared/Footer/footer";
 import Image from "next/image";
 import Link from "next/link";

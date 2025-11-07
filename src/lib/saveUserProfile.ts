@@ -1,4 +1,5 @@
 import { getAuth } from "firebase/auth";
+import apiClient from "./apiClient";
 import type { UserRow, UserUpsertPayload } from "../types/db";
 
 export async function saveUserProfile(
@@ -7,21 +8,13 @@ export async function saveUserProfile(
   const auth = getAuth();
   const user = auth.currentUser;
   if (!user) throw new Error("Not authenticated");
-  const idToken = await user.getIdToken(true);
+  await user.getIdToken(true); // ensure token is fresh (apiClient will fetch again if needed)
 
-  let res: Response;
-  try {
-    res = await fetch("/api/users/upsert", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${idToken}`,
-      },
-      body: JSON.stringify({ profile }),
-    });
-  } catch (e) {
-    throw new Error(`network error: ${String(e ?? "unknown error")}`);
-  }
+  // use apiClient which will attach Authorization header and handle token refresh
+  const res = await apiClient("/api/users/upsert", {
+    method: "POST",
+    body: JSON.stringify({ profile }),
+  });
 
   if (!res.ok) {
     let text = "";

@@ -5,16 +5,21 @@ import ButtonBase from "@mui/material/ButtonBase";
 import Typography from "@mui/material/Typography";
 import Popover from "@mui/material/Popover";
 import Skeleton from "@mui/material/Skeleton";
-import ProfileMenuContent from "./ProfileMenuContent";
+import ProfileMenuContent from "./Profile/ProfileMenuContent";
 import { titleCase } from "../../../lib/stringUtils";
 import { useRouter } from "next/navigation";
 import type { User } from "./types";
-import UserAvatar from "./UserAvatar";
+import UserAvatar from "./Profile/UserAvatar";
 
 type Props = {
   user?: User | null;
   isOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
+  // If provided, the parent fully controls the Popover's anchor element.
+  // Prefer `anchorEl` (an HTMLElement) or `anchorRef` (a ref to an element).
+  // When the parent provides these, this component will not mutate internal anchor state.
+  anchorEl?: HTMLElement | null;
+  anchorRef?: React.RefObject<HTMLElement>;
   onSignOut?: () => Promise<void> | void;
   showDetails?: boolean; // controls whether to show name/role text
 };
@@ -25,28 +30,68 @@ export default function NavbarProfile({
   onOpenChange,
   onSignOut,
   showDetails = true,
+  anchorEl: parentAnchorEl,
+  anchorRef,
 }: Props) {
   const router = useRouter();
   const [anchorEl, setAnchorEl] = React.useState<HTMLElement | null>(null);
-  const open = controlledOpen ?? Boolean(anchorEl);
+  // Determine the effective anchor element. Prefer parent-supplied anchorEl or anchorRef,
+  // otherwise fall back to this component's internal anchor state.
+  const effectiveAnchorEl = parentAnchorEl ?? anchorRef?.current ?? anchorEl;
 
-  const handleToggle = (e: React.MouseEvent<HTMLElement>) => {
-    if (anchorEl) {
-      setAnchorEl(null);
+  // When parent provides controlledOpen, avoid opening the Popover without an anchorEl.
+  // If controlledOpen is undefined, behave uncontrolled and use anchor presence.
+  const open =
+    controlledOpen === undefined
+      ? Boolean(effectiveAnchorEl)
+      : Boolean(controlledOpen && effectiveAnchorEl);
+
+  const popoverId = open ? "profile-popover" : undefined;
+
+  // Stabilize handlers to avoid unnecessary re-renders in parent trees
+  const handleToggle = React.useCallback(
+    (e: React.MouseEvent<HTMLElement>) => {
+      // If parent provided an anchor (anchorEl or anchorRef), don't mutate internal state;
+      // delegate open/close control to the parent via onOpenChange.
+      const parentAnchored = Boolean(parentAnchorEl || anchorRef?.current);
+      if (parentAnchored) {
+        onOpenChange?.(!controlledOpen);
+        return;
+      }
+
+      if (anchorEl) {
+        setAnchorEl(null);
+        onOpenChange?.(false);
+      } else {
+        setAnchorEl(e.currentTarget);
+        onOpenChange?.(true);
+      }
+    },
+    [anchorEl, onOpenChange, parentAnchorEl, anchorRef, controlledOpen]
+  );
+
+  const handleClose = React.useCallback(() => {
+    // If parent controls anchor, ask parent to close; otherwise clear internal state
+    if (parentAnchorEl || anchorRef?.current) {
       onOpenChange?.(false);
-    } else {
-      setAnchorEl(e.currentTarget);
-      onOpenChange?.(true);
+      return;
     }
-  };
-  const handleClose = () => {
     setAnchorEl(null);
     onOpenChange?.(false);
-  };
+  }, [onOpenChange, parentAnchorEl, anchorRef]);
 
-  const displayName = titleCase(user?.name ?? "Guest") ?? "Guest";
+  const displayName = React.useMemo(
+    () => titleCase(user?.name ?? "Guest") ?? "Guest",
+    [user?.name]
+  );
   // prefer explicit accountType returned from DB; fall back to role for compatibility
-  const displayRole = (user as any)?.accountType ?? user?.role ?? "Free"; // default to Free for accounts without explicit accountType
+  const displayRole = React.useMemo(
+    () => user?.accountType ?? user?.role ?? "Free",
+    [user?.accountType, user?.role]
+  );
+
+  // Treat any falsy avatarUrl (null, undefined, empty string) as "no avatar" to show skeleton
+  const hasAvatar = Boolean(user?.avatarUrl);
 
   return (
     <>
@@ -86,23 +131,32 @@ export default function NavbarProfile({
           ))}
 
         {user ? (
-          <ButtonBase
-            onClick={handleToggle}
-            aria-haspopup
-            aria-expanded={open}
-            aria-label="Open profile menu"
-            sx={{ borderRadius: "50%" }}
-          >
-            <UserAvatar user={user} size={36} showRing />
-          </ButtonBase>
+          // If the passed user doesn't yet have an avatarUrl (or it's falsy), show a circular skeleton
+          // to avoid layout shift while the avatar is being resolved.
+          !hasAvatar ? (
+            <Skeleton variant="circular" width={36} height={36} />
+          ) : (
+            <ButtonBase
+              id="profile-button"
+              onClick={handleToggle}
+              aria-haspopup="true"
+              aria-controls={popoverId}
+              aria-expanded={open ? "true" : "false"}
+              aria-label="Open profile menu"
+              sx={{ borderRadius: "50%" }}
+            >
+              <UserAvatar user={user} size={36} showRing />
+            </ButtonBase>
+          )
         ) : (
           <Skeleton variant="circular" width={36} height={36} />
         )}
       </Box>
 
       <Popover
+        id={popoverId}
         open={open}
-        anchorEl={anchorEl}
+        anchorEl={effectiveAnchorEl}
         onClose={handleClose}
         anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
         transformOrigin={{ vertical: "top", horizontal: "right" }}

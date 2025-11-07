@@ -1,41 +1,14 @@
-import TopNavBar from "./components/shared/TopNavBar";
-import SnackbarNotice from "./components/shared/SnackbarNotice";
-import HeroHome from "./homepage/sections/Hero/HeroHome";
-import TopperSection from "./homepage/sections/Toppers/TopperSection";
-import AchievementsSection from "./homepage/sections/Achievements/AchievementsSection";
-import ParentsSection from "./homepage/sections/Parents/ParentsSection";
-import YouTubeSection from "./homepage/sections/Youtube/YouTubeSection";
-import CardCoursesSection from "./homepage/sections/CardCourses/CardCoursesSection";
-import AudiowhatsappSection from "./homepage/sections/Audio&Whatsapp/AudiowhatsappSection";
-import FaqsSection from "./homepage/sections/Faqs/FaqsSection";
-import TeamSection from "./homepage/sections/Team/TeamSection";
-import AdvantagesSection from "./homepage/sections/Advantages/AdvantagesSection";
-import HeroWaves from "./homepage/sections/Hero/HeroWaves";
-import Footer from "./components/shared/Footer/footer";
-import { Suspense } from "react";
+"use client";
 
-export default function Home() {
+import React, { Suspense } from "react";
+import Home from "./(main)/homepage/page";
+import TopNavBar from "./components/shared/TopNavBar";
+
+export default function RootPage() {
   return (
     <Suspense fallback={null}>
-      <div>
-        <TopNavBar />
-        <SnackbarNotice />
-        <HeroHome />
-        <TopperSection />
-        <AchievementsSection />
-        <ParentsSection />
-        <YouTubeSection />
-        <CardCoursesSection />
-        <AudiowhatsappSection />
-        <FaqsSection />
-        <TeamSection />
-        <AdvantagesSection />
-
-        <div style={{ position: "relative" }}>
-          <HeroWaves position="top" bgcolor="#fff" />
-          <Footer />
-        </div>
-      </div>
+      <TopNavBar />
+      <Home />
     </Suspense>
   );
 }

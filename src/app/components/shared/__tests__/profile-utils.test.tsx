@@ -1,5 +1,5 @@
-import { initialsForName } from "../ProfileMenu";
-import useAvatarColor from "../useAvatarColor";
+import { initialsForName } from "../Profile/ProfileMenuContent";
+import useAvatarColor from "../Profile/useAvatarColor";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import React from "react";
 import { renderHook } from "@testing-library/react";

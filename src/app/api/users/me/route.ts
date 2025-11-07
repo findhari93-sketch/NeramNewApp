@@ -4,6 +4,10 @@
 // with a proper authenticated user lookup if you need full functionality.
 import admin from "firebase-admin";
 import supabaseServer from "../../../../lib/supabaseServer";
+import {
+  mapFromUsersDuplicate,
+  type UsersDuplicateRow,
+} from "../../../../lib/userFieldMapping";
 
 // initialize firebase-admin if not already (reuse pattern from upsert)
 if (!admin.apps.length) {
@@ -54,11 +58,11 @@ export async function GET(req: Request) {
     }
 
     const firebaseUid = decoded.uid as string;
-    // lookup by firebase_uid
+    // lookup by firebase_uid in users_duplicate table
     const { data, error } = await supabaseServer
-      .from("users")
+      .from("users_duplicate")
       .select("*")
-      .eq("firebase_uid", firebaseUid)
+      .filter("account->>firebase_uid", "eq", firebaseUid)
       .limit(1)
       .maybeSingle();
     if (error) {
@@ -68,7 +72,13 @@ export async function GET(req: Request) {
         headers: { "Content-Type": "application/json" },
       });
     }
-    return new Response(JSON.stringify({ ok: true, user: data ?? null }), {
+
+    // Map to flat structure for backward compatibility
+    const flatUser = data
+      ? mapFromUsersDuplicate(data as UsersDuplicateRow)
+      : null;
+
+    return new Response(JSON.stringify({ ok: true, user: flatUser }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });

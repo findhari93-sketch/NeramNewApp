@@ -65,11 +65,11 @@ export async function POST(req: Request) {
 
     const { username } = validation.data;
 
-    // Check if username exists (case-insensitive)
+    // Check if username exists (case-insensitive) in users_duplicate
     const { data, error } = await supabaseServer
-      .from("users")
+      .from("users_duplicate")
       .select("id")
-      .ilike("username", username.toLowerCase())
+      .filter("account->>username", "ilike", username.toLowerCase())
       .limit(1)
       .maybeSingle();
 

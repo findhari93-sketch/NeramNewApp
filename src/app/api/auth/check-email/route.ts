@@ -12,9 +12,9 @@ export async function GET(req: Request) {
       );
 
     const { data, error } = await supabaseServer
-      .from("users")
-      .select("providers")
-      .eq("email", email)
+      .from("users_duplicate")
+      .select("account")
+      .filter("contact->>email", "ilike", email)
       .limit(1)
       .maybeSingle();
 
@@ -27,11 +27,10 @@ export async function GET(req: Request) {
     }
     if (!data) return NextResponse.json({ ok: true, providers: [] });
 
-    // providers is stored as jsonb/text in the users table; normalize to string[]
-    const providers = Array.isArray(data.providers)
-      ? data.providers
-      : typeof data.providers === "string" && data.providers
-      ? JSON.parse(data.providers)
+    // providers is stored in account JSONB
+    const account = data.account as any;
+    const providers = Array.isArray(account?.providers)
+      ? account.providers
       : [];
     return NextResponse.json({ ok: true, providers });
   } catch (err) {

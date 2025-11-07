@@ -12,25 +12,17 @@ export async function GET(req: NextRequest) {
     if (!userId)
       return NextResponse.json({ error: "userId required" }, { status: 400 });
 
-    // Try users table first (we store avatar_path in users.avatar_path)
+    // Try users_duplicate table first (avatar_path is in account JSONB)
     const { data: userRow, error: uErr } = await supabaseServer
-      .from("users")
-      .select("avatar_path")
-      .eq("firebase_uid", userId)
+      .from("users_duplicate")
+      .select("account")
+      .filter("account->>firebase_uid", "eq", userId)
       .single();
 
     let avatarPath: string | null = null;
-    if (!uErr && userRow && userRow.avatar_path) {
-      avatarPath = userRow.avatar_path as string;
-    } else {
-      // fallback to legacy `profiles` table for compatibility
-      const { data: profile, error: pErr } = await supabaseServer
-        .from("profiles")
-        .select("avatar_path")
-        .eq("id", userId)
-        .single();
-      if (!pErr && profile && profile.avatar_path)
-        avatarPath = profile.avatar_path;
+    if (!uErr && userRow && userRow.account) {
+      const account = userRow.account as any;
+      avatarPath = account.avatar_path || null;
     }
 
     if (!avatarPath) return new NextResponse(null, { status: 204 });

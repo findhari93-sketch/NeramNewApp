@@ -63,6 +63,10 @@ export const saveApplicationStep = async (
       if (stepData.educationType)
         payload.educationType = stepData.educationType;
 
+      // Persist selectedCourse from education step if provided
+      if (stepData.selectedCourse)
+        payload.selectedCourse = stepData.selectedCourse;
+
       // Promote education fields to top-level columns so future reads reflect latest DB values
       const type = stepData.educationType;
       const form = (stepData.form || {}) as Record<string, unknown>;

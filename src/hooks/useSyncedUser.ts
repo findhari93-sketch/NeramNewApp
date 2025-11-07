@@ -1,5 +1,11 @@
-import { useEffect, useState, useCallback } from "react";
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { supabase } from "../lib/supabase";
+import {
+  mapFromUsersDuplicate,
+  mapToUsersDuplicate,
+  type UsersDuplicateRow,
+} from "../lib/userFieldMapping";
+import apiClient from "../lib/apiClient";
 
 // Define the shape of your user record (customize as needed)
 export interface UserRecord {
@@ -7,13 +13,9 @@ export interface UserRecord {
   [key: string]: any;
 }
 
-const supabase: SupabaseClient = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
-
 export function useSyncedUser(userId: string) {
   const localKey = `user-cache:${userId}`;
+  const resolvedIdRef = useRef<string | null>(null);
   const [user, setUserState] = useState<UserRecord | null>(() => {
     try {
       const raw =
@@ -27,47 +29,93 @@ export function useSyncedUser(userId: string) {
   // Fetch latest user from Supabase on mount
   useEffect(() => {
     let isMounted = true;
+    let activeChannel: any = null;
     async function fetchUser() {
       if (!userId) return;
-      const { data, error } = await supabase
-        .from("users")
-        .select("*")
-        .eq("uuid", userId)
-        .single();
-      if (!error && data && isMounted) {
-        const userData = data as UserRecord;
-        setUserState(userData);
-        localStorage.setItem(localKey, JSON.stringify(userData));
+      const uuidRegex =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      let dbId: string | null = null;
+
+      try {
+        if (uuidRegex.test(userId)) {
+          dbId = userId;
+        } else {
+          // resolve firebase uid to Supabase row
+          try {
+            const flat = await fetchUserByFirebaseUid(userId);
+            if (flat && flat.id) {
+              dbId = flat.id;
+              if (isMounted) {
+                setUserState(flat as UserRecord);
+                localStorage.setItem(localKey, JSON.stringify(flat));
+              }
+            }
+          } catch {
+            // ignore resolution errors and continue; we'll fall back
+          }
+        }
+
+        if (dbId) {
+          resolvedIdRef.current = dbId;
+          const { data, error } = await supabase
+            .from("users_duplicate")
+            .select("*")
+            .eq("id", dbId)
+            .single();
+          if (!error && data && isMounted) {
+            const flatUser = mapFromUsersDuplicate(data as UsersDuplicateRow);
+            setUserState(flatUser as UserRecord);
+            localStorage.setItem(localKey, JSON.stringify(flatUser));
+          }
+        }
+      } catch {
+        // ignore fetch errors
       }
     }
     fetchUser();
 
     // Subscribe to realtime changes
-    const channel = supabase
-      .channel("user-sync")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "users",
-          filter: `uuid=eq.${userId}`,
-        },
-        (payload) => {
-          if (payload.new) {
-            setUserState(payload.new as UserRecord);
-            localStorage.setItem(localKey, JSON.stringify(payload.new));
-          } else if (payload.old) {
-            setUserState(null);
-            localStorage.removeItem(localKey);
-          }
-        }
-      )
-      .subscribe();
+    // subscribe when we have a resolved Supabase id
+    const setupSubscription = async () => {
+      try {
+        const dbId = resolvedIdRef.current;
+        if (!dbId) return;
+        activeChannel = supabase
+          .channel("user-sync")
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema: "public",
+              table: "users_duplicate",
+              filter: `id=eq.${dbId}`,
+            },
+            (payload: any) => {
+              if (payload.new) {
+                const flatUser = mapFromUsersDuplicate(
+                  payload.new as UsersDuplicateRow
+                );
+                setUserState(flatUser as UserRecord);
+                localStorage.setItem(localKey, JSON.stringify(flatUser));
+              } else if (payload.old) {
+                setUserState(null);
+                localStorage.removeItem(localKey);
+              }
+            }
+          )
+          .subscribe();
+      } catch {
+        /* ignore */
+      }
+    };
+
+    // wait a tick to allow fetchUser to resolve and set resolvedIdRef
+    const t = setTimeout(() => void setupSubscription(), 250);
 
     return () => {
       isMounted = false;
-      supabase.removeChannel(channel);
+      clearTimeout(t);
+      if (activeChannel) supabase.removeChannel(activeChannel);
     };
   }, [userId, localKey]);
 
@@ -76,12 +124,54 @@ export function useSyncedUser(userId: string) {
     async (newUser: UserRecord) => {
       setUserState(newUser);
       localStorage.setItem(localKey, JSON.stringify(newUser));
-      if (userId) {
-        await supabase.from("users").update(newUser).eq("uuid", userId);
+      // Prefer updating by resolved Supabase id. If none, fall back to server upsert.
+      const mapped = mapToUsersDuplicate(newUser);
+      const dbId = resolvedIdRef.current;
+      try {
+        if (dbId) {
+          await supabase.from("users_duplicate").update(mapped).eq("id", dbId);
+        } else if (
+          userId &&
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+            userId
+          )
+        ) {
+          // userId looks like a UUID
+          await supabase
+            .from("users_duplicate")
+            .update(mapped)
+            .eq("id", userId);
+        } else {
+          // No Supabase id available — call server upsert which can map firebase_uid -> id
+          await apiClient("/api/users/upsert", {
+            method: "POST",
+            body: JSON.stringify(newUser),
+          });
+        }
+      } catch {
+        // ignore update errors here; callers may handle if needed
       }
     },
     [userId, localKey]
   );
 
   return [user, setUser] as const;
+}
+
+// When reading a user row for a firebase uid, query the users_duplicate table and map grouped jsonb into one object.
+export async function fetchUserByFirebaseUid(firebaseUid: string) {
+  // Query users_duplicate where account->>firebase_uid = firebaseUid
+  const { data, error } = await supabase
+    .from("users_duplicate")
+    .select("*")
+    .filter("account->>firebase_uid", "eq", firebaseUid)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+
+  if (!data) return null;
+
+  // Use mapping helper to convert to flat structure
+  return mapFromUsersDuplicate(data as UsersDuplicateRow);
 }

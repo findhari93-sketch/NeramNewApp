@@ -1,75 +1,24 @@
-export const runtime = "nodejs";
+﻿export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
 import crypto from "crypto";
-import admin from "firebase-admin";
-import supabaseServer from "../../../../../lib/supabaseServer";
+import { createClient } from "@supabase/supabase-js";
+import { verifyPaymentTokenServer } from "@/lib/validatePaymentToken";
 
-// Initialize firebase-admin if needed
-if (!admin.apps.length) {
-  const json = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-  if (json) {
-    try {
-      admin.initializeApp({
-        credential: admin.credential.cert(JSON.parse(json)),
-      });
-    } catch (e) {
-      console.warn("FIREBASE_SERVICE_ACCOUNT_JSON parse error:", e);
-    }
-  } else if (
-    process.env.FIREBASE_PROJECT_ID &&
-    process.env.FIREBASE_CLIENT_EMAIL &&
-    process.env.FIREBASE_PRIVATE_KEY
-  ) {
-    admin.initializeApp({
-      credential: admin.credential.cert({
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: (process.env.FIREBASE_PRIVATE_KEY || "").replace(
-          /\\n/g,
-          "\n"
-        ),
-      }),
-    });
-  }
-}
+const supabase = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 export async function POST(req: Request) {
   try {
-    const allowUnauth = process.env.ALLOW_UNAUTH_RAZORPAY === "true";
-    // Auth
-    let uid: string | null = null;
-    if (!allowUnauth) {
-      const authHeader = req.headers.get("authorization") || "";
-      const idToken = authHeader.startsWith("Bearer ")
-        ? authHeader.split(" ")[1]
-        : "";
-      if (!idToken) {
-        return NextResponse.json(
-          { error: "invalid_token", hint: "Missing Authorization header" },
-          { status: 401 }
-        );
-      }
-      try {
-        const decoded = await admin.auth().verifyIdToken(idToken);
-        uid = decoded.uid;
-      } catch (e: any) {
-        return NextResponse.json(
-          {
-            error: "invalid_token",
-            hint: e?.message || "verifyIdToken failed",
-          },
-          { status: 401 }
-        );
-      }
-    }
-
     const body = await req.json().catch(() => ({}));
     const orderId: string = body?.razorpay_order_id;
     const paymentId: string = body?.razorpay_payment_id;
     const signature: string = body?.razorpay_signature;
-    const amount: number | undefined = body?.amount; // optional, in INR
-    const course: string | undefined = body?.course; // optional course slug/id
+    const token: string | undefined = body?.token;
+    const userIdFromClient: string | undefined = body?.userId;
+
     if (!orderId || !paymentId || !signature) {
       return NextResponse.json(
         { error: "invalid_payload", hint: "Missing Razorpay fields" },
@@ -77,126 +26,180 @@ export async function POST(req: Request) {
       );
     }
 
-    const secret =
-      process.env.RAZORPAY_KEY_SECRET || process.env.NEXT_RAZORPAY_KEY_SECRET;
-    if (!secret) {
+    const keySecret = process.env.RAZORPAY_KEY_SECRET;
+    if (!keySecret) {
+      console.error("[verify] RAZORPAY_KEY_SECRET not configured");
       return NextResponse.json(
-        { error: "server_misconfigured", hint: "Missing Razorpay secret" },
+        { error: "config_error", hint: "Payment verification not configured" },
         { status: 500 }
       );
     }
 
-    // Verify signature
-    const payload = `${orderId}|${paymentId}`;
-    const expected = crypto
-      .createHmac("sha256", secret)
-      .update(payload)
+    const expectedSignature = crypto
+      .createHmac("sha256", keySecret)
+      .update(`${orderId}|${paymentId}`)
       .digest("hex");
-    const verified = expected === signature;
-    if (!verified) {
-      return NextResponse.json({ error: "invalid_signature" }, { status: 400 });
+
+    if (expectedSignature !== signature) {
+      console.error("[verify] Signature mismatch");
+      return NextResponse.json(
+        { error: "invalid_signature", hint: "Payment verification failed" },
+        { status: 400 }
+      );
     }
 
-    // Persist to Supabase users table (merge into application JSON)
-    // We associate by firebase_uid. If unauth dev mode, we skip DB write.
-    if (uid) {
-      const { data: userRow } = await supabaseServer
-        .from("users")
-        .select("id, application, account_type")
-        .eq("firebase_uid", uid)
-        .maybeSingle();
+    console.log("[verify] Signature verified successfully");
 
-      const currentApp = (userRow?.application as any) || {};
-      const payments = Array.isArray(currentApp.payments)
-        ? currentApp.payments
-        : [];
+    let applicationId: string | null = null;
+    let application: any = null;
 
-      // Idempotency: if this paymentId already exists, don't duplicate side effects
-      const already = payments.some((p: any) => p && p.paymentId === paymentId);
+    const { data: appsByOrder, error: orderErr } = await supabase
+      .from("users_duplicate")
+      .select("id, application_details");
 
-      if (!already)
-        payments.push({
-          provider: "razorpay",
-          orderId,
-          paymentId,
-          signature,
-          amount: typeof amount === "number" ? amount : undefined,
-          currency: body?.currency || "INR",
-          status: "verified",
-          course: course || undefined,
-          ts: new Date().toISOString(),
-        });
-
-      // Add simple entitlement/purchase record
-      const purchases = Array.isArray((currentApp as any).purchases)
-        ? (currentApp as any).purchases
-        : [];
-      if (!already) {
-        purchases.push({
-          course: course || "general",
-          paymentId,
-          orderId,
-          amount: typeof amount === "number" ? amount : undefined,
-          granted_at: new Date().toISOString(),
-          provider: "razorpay",
-        });
-      }
-
-      // Elevate account_type to 'premium' but avoid overriding if present
-      const accountTypeUpdate = already ? undefined : ("premium" as any);
-
-      // Minimal invoice record (placeholder for future PDF/email integration)
-      const invoices = Array.isArray((currentApp as any).invoices)
-        ? (currentApp as any).invoices
-        : [];
-      const hasInvoice = invoices.some(
-        (inv: any) => inv && inv.paymentId === paymentId
-      );
-      if (!already && !hasInvoice) {
-        invoices.push({
-          paymentId,
-          orderId,
-          amount: typeof amount === "number" ? amount : undefined,
-          currency: body?.currency || "INR",
-          course: course || undefined,
-          created_at: new Date().toISOString(),
-          // In future: url to uploaded PDF, tax details, etc.
-        });
-      }
-
-      const newApp = { ...currentApp, payments, purchases, invoices };
-      const updatePayload: Record<string, any> = { application: newApp };
-      if (accountTypeUpdate) updatePayload["account_type"] = accountTypeUpdate;
-
-      const { error } = await supabaseServer
-        .from("users")
-        .update(updatePayload)
-        .eq("firebase_uid", uid);
-      if (error) {
-        // Fallback if account_type column doesn't exist: drop it and retry
-        const msg = String(error.message || "").toLowerCase();
-        if (msg.includes("column") && msg.includes("account_type")) {
-          try {
-            const fallbackPayload = { application: newApp } as any;
-            await supabaseServer
-              .from("users")
-              .update(fallbackPayload)
-              .eq("firebase_uid", uid);
-          } catch (e) {
-            // If fallback also fails, let the outer try/catch handle
-            throw e;
-          }
-        } else {
-          throw error;
+    if (!orderErr && appsByOrder) {
+      for (const app of appsByOrder) {
+        const appDetails = app.application_details as any;
+        const finalFee = appDetails?.final_fee_payment || {};
+        if (finalFee.razorpay_order_id === orderId) {
+          applicationId = app.id;
+          application = app;
+          console.log("[verify] Found application by order_id", {
+            id: applicationId,
+          });
+          break;
         }
       }
     }
 
-    return NextResponse.json({ ok: true });
-  } catch (err: any) {
-    console.error("razorpay verify error:", err);
+    if (!applicationId && token) {
+      const validation = await verifyPaymentTokenServer(token);
+      if (validation.ok && validation.payload) {
+        applicationId = validation.payload.userId as string;
+        console.log("[verify] Extracted userId from JWT", {
+          id: applicationId,
+        });
+      }
+    }
+
+    if (!applicationId && userIdFromClient) {
+      applicationId = userIdFromClient;
+      console.log("[verify] Using userId from client", { id: applicationId });
+    }
+
+    if (!applicationId) {
+      console.error("[verify] Could not determine application ID");
+      return NextResponse.json(
+        {
+          error: "application_not_found",
+          hint: "Could not find application for this payment",
+        },
+        { status: 404 }
+      );
+    }
+
+    if (!application) {
+      const { data: app, error: fetchErr } = await supabase
+        .from("users_duplicate")
+        .select("application_details")
+        .eq("id", applicationId)
+        .single();
+
+      if (fetchErr || !app) {
+        console.error("[verify] Failed to fetch application", fetchErr);
+        return NextResponse.json(
+          { error: "application_not_found", hint: "Application not found" },
+          { status: 404 }
+        );
+      }
+      application = app;
+    }
+
+    const appDetails = application.application_details as any;
+    const finalFee = appDetails?.final_fee_payment || {};
+    const paymentHistory = Array.isArray(finalFee.payment_history)
+      ? finalFee.payment_history
+      : [];
+
+    const alreadyProcessed = paymentHistory.some(
+      (entry: any) => entry.paymentId === paymentId
+    );
+
+    if (alreadyProcessed) {
+      console.log("[verify] Payment already processed (idempotent)", {
+        paymentId,
+      });
+      const redirectToken = crypto.randomBytes(32).toString("hex");
+      return NextResponse.json({
+        ok: true,
+        redirectToken,
+        message: "Payment already verified",
+      });
+    }
+
+    const now = new Date().toISOString();
+    const newPaymentHistory = [
+      ...paymentHistory,
+      {
+        event: "payment.verified",
+        paymentId,
+        orderId,
+        amount: finalFee.payable_amount || 0,
+        ts: now,
+        source: "verify",
+      },
+    ];
+
+    const updatedFinalFee = {
+      ...finalFee,
+      token_used: true,
+      payment_status: "paid",
+      payment_at: now,
+      razorpay_payment_id: paymentId,
+      payment_history: newPaymentHistory,
+      last_verify_at: now,
+    };
+
+    const updatedAppDetails = {
+      ...appDetails,
+      final_fee_payment: updatedFinalFee,
+    };
+
+    const { error: updateErr } = await supabase
+      .from("users_duplicate")
+      .update({
+        application_details: updatedAppDetails,
+        updated_at: now,
+      })
+      .eq("id", applicationId);
+
+    if (updateErr) {
+      console.error("[verify] Failed to update payment status", updateErr);
+      return NextResponse.json(
+        { error: "update_failed", hint: "Failed to save payment status" },
+        { status: 500 }
+      );
+    }
+
+    console.log("[verify] Payment verified and saved successfully");
+
+    const redirectToken = crypto.randomBytes(32).toString("hex");
+
+    return NextResponse.json({
+      ok: true,
+      redirectToken,
+      message: "Payment verified successfully",
+    });
+  } catch (error) {
+    console.error("[verify] Unexpected error:", error);
     return NextResponse.json(
-      { error: "verify_failed", hint: err?.message || String(err) },
+      {
+        error: "internal_error",
+        hint:
+          error instanceof Error
+            ? error.message
+            : "Payment verification failed",
+      },
       { status: 500 }
     );
   }

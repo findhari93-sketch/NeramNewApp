@@ -7,6 +7,7 @@ import Toolbar from "@mui/material/Toolbar";
 import IconButton from "@mui/material/IconButton";
 import Button from "@mui/material/Button";
 import MenuIcon from "@mui/icons-material/Menu";
+import CloseIcon from "@mui/icons-material/Close";
 import LoginRounded from "@mui/icons-material/LoginRounded";
 import Box from "@mui/material/Box";
 import Drawer from "@mui/material/Drawer";
@@ -18,12 +19,21 @@ import Typography from "@mui/material/Typography";
 import Breadcrumbs from "@mui/material/Breadcrumbs";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import NavbarProfile from "./NavbarProfile";
 import { titleCase } from "../../../lib/stringUtils";
 import { NeramLogo, MobileLogo } from "./NeramLogo/NeramLogo";
 import { signOut } from "firebase/auth";
 import NavLinkText from "./NavLinkText";
+
+// Menu items are static; keep at module scope to avoid re-creating on each render
+const MENU_ITEMS: Array<{ label: string; href: string; badge?: string }> = [
+  { label: "Materials", href: "/materials", badge: "Free" },
+  { label: "NATA", href: "/applicationform", badge: "Syllabus" },
+  { label: "JEE B.Arch", href: "/about", badge: "Paper 2" },
+  { label: "Alumni", href: "/alumni", badge: "Neram Nata" },
+  { label: "Contact", href: "/contact", badge: "Office" },
+];
 
 type TopNavBarProps = {
   // Controls initial background behavior:
@@ -97,15 +107,64 @@ export default function TopNavBar({
   // Track small-screen state on client only to avoid SSR `window` access
   const [isSmall, setIsSmall] = React.useState(false);
   const pathname = usePathname();
+  const router = useRouter();
+  const handleCloseDrawer = React.useCallback(() => setOpen(false), []);
+  const openDrawer = React.useCallback(() => setOpen(true), []);
 
-  type NavItem = { label: string; href: string; badge?: string };
-  const menuItems: NavItem[] = [
-    { label: "Materials", href: "/freebooks", badge: "Free" },
-    { label: "NATA", href: "/applicationform", badge: "Syllabus" },
-    { label: "JEE B.arch", href: "/about", badge: "Paper 2" },
-    { label: "Allumnus", href: "/contact", badge: "Neram Nata" },
-    { label: "Contact", href: "/materials", badge: "Office" },
-  ];
+  // Extract titleBar pieces for memoization/hooks below
+  const tbTitle = titleBar?.title;
+  const tbBreadcrumbs = titleBar?.breadcrumbs;
+  const tbAutoBreadcrumbs = titleBar?.autoBreadcrumbs;
+  const tbSegmentLabelMap = titleBar?.segmentLabelMap;
+  const tbShowBreadcrumbs = titleBar?.showBreadcrumbs ?? true;
+  const tbActions = React.useMemo(
+    () => titleBar?.actions ?? [],
+    [titleBar?.actions]
+  );
+  const tbShowBackButton = titleBar?.showBackButton ?? true;
+  const tbOnBack = titleBar?.onBack;
+
+  // Memoize computed breadcrumbs and action slices at component level
+  const computedCrumbs = React.useMemo(() => {
+    try {
+      const list: Array<{ label: string; href?: string }> = [];
+      // Always show Home
+      list.push({ label: "Home", href: "/" });
+      if (!pathname || pathname === "/") return list;
+      const parts = pathname.split("/").filter(Boolean).slice(0, 6); // cap length
+      let acc = "";
+      parts.forEach((seg, idx) => {
+        acc += "/" + seg;
+        const isIdLike = /^(?:[0-9a-fA-F-]{8,}|\[.*\]|id|\d+)$/.test(seg);
+        if (isIdLike) return;
+        const normalized = seg;
+        const label =
+          (tbSegmentLabelMap && tbSegmentLabelMap[normalized]) ||
+          normalized
+            .replace(/[-_]/g, " ")
+            .replace(/\b\w/g, (m) => m.toUpperCase());
+        list.push({ label, href: idx < parts.length - 1 ? acc : undefined });
+      });
+      if (tbTitle && list.length > 0) {
+        list[list.length - 1] = { label: tbTitle, href: undefined };
+      }
+      return list;
+    } catch {
+      return (tbBreadcrumbs as Array<{ label: string; href?: string }>) || [];
+    }
+  }, [pathname, tbTitle, tbSegmentLabelMap, tbBreadcrumbs]);
+
+  const visibleLimit = isSmall ? 1 : 2;
+  const visibleActions = React.useMemo(
+    () => tbActions.slice(0, visibleLimit),
+    [tbActions, visibleLimit]
+  );
+  const overflowActions = React.useMemo(
+    () => tbActions.slice(visibleLimit),
+    [tbActions, visibleLimit]
+  );
+
+  // menuItems moved to module-scope as MENU_ITEMS
 
   React.useEffect(() => {
     // Fast path: if we already have a current user, set state immediately (before waiting for auth events)
@@ -202,11 +261,11 @@ export default function TopNavBar({
       })();
     });
     // listen for in-page avatar updates (dispatched by profile upload flow)
-    const onAvatarUpdated = (ev: Event) => {
+    const onAvatarUpdated = (
+      ev: CustomEvent<{ uid?: string; photo?: string }>
+    ) => {
       try {
-        const detail = (ev as CustomEvent).detail as
-          | { uid?: string; photo?: string }
-          | undefined;
+        const detail = ev?.detail;
         const curUid = (auth.currentUser as any)?.uid;
         if (!detail || !detail.photo) return;
         if (detail.uid && curUid && detail.uid !== curUid) return;
@@ -278,48 +337,14 @@ export default function TopNavBar({
 
   const renderTitleBar = () => {
     if (!titleBar || titleBar.visible === false) return null;
-    const {
-      title,
-      breadcrumbs,
-      autoBreadcrumbs,
-      segmentLabelMap,
-      showBreadcrumbs = true,
-      actions = [],
-      showBackButton = true,
-      onBack,
-    } = titleBar;
-    // Build breadcrumbs automatically from the current pathname if requested or when none provided
-    const computedCrumbs: Array<{ label: string; href?: string }> = (() => {
-      try {
-        const list: Array<{ label: string; href?: string }> = [];
-        // Always show Home
-        list.push({ label: "Home", href: "/" });
-        if (!pathname || pathname === "/") return list;
-        const parts = pathname.split("/").filter(Boolean).slice(0, 6); // cap length to avoid overly long crumbs
-        let acc = "";
-        parts.forEach((seg, idx) => {
-          acc += "/" + seg;
-          // Hide obvious dynamic IDs and common technical segments
-          const isIdLike = /^(?:[0-9a-fA-F-]{8,}|\[.*\]|id|\d+)$/.test(seg);
-          if (isIdLike) return;
-          const label =
-            (segmentLabelMap && segmentLabelMap[seg]) ||
-            seg.replace(/[-_]/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
-          list.push({ label, href: idx < parts.length - 1 ? acc : undefined });
-        });
-        // Prefer the provided page title as final crumb label if available
-        if (title && list.length > 0) {
-          list[list.length - 1] = { label: title, href: undefined };
-        }
-        return list;
-      } catch {
-        return (breadcrumbs as Array<{ label: string; href?: string }>) || [];
-      }
-    })();
-    // use isSmall state set on the client by the effect above
-    const visibleLimit = isSmall ? 1 : 2;
-    const visibleActions = actions.slice(0, visibleLimit);
-    const overflowActions = actions.slice(visibleLimit);
+    // use tb* memoized values computed at component level
+    const title = tbTitle;
+    const breadcrumbs = tbBreadcrumbs;
+    const autoBreadcrumbs = tbAutoBreadcrumbs;
+    const showBreadcrumbs = tbShowBreadcrumbs;
+
+    const showBackButton = tbShowBackButton;
+    const onBack = tbOnBack;
 
     return (
       <Box
@@ -341,7 +366,7 @@ export default function TopNavBar({
         >
           {showBackButton && (
             <IconButton
-              onClick={() => (onBack ? onBack() : window.history.back())}
+              onClick={() => (onBack ? onBack() : router.back())}
               aria-label="back"
               size="large"
             >
@@ -374,7 +399,8 @@ export default function TopNavBar({
           </Typography>
           {showBreadcrumbs && (
             <Breadcrumbs
-              aria-label="breadcrumb"
+              role="navigation"
+              aria-label="Main breadcrumb"
               separator="›"
               sx={{
                 fontSize: { xs: "10px", sm: `${TB_BC_FONT}px` },
@@ -385,8 +411,9 @@ export default function TopNavBar({
               {(autoBreadcrumbs || !breadcrumbs || breadcrumbs.length === 0
                 ? computedCrumbs
                 : breadcrumbs
-              ).map((c, idx) =>
-                c.href ? (
+              ).map((c, idx, arr) => {
+                const isLast = idx === arr.length - 1;
+                return c.href ? (
                   <Link
                     key={idx}
                     href={c.href}
@@ -402,12 +429,13 @@ export default function TopNavBar({
                     key={idx}
                     component="span"
                     variant="inherit"
+                    aria-current={isLast ? "page" : undefined}
                     sx={{ fontSize: "inherit", color: "inherit" }}
                   >
                     {c.label}
                   </Typography>
-                )
-              )}
+                );
+              })}
             </Breadcrumbs>
           )}
         </Box>
@@ -452,6 +480,7 @@ export default function TopNavBar({
   return (
     <>
       <AppBar
+        aria-label="Top navigation"
         position="fixed"
         elevation={0}
         color="transparent"
@@ -473,13 +502,14 @@ export default function TopNavBar({
                 display: { xs: "inline-flex", md: "none" },
                 color: "#fff",
               }}
-              onClick={() => setOpen(true)}
+              onClick={openDrawer}
             >
               <MenuIcon />
             </IconButton>
 
             <Link
               href="/"
+              aria-label="Neram home"
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -498,28 +528,41 @@ export default function TopNavBar({
           <Box
             sx={{ display: { xs: "none", md: "flex" }, alignItems: "center" }}
           >
-            {menuItems.map((m, idx) => (
-              <React.Fragment key={m.href}>
-                <Link href={m.href} style={{ textDecoration: "none" }}>
-                  <Button>
-                    <NavLinkText primary={m.label} badge={m.badge ?? null} />
-                  </Button>
-                </Link>
-                {idx < menuItems.length - 1 ? (
-                  <Box
-                    aria-hidden
-                    sx={{
-                      width: "2px",
-                      height: "25px",
-                      mx: 1,
-                      bgcolor: "rgba(255,255,255,0.15)",
-                      borderRadius: 0.5,
-                      alignSelf: "center",
-                    }}
-                  />
-                ) : null}
-              </React.Fragment>
-            ))}
+            {MENU_ITEMS.map((m, idx) => {
+              const isActive =
+                !!pathname &&
+                (pathname === m.href || pathname.startsWith(m.href + "/"));
+              return (
+                <React.Fragment key={m.href}>
+                  <Link href={m.href} style={{ textDecoration: "none" }}>
+                    <Button
+                      aria-current={isActive ? "page" : undefined}
+                      aria-label={m.label}
+                      sx={
+                        isActive
+                          ? { fontWeight: 600, textDecoration: "underline" }
+                          : undefined
+                      }
+                    >
+                      <NavLinkText primary={m.label} badge={m.badge ?? null} />
+                    </Button>
+                  </Link>
+                  {idx < MENU_ITEMS.length - 1 ? (
+                    <Box
+                      aria-hidden
+                      sx={{
+                        width: "2px",
+                        height: "25px",
+                        mx: 1,
+                        bgcolor: "rgba(255,255,255,0.15)",
+                        borderRadius: 0.5,
+                        alignSelf: "center",
+                      }}
+                    />
+                  ) : null}
+                </React.Fragment>
+              );
+            })}
           </Box>
 
           <Box>
@@ -570,11 +613,11 @@ export default function TopNavBar({
           </Box>
         </Toolbar>
         {/* Render the TitleBar inside the AppBar so it is attached to the bottom
-            of the AppBar and not visually hidden behind it. */}
+      of the AppBar and not visually hidden behind it. */}
         {renderTitleBar()}
       </AppBar>
 
-      <Drawer open={open} onClose={() => setOpen(false)}>
+      <Drawer open={open} onClose={handleCloseDrawer} role="presentation">
         <Box
           sx={(theme) => ({
             width: 260,
@@ -594,28 +637,58 @@ export default function TopNavBar({
               borderBottom: "1px solid rgba(255,255,255,0.15)",
             }}
           >
-            <Link
-              href="/"
-              style={{ textDecoration: "none" }}
-              onClick={() => setOpen(false)}
+            <Box
+              sx={{
+                display: "flex",
+                width: "100%",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
             >
-              <NeramLogo sx={{ height: 28 }} />
-            </Link>
+              <Link
+                href="/"
+                style={{ textDecoration: "none" }}
+                onClick={handleCloseDrawer}
+              >
+                <NeramLogo sx={{ height: 28 }} />
+              </Link>
+              <IconButton
+                aria-label="close menu"
+                onClick={handleCloseDrawer}
+                sx={{ color: "white" }}
+                autoFocus
+              >
+                <CloseIcon />
+              </IconButton>
+            </Box>
           </Box>
 
           <List>
-            {menuItems.map((m) => (
-              <ListItem key={m.href} disablePadding>
-                <Link
-                  href={m.href}
-                  style={{ textDecoration: "none", width: "100%" }}
-                >
-                  <ListItemButton onClick={() => setOpen(false)}>
-                    <NavLinkText primary={m.label} badge={m.badge ?? null} />
-                  </ListItemButton>
-                </Link>
-              </ListItem>
-            ))}
+            {MENU_ITEMS.map((m) => {
+              const isActive =
+                !!pathname &&
+                (pathname === m.href || pathname.startsWith(m.href + "/"));
+              return (
+                <ListItem key={m.href} disablePadding>
+                  <Link
+                    href={m.href}
+                    style={{ textDecoration: "none", width: "100%" }}
+                  >
+                    <ListItemButton
+                      onClick={handleCloseDrawer}
+                      aria-current={isActive ? "page" : undefined}
+                      sx={
+                        isActive
+                          ? { fontWeight: 600, textDecoration: "underline" }
+                          : undefined
+                      }
+                    >
+                      <NavLinkText primary={m.label} badge={m.badge ?? null} />
+                    </ListItemButton>
+                  </Link>
+                </ListItem>
+              );
+            })}
           </List>
           <Divider
             orientation="vertical"
@@ -663,7 +736,6 @@ export default function TopNavBar({
           </Box>
         </Box>
       </Drawer>
-      {renderTitleBar()}
     </>
   );
 }

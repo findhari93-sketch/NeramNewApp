@@ -10,9 +10,7 @@ import {
   RecaptchaVerifier,
   signInWithPhoneNumber,
   linkWithPhoneNumber,
-  signInWithRedirect,
   type ConfirmationResult,
-  PhoneAuthProvider,
 } from "firebase/auth";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -20,6 +18,7 @@ import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import IconButton from "@mui/material/IconButton";
 import EditIcon from "@mui/icons-material/Edit";
+import CircularProgress from "@mui/material/CircularProgress";
 
 const PHONE_KEY = "phone_verified";
 // reCAPTCHA Enterprise site key — prefer Vite env var VITE_RECAPTCHA_ENTERPRISE_SITE_KEY.
@@ -99,6 +98,26 @@ export default function PhoneAuth({
   const [error, setError] = useState("");
   const [popupBlocked, setPopupBlocked] = useState(false);
 
+  // Refs & helpers for OTP inputs focus management (avoid getElementById)
+  const otpRefs = useRef<Array<HTMLInputElement | null>>([]);
+
+  // Throttle/resend cooldown to avoid spamming sendOtp
+  const [resendCooldown, setResendCooldown] = useState<number>(0);
+  const lastSentAtRef = useRef<number | null>(null);
+
+  // Abort controller for server upsert in verifyOtp
+  const upsertControllerRef = useRef<AbortController | null>(null);
+
+  // Abort any pending upsert when component unmounts
+  useEffect(() => {
+    return () => {
+      try {
+        upsertControllerRef.current?.abort();
+      } catch {}
+      upsertControllerRef.current = null;
+    };
+  }, []);
+
   // Keep a single verifier instance for the component lifetime.
   const verifierRef = useRef<RecaptchaVerifier | null>(null);
   const renderPromiseRef = useRef<Promise<number | void> | null>(null);
@@ -117,6 +136,13 @@ export default function PhoneAuth({
       } catch {}
     }
   }, [initialPhone]);
+
+  // autofocus first OTP input when entering otp step
+  useEffect(() => {
+    if (step === "otp") {
+      setTimeout(() => otpRefs.current[0]?.focus(), 0);
+    }
+  }, [step]);
 
   // Ensure the verifier exists and has finished rendering before use.
   const ensureVerifier = async (): Promise<RecaptchaVerifier> => {
@@ -159,6 +185,21 @@ export default function PhoneAuth({
     return verifierRef.current!;
   };
 
+  // Countdown timer for resendCooldown
+  useEffect(() => {
+    if (!resendCooldown) return;
+    const t = setInterval(() => {
+      setResendCooldown((s) => {
+        if (s <= 1) {
+          clearInterval(t);
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [resendCooldown]);
+
   // If the verifier gets into a bad state, clear and recreate it.
   const resetVerifier = () => {
     try {
@@ -170,6 +211,18 @@ export default function PhoneAuth({
     renderPromiseRef.current = null;
   };
 
+  // Ensure verifier is cleaned up when the component unmounts to avoid leaked
+  // recaptcha UI or handlers. This mirrors `resetVerifier` but is defensive.
+  useEffect(() => {
+    return () => {
+      try {
+        verifierRef.current?.clear?.();
+      } catch {}
+      verifierRef.current = null;
+      renderPromiseRef.current = null;
+    };
+  }, []);
+
   const normalizeE164 = (v: string) =>
     v.startsWith("+") ? v.replace(/[^\d+]/g, "") : `+${v.replace(/\D/g, "")}`;
 
@@ -178,6 +231,14 @@ export default function PhoneAuth({
     setLoading(true);
     setPopupBlocked(false);
     try {
+      // Throttle repeated sends (30s)
+      if (
+        lastSentAtRef.current &&
+        Date.now() - lastSentAtRef.current < 30_000
+      ) {
+        setError("Please wait a moment before requesting another code.");
+        return;
+      }
       const num = normalizeE164(phone);
       if (!num || num.length < 8)
         throw new Error("Enter a valid phone number.");
@@ -202,6 +263,9 @@ export default function PhoneAuth({
           }
           setConfirmation(c);
           setStep("otp");
+          // start resend cooldown to avoid spam
+          lastSentAtRef.current = Date.now();
+          setResendCooldown(30);
           setLoading(false);
           return;
         } catch (err) {
@@ -214,38 +278,20 @@ export default function PhoneAuth({
 
       // Try to send; if verifier is in a destroyed state, recreate and retry once.
       try {
-        // Detect popup block by catching DOMException or window.open failure
-        let popupBlockedDetected = false;
-        const origWindowOpen = window.open;
-        window.open = function (...args) {
-          const win = origWindowOpen.apply(window, args);
-          if (!win || win.closed || typeof win.closed === "undefined") {
-            popupBlockedDetected = true;
-          }
-          return win;
-        };
-        try {
-          const current = auth.currentUser;
-          let c;
-          if (current) {
-            c = await linkWithPhoneNumber(current, num, verifier);
-          } else {
-            c = await signInWithPhoneNumber(auth, num, verifier);
-          }
-          if (popupBlockedDetected) {
-            setPopupBlocked(true);
-            setError(
-              "Popup blocked. Please allow popups or use the fallback below."
-            );
-            return;
-          }
-          setConfirmation(c);
-          setStep("otp");
-        } finally {
-          window.open = origWindowOpen;
+        const current = auth.currentUser;
+        let c;
+        if (current) {
+          c = await linkWithPhoneNumber(current, num, verifier);
+        } else {
+          c = await signInWithPhoneNumber(auth, num, verifier);
         }
+        setConfirmation(c);
+        setStep("otp");
+        lastSentAtRef.current = Date.now();
+        setResendCooldown(30);
       } catch (e) {
         const s = String(e);
+        // If verifier was destroyed, recreate and retry once
         if (s.includes("assertNotDestroyed") || s.includes("_reset")) {
           resetVerifier();
           const v2 = await ensureVerifier();
@@ -262,6 +308,7 @@ export default function PhoneAuth({
           s.toLowerCase().includes("popup") ||
           s.toLowerCase().includes("blocked")
         ) {
+          // Popup was blocked — tell the user and show fallback
           setPopupBlocked(true);
           setError(
             "Popup blocked. Please allow popups or use the fallback below."
@@ -289,7 +336,11 @@ export default function PhoneAuth({
       await confirmation.confirm(otp);
 
       const stored = normalizeE164(phone);
-      localStorage.setItem(PHONE_KEY, stored);
+      // Store a short-term UI hint locally but do not treat this as the
+      // authoritative source of truth — server-side DB is the source of truth.
+      try {
+        localStorage.setItem(PHONE_KEY, stored);
+      } catch {}
       // notify parent that verification succeeded
       try {
         onVerified?.(stored);
@@ -303,6 +354,8 @@ export default function PhoneAuth({
         const current = auth.currentUser;
         if (current) {
           const idToken = await current.getIdToken();
+          // use an AbortController so this request can be cancelled if needed
+          upsertControllerRef.current = new AbortController();
           await fetch("/api/users/upsert", {
             method: "POST",
             headers: {
@@ -316,12 +369,27 @@ export default function PhoneAuth({
               displayName: current.displayName || undefined,
               profile: { photoURL: current.photoURL },
             }),
+            signal: upsertControllerRef.current.signal,
           });
+
+          // re-fetch server session so server-side guards pick up the new phone
+          try {
+            await fetch("/api/session", {
+              headers: { Authorization: `Bearer ${idToken}` },
+            });
+          } catch {
+            // non-fatal
+          }
+          upsertControllerRef.current = null;
         }
-        // Also persist the phone into profile for completeness
+        // Also persist the phone into profile for completeness (client helper)
         await saveUserProfile({ phone: stored });
       } catch (persistErr) {
-        console.warn("Server upsert failed:", persistErr);
+        if ((persistErr as any)?.name === "AbortError") {
+          // aborted — treat as non-fatal
+        } else {
+          console.warn("Server upsert failed:", persistErr);
+        }
         // Non-fatal: the user is verified; allow proceeding. The next profile save will retry.
       }
     } catch (e) {
@@ -390,7 +458,12 @@ export default function PhoneAuth({
                   : `+${dial}${digits}`;
               setPhone(full);
             }}
-            inputProps={{ name: "phone", required: true, autoFocus: true }}
+            inputProps={{
+              name: "phone",
+              required: true,
+              autoFocus: true,
+              "aria-label": "Phone number",
+            }}
             inputStyle={{
               width: "100%",
               padding: 10,
@@ -405,9 +478,10 @@ export default function PhoneAuth({
             fullWidth
             onClick={sendOtp}
             disabled={loading || !phone}
+            startIcon={loading ? <CircularProgress size={16} /> : undefined}
             sx={{ py: 1.25 }}
           >
-            {loading ? "Sending..." : "Send OTP"}
+            Send OTP
           </Button>
 
           {/* Fallback for popup blocked */}
@@ -427,9 +501,13 @@ export default function PhoneAuth({
                     const num = normalizeE164(phone);
                     if (!num || num.length < 8)
                       throw new Error("Enter a valid phone number.");
-                    // Use signInWithRedirect as fallback
-                    const provider = new PhoneAuthProvider(auth);
-                    await signInWithRedirect(auth, provider);
+                    // signInWithRedirect is not a supported fallback for
+                    // PhoneAuthProvider (it expects OAuth providers).
+                    // Show a clear instruction to the user instead of
+                    // attempting an unsupported redirect.
+                    setError(
+                      "Popup blocked. Please allow popups in your browser or try verifying from a different device/browser."
+                    );
                   } catch (e) {
                     setError(getErrorMessage(e));
                   } finally {
@@ -458,24 +536,36 @@ export default function PhoneAuth({
             {[0, 1, 2, 3, 4, 5].map((i) => (
               <TextField
                 key={i}
-                id={`otp-box-${i}`}
+                inputRef={(el: HTMLInputElement | null) => {
+                  otpRefs.current[i] = el;
+                }}
                 inputProps={{
                   inputMode: "numeric",
                   maxLength: 1,
                   style: { textAlign: "center", color: "#fff" },
+                  "aria-label": `OTP digit ${i + 1}`,
                 }}
                 value={otp[i] || ""}
                 onChange={(e) => {
                   const val = e.target.value.replace(/\D/g, "");
-                  if (!val) return;
                   const next = otp.split("");
-                  next[i] = val;
+                  next[i] = val || "";
                   const joined = next.join("").slice(0, 6);
                   setOtp(joined);
-                  const nextEl = document.getElementById(
-                    `otp-box-${i + 1}`
-                  ) as HTMLInputElement | null;
-                  if (nextEl && val) nextEl.focus();
+                  // focus next only when we actually received a digit
+                  if (val) otpRefs.current[i + 1]?.focus();
+                }}
+                onPaste={(e: React.ClipboardEvent<HTMLInputElement>) => {
+                  try {
+                    const pasted = e.clipboardData?.getData("text") || "";
+                    const digits = pasted.replace(/\D/g, "").slice(0, 6);
+                    if (digits.length === 6) {
+                      setOtp(digits);
+                      // focus the last box so screen readers know the input completed
+                      setTimeout(() => otpRefs.current[5]?.focus(), 0);
+                      e.preventDefault();
+                    }
+                  } catch {}
                 }}
                 onKeyDown={(e) => {
                   if (e.key === "Backspace") {
@@ -484,45 +574,22 @@ export default function PhoneAuth({
                     if (chars[i]) {
                       chars[i] = "";
                       setOtp(chars.join(""));
-                      if (i > 0) {
-                        (
-                          document.getElementById(
-                            `otp-box-${i - 1}`
-                          ) as HTMLInputElement | null
-                        )?.focus();
-                      } else {
-                        (
-                          document.getElementById(
-                            `otp-box-${i}`
-                          ) as HTMLInputElement | null
-                        )?.focus();
-                      }
+                      if (i > 0) otpRefs.current[i - 1]?.focus();
+                      else otpRefs.current[i]?.focus();
                       return;
                     }
                     if (i > 0) {
                       const prev = i - 1;
                       chars[prev] = "";
                       setOtp(chars.join(""));
-                      (
-                        document.getElementById(
-                          `otp-box-${prev}`
-                        ) as HTMLInputElement | null
-                      )?.focus();
+                      otpRefs.current[prev]?.focus();
                     }
                   } else if (e.key === "ArrowLeft" && i > 0) {
                     e.preventDefault();
-                    (
-                      document.getElementById(
-                        `otp-box-${i - 1}`
-                      ) as HTMLInputElement | null
-                    )?.focus();
+                    otpRefs.current[i - 1]?.focus();
                   } else if (e.key === "ArrowRight" && i < 5) {
                     e.preventDefault();
-                    (
-                      document.getElementById(
-                        `otp-box-${i + 1}`
-                      ) as HTMLInputElement | null
-                    )?.focus();
+                    otpRefs.current[i + 1]?.focus();
                   }
                 }}
                 sx={{
@@ -545,10 +612,45 @@ export default function PhoneAuth({
             fullWidth
             onClick={verifyOtp}
             disabled={loading || otp.length !== 6}
+            startIcon={loading ? <CircularProgress size={16} /> : undefined}
             sx={{ py: 1.25 }}
           >
-            {loading ? "Verifying..." : "Verify OTP"}
+            Verify OTP
           </Button>
+
+          <Box sx={{ display: "flex", gap: 1, mt: 1 }}>
+            <Button
+              variant="text"
+              onClick={async () => {
+                // Resend code (throttled by resendCooldown)
+                if (resendCooldown > 0) return;
+                try {
+                  setError("");
+                  await sendOtp();
+                } catch (e) {
+                  setError(getErrorMessage(e));
+                }
+              }}
+              disabled={resendCooldown > 0 || loading}
+            >
+              {resendCooldown > 0 ? `Resend (${resendCooldown}s)` : "Resend"}
+            </Button>
+            <Button
+              variant="text"
+              onClick={() => {
+                // change number — go back to phone entry
+                try {
+                  resetVerifier();
+                } catch {}
+                setOtp("");
+                setConfirmation(null);
+                setError("");
+                setStep("phone");
+              }}
+            >
+              Change number
+            </Button>
+          </Box>
         </>
       )}
 
