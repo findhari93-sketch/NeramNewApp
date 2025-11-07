@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { decodePaymentToken } from "@/lib/validatePaymentToken";
 import Box from "@mui/material/Box";
@@ -16,7 +16,7 @@ declare global {
   }
 }
 
-export default function PayPage() {
+function PayPageContent() {
   const sp = useSearchParams();
   const router = useRouter();
   const token = sp?.get("v") || "";
@@ -280,5 +280,28 @@ export default function PayPage() {
         </Typography>
       </Paper>
     </Box>
+  );
+}
+
+export default function PayPage() {
+  return (
+    <Suspense
+      fallback={
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            minHeight: "100vh",
+            p: 3,
+          }}
+        >
+          <CircularProgress />
+        </Box>
+      }
+    >
+      <PayPageContent />
+    </Suspense>
   );
 }
