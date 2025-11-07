@@ -1,0 +1,102 @@
+# Settings for Backend (on Cloud Run).
+# See https://firebase.google.com/docs/app-hosting/configure#cloud-run
+runConfig:
+  minInstances: 0
+  # maxInstances: 100
+  # concurrency: 80
+  # cpu: 1
+  # memoryMiB: 512
+
+# Environment variables and secrets.
+# IMPORTANT: This is a TEMPLATE. Replace placeholder values with real credentials
+# and store them securely (CI secrets, secret manager, or local .env files).
+# NEVER commit real credentials to git.
+env:
+  # Firebase
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    value: "your-firebase-api-key"
+    availability: [BUILD, RUNTIME]
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: "your-project.firebaseapp.com"
+    availability: [BUILD, RUNTIME]
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: "your-firebase-project-id"
+    availability: [BUILD, RUNTIME]
+  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    value: "your-project.appspot.com"
+    availability: [BUILD, RUNTIME]
+  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+    value: "your-sender-id"
+    availability: [BUILD, RUNTIME]
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    value: "your-firebase-app-id"
+    availability: [BUILD, RUNTIME]
+  - variable: FIREBASE_SERVICE_ACCOUNT_JSON
+    value: '{"type":"service_account","project_id":"your-project","private_key_id":"...","private_key":"-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n","client_email":"...@....iam.gserviceaccount.com","client_id":"...","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","auth_provider_x509_cert_url":"https://www.googleapis.com/oauth2/v1/certs","client_x509_cert_url":"...","universe_domain":"googleapis.com"}'
+    availability: [BUILD, RUNTIME]
+  - variable: FIREBASE_PROJECT_ID
+    value: "your-firebase-project-id"
+    availability: [BUILD, RUNTIME]
+  - variable: FIREBASE_CLIENT_EMAIL
+    value: "your-service-account@your-project.iam.gserviceaccount.com"
+    availability: [BUILD, RUNTIME]
+  - variable: FIREBASE_PRIVATE_KEY
+    value: "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+    availability: [BUILD, RUNTIME]
+
+  # Supabase
+  - variable: NEXT_PUBLIC_SUPABASE_URL
+    value: "https://your-project-id.supabase.co"
+    availability: [BUILD, RUNTIME]
+  - variable: SUPABASE_URL
+    value: "https://your-project-id.supabase.co"
+    availability: [BUILD, RUNTIME]
+  - variable: NEXT_PUBLIC_SUPABASE_ANON_KEY
+    value: "your-supabase-anon-key"
+    availability: [BUILD, RUNTIME]
+  - variable: SUPABASE_SERVICE_ROLE_KEY
+    value: "your-supabase-service-role-key"
+    availability: [BUILD, RUNTIME]
+
+  # Recaptcha
+  - variable: NEXT_PUBLIC_RECAPTCHA_ENTERPRISE_SITE_KEY
+    value: "your-recaptcha-site-key"
+    availability: [BUILD, RUNTIME]
+
+  # Youtube
+  - variable: NEXT_PUBLIC_YOUTUBE_API_KEY
+    value: "your-youtube-api-key"
+    availability: [BUILD, RUNTIME]
+  - variable: NEXT_PUBLIC_YOUTUBE_CHANNEL_ID
+    value: "your-youtube-channel-id"
+    availability: [BUILD, RUNTIME]
+
+  # Razorpay
+  - variable: NEXT_PUBLIC_RAZORPAY_KEY_ID
+    value: "your-razorpay-key-id"
+    availability: [BUILD, RUNTIME]
+  - variable: RAZORPAY_KEY_ID
+    value: "your-razorpay-key-id"
+    availability: [BUILD, RUNTIME]
+  - variable: RAZORPAY_KEY_SECRET
+    value: "your-razorpay-secret"
+    availability: [BUILD, RUNTIME]
+  - variable: NEXT_PUBLIC_UPI_VPA
+    value: "your-upi-vpa"
+    availability: [BUILD, RUNTIME]
+  - variable: NEXT_RAZORPAY_KEY_SECRET
+    value: "your-razorpay-secret"
+    availability: [BUILD, RUNTIME]
+
+  # Tawk.to
+  - variable: NEXT_PUBLIC_TAWK_PROPERTY_ID
+    value: "your-tawk-property-id"
+    availability: [BUILD, RUNTIME]
+  - variable: NEXT_PUBLIC_TAWK_WIDGET_ID
+    value: "your-tawk-widget-id"
+    availability: [BUILD, RUNTIME]
+
+  # Grant access to secrets in Cloud Secret Manager.
+  # See https://firebase.google.com/docs/app-hosting/configure#secret-parameters
+  # - variable: MY_SECRET
+  #   secret: mySecretRef
