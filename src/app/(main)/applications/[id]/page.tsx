@@ -23,15 +23,21 @@ import {
 } from "@mui/icons-material";
 
 type Props = {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 };
 
 export default function ApplicationDetail({ params }: Props) {
   const [app, setApp] = useState<any>(null);
-  const { id } = params; // params in client page is a plain object
-
+  const [id, setId] = useState<string>("");
   const router = useRouter();
   const [checkingAuth, setCheckingAuth] = useState(true);
+
+  // Unwrap params Promise
+  useEffect(() => {
+    params.then((resolvedParams) => {
+      setId(resolvedParams.id);
+    });
+  }, [params]);
 
   useEffect(() => {
     let mounted = true;
@@ -304,7 +310,7 @@ export default function ApplicationDetail({ params }: Props) {
 
       <MUIGrid container spacing={3}>
         {Object.entries(sections).map(([sectionTitle, items]) => (
-          <MUIGrid item xs={12} md={6} key={`${sectionTitle}`}>
+          <MUIGrid size={{ xs: 12, md: 6 }} key={sectionTitle}>
             <Card
               elevation={0}
               sx={{
