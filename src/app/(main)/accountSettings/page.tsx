@@ -6,9 +6,7 @@ import {
   Box,
   Button,
   Card,
-  CardContent,
   Divider,
-  IconButton,
   List,
   ListItemButton,
   ListItemIcon,
@@ -16,15 +14,12 @@ import {
   Paper,
   Stack,
   Switch,
-  Tab,
-  Tabs,
   TextField,
   Typography,
   useMediaQuery,
   useTheme,
   Snackbar,
   Alert,
-  Skeleton,
   Tooltip,
   Grid,
 } from "@mui/material";
@@ -37,7 +32,6 @@ import {
   CreditCard,
   DeleteOutline,
   CheckCircle,
-  Edit,
   Save,
   History,
   Logout,
@@ -70,7 +64,6 @@ export default function AccountSettingsMUI() {
   const theme = useTheme();
   const mdUp = useMediaQuery(theme.breakpoints.up("md"));
 
-  const [loading] = useState(false);
   const [user, setUser] = useState<User>({
     displayName: "Jane Doe",
     email: "jane.doe@example.com",
@@ -82,13 +75,10 @@ export default function AccountSettingsMUI() {
   });
 
   const [active, setActive] = useState<TabId>("profile");
-  const [editing, setEditing] = useState<Record<string, boolean>>({});
   const [form, setForm] = useState<User>({ ...user });
   const [snack, setSnack] = useState<Snack>(null);
   const [sessionsOpen, setSessionsOpen] = useState(false);
   const [twoFAEnabled, setTwoFAEnabled] = useState(false);
-  const [notifEmail, setNotifEmail] = useState(true);
-  const [notifSms, setNotifSms] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => setForm((f: User) => ({ ...f, ...user })), [user]);
@@ -136,7 +126,6 @@ export default function AccountSettingsMUI() {
       await new Promise((r) => setTimeout(r, 700));
       setUser((u) => ({ ...u, ...form }));
       setSnack({ severity: "success", message: "Profile saved" });
-      setEditing({});
     } catch {
       setSnack({ severity: "error", message: "Save failed" });
     } finally {
@@ -190,7 +179,7 @@ export default function AccountSettingsMUI() {
     <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2 }}>
       <Grid container spacing={3}>
         {/* Left: form (takes 2/3 of the area) */}
-        <Grid item xs={12} md={8}>
+        <Grid size={{ xs: 12, md: 8 }}>
           <Typography variant="h6" gutterBottom>
             Profile
           </Typography>
@@ -234,7 +223,7 @@ export default function AccountSettingsMUI() {
             </Box>
 
             <Grid container spacing={2}>
-              <Grid item xs={12} sm={8}>
+              <Grid size={{ xs: 12, sm: 8 }}>
                 <Box>
                   <Typography variant="caption" color="text.secondary">
                     Email
@@ -252,9 +241,7 @@ export default function AccountSettingsMUI() {
               </Grid>
 
               <Grid
-                item
-                xs={12}
-                sm={4}
+                size={{ xs: 12, sm: 4 }}
                 sx={{ display: "flex", alignItems: "center" }}
               >
                 <Box sx={{ width: "100%", ml: { xs: 0, sm: 1 } }}>
@@ -323,7 +310,7 @@ export default function AccountSettingsMUI() {
         </Grid>
 
         {/* Right: summary card (1/3) */}
-        <Grid item xs={12} md={4}>
+        <Grid size={{ xs: 12, md: 4 }}>
           <Card
             variant="outlined"
             sx={{
@@ -417,7 +404,7 @@ export default function AccountSettingsMUI() {
       </Typography>
 
       <Grid container spacing={2}>
-        <Grid item xs={12} md={6}>
+        <Grid size={{ xs: 12, md: 6 }}>
           <Paper variant="outlined" sx={{ p: 2 }}>
             <Stack
               direction="row"
@@ -450,7 +437,7 @@ export default function AccountSettingsMUI() {
           </Paper>
         </Grid>
 
-        <Grid item xs={12} md={6}>
+        <Grid size={{ xs: 12, md: 6 }}>
           <Paper variant="outlined" sx={{ p: 2 }}>
             <Stack
               direction="row"
@@ -526,7 +513,7 @@ export default function AccountSettingsMUI() {
       <Grid container spacing={3}>
         {/* left nav */}
         {mdUp && (
-          <Grid item md={3}>
+          <Grid size={{ md: 3 }}>
             <Paper
               variant="outlined"
               sx={{ p: 2, position: "sticky", top: 24, borderRadius: 2 }}
@@ -578,7 +565,7 @@ export default function AccountSettingsMUI() {
         )}
 
         {/* content center */}
-        <Grid item xs={12} md={6}>
+        <Grid size={{ xs: 12, md: 6 }}>
           {active === "profile" && renderProfileArea()}
           {active === "security" && renderSecurityCard()}
 
@@ -618,7 +605,7 @@ export default function AccountSettingsMUI() {
 
         {/* right summary column (keeps page balanced) */}
         {mdUp && (
-          <Grid item md={3}>
+          <Grid size={{ md: 3 }}>
             <Box sx={{ position: "sticky", top: 24 }}>
               <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 2 }}>
                 <Typography variant="subtitle2" color="text.secondary">
@@ -678,12 +665,12 @@ export default function AccountSettingsMUI() {
         )}
       </Grid>
 
-      <Snackbar
-        open={!!snack}
-        autoHideDuration={3000}
-        onClose={() => setSnack(null)}
-      >
-        {snack ? (
+      {snack && (
+        <Snackbar
+          open={!!snack}
+          autoHideDuration={3000}
+          onClose={() => setSnack(null)}
+        >
           <Alert
             severity={snack.severity}
             onClose={() => setSnack(null)}
@@ -691,8 +678,8 @@ export default function AccountSettingsMUI() {
           >
             {snack.message}
           </Alert>
-        ) : null}
-      </Snackbar>
+        </Snackbar>
+      )}
     </Box>
   );
 }
