@@ -132,35 +132,3 @@ export async function POST(req: Request) {
     );
   }
 }
-
-/**
- * Utility to generate a payment token (used by other endpoints when sending payment link emails).
- * Export this function for use in other server routes.
- */
-export function generatePaymentToken(
-  firebase_uid: string,
-  amount: number,
-  expiresInMs: number = 24 * 60 * 60 * 1000
-): string {
-  const expiresAt = Date.now() + expiresInMs;
-  const payload = `${firebase_uid}:${amount}:${expiresAt}`;
-  const signature = crypto
-    .createHmac("sha256", TOKEN_SECRET)
-    .update(payload)
-    .digest("hex");
-
-  const tokenPayload: TokenPayload = {
-    firebase_uid,
-    amount,
-    expiresAt,
-    signature,
-  };
-
-  const jsonStr = JSON.stringify(tokenPayload);
-  const base64 = Buffer.from(jsonStr, "utf-8").toString("base64");
-  const base64url = base64
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=/g, "");
-  return base64url;
-}
