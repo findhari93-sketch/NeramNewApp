@@ -84,6 +84,16 @@ export async function GET(req: Request) {
             .maybeSingle();
           userRow = data || null;
         }
+
+        // CRITICAL: Reject deleted users - if user not found in database, return 404
+        // This ensures deleted users are signed out immediately on next session check
+        if (!userRow) {
+          return NextResponse.json(
+            { ok: false, error: "user_not_found" },
+            { status: 404 }
+          );
+        }
+
         return NextResponse.json({ ok: true, user: userRow });
       } catch (e) {
         console.warn("/api/session: token verification failed", e);

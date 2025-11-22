@@ -6,6 +6,9 @@ import {
   type UsersDuplicateRow,
 } from "../lib/userFieldMapping";
 import apiClient from "../lib/apiClient";
+import { auth } from "../lib/firebase";
+import { signOut } from "firebase/auth";
+import { clearAllAuthCaches } from "../lib/clearAuthCache";
 
 // Define the shape of your user record (customize as needed)
 export interface UserRecord {
@@ -62,6 +65,24 @@ export function useSyncedUser(userId: string) {
             .select("*")
             .eq("id", dbId)
             .single();
+
+          // CRITICAL: If user not found (deleted), sign out immediately
+          if (error && error.code === "PGRST116" && isMounted) {
+            console.warn(
+              "[useSyncedUser] User not found in database (deleted), signing out..."
+            );
+            try {
+              await clearAllAuthCaches();
+              await signOut(auth);
+              if (typeof window !== "undefined") {
+                window.location.href = "/auth/login?error=account_deleted";
+              }
+            } catch (e) {
+              console.error("[useSyncedUser] Error during forced logout:", e);
+            }
+            return;
+          }
+
           if (!error && data && isMounted) {
             const flatUser = mapFromUsersDuplicate(data as UsersDuplicateRow);
             setUserState(flatUser as UserRecord);
@@ -90,14 +111,37 @@ export function useSyncedUser(userId: string) {
               table: "users_duplicate",
               filter: `id=eq.${dbId}`,
             },
-            (payload: any) => {
+            async (payload: any) => {
               if (payload.new) {
                 const flatUser = mapFromUsersDuplicate(
                   payload.new as UsersDuplicateRow
                 );
                 setUserState(flatUser as UserRecord);
                 localStorage.setItem(localKey, JSON.stringify(flatUser));
+              } else if (payload.old && payload.eventType === "DELETE") {
+                // CRITICAL: User was deleted from database
+                // Sign out immediately and clear all caches
+                console.warn(
+                  "[useSyncedUser] User deleted from database, signing out..."
+                );
+                setUserState(null);
+                localStorage.removeItem(localKey);
+
+                try {
+                  await clearAllAuthCaches();
+                  await signOut(auth);
+                  // Redirect to login with error message
+                  if (typeof window !== "undefined") {
+                    window.location.href = "/auth/login?error=account_deleted";
+                  }
+                } catch (e) {
+                  console.error(
+                    "[useSyncedUser] Error during forced logout on user deletion:",
+                    e
+                  );
+                }
               } else if (payload.old) {
+                // Handle other cases where payload.old exists but not DELETE
                 setUserState(null);
                 localStorage.removeItem(localKey);
               }

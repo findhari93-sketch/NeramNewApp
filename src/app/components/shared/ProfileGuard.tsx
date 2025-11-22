@@ -2,14 +2,17 @@
 
 import React from "react";
 import { auth } from "../../../lib/firebase";
-import { onAuthStateChanged, type Unsubscribe, type User } from "firebase/auth";
+import { onAuthStateChanged, signOut, type Unsubscribe, type User } from "firebase/auth";
 import GoogleProfileCompletionModal from "./GoogleProfileCompletionModal";
+import { clearAllAuthCaches } from "../../../lib/clearAuthCache";
+import { useRouter } from "next/navigation";
 
 export default function ProfileGuard({
   children,
 }: {
   children: React.ReactNode;
 }): React.ReactElement {
+  const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const [profileInitialPhone, setProfileInitialPhone] = React.useState("");
   const [profileForceComplete, setProfileForceComplete] = React.useState(false);
@@ -90,6 +93,24 @@ export default function ProfileGuard({
             });
             if (!mounted || controller.signal.aborted) return;
             if (!res.ok) {
+              // CRITICAL: If session returns 404, user was deleted from database
+              // Sign out immediately and redirect to login
+              if (res.status === 404) {
+                reportError(
+                  "ProfileGuard: User not found in database (deleted). Signing out.",
+                  { status: res.status },
+                  true
+                );
+                try {
+                  await clearAllAuthCaches();
+                  await signOut(auth);
+                } catch (e) {
+                  console.warn("Error clearing caches during forced logout", e);
+                }
+                router.push("/auth/login?error=user_deleted");
+                return;
+              }
+
               // If the session endpoint failed, increment failure counter and
               // avoid opening the modal when failures exceed the threshold.
               validationFailuresRef.current += 1;
@@ -107,7 +128,7 @@ export default function ProfileGuard({
                     new CustomEvent("neram:toast", {
                       detail: {
                         message:
-                          "We’re having trouble validating your session. Please check your connection and try again.",
+                          "We're having trouble validating your session. Please check your connection and try again.",
                       },
                     })
                   );

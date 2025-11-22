@@ -10,6 +10,7 @@ import Box from "@mui/material/Box";
 import { useRouter } from "next/navigation";
 import { auth } from "../../../lib/firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
+import { clearAllAuthCaches } from "../../../lib/clearAuthCache";
 
 type Props = {
   label?: string | null;
@@ -66,14 +67,22 @@ export default function AccountMenu({ label: initialLabel }: Props) {
 
   const handleLogout = async () => {
     handleClose();
+
+    // CRITICAL: Clear ALL auth caches before signing out
+    // This ensures deleted/logged-out users cannot access cached data
+    try {
+      await clearAllAuthCaches();
+    } catch (e) {
+      console.warn("clearAllAuthCaches error", e);
+    }
+
+    // Sign out from Firebase
     try {
       await signOut(auth);
     } catch (e) {
       console.warn("signOut error", e);
     }
-    try {
-      localStorage.removeItem("phone_verified");
-    } catch {}
+
     router.push("/");
   };
 
