@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import admin from "firebase-admin";
-import { sendEmail } from "../../../../lib/email";
+import { sendMail } from "../../../../lib/email";
 import {
   generateVerificationEmailHTML,
   generateVerificationEmailText,
@@ -125,7 +125,7 @@ export async function POST(req: Request) {
 
     // Send email via Nodemailer
     try {
-      await sendEmail({
+      await sendMail({
         to: email,
         subject: "Verify your email - Neram Classes",
         text: textContent,
