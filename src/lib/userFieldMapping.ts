@@ -181,6 +181,8 @@ export function mapFromUsersDuplicate(
     // Top-level fields
     id: dbRow.id,
     uuid: dbRow.id, // For compatibility with useSyncedUser
+    created_at_tz: dbRow.created_at_tz,
+    createdAt: dbRow.created_at_tz,
     selected_course: dbRow.selected_course,
     selectedCourse: dbRow.selected_course,
     nata_attempt_year: dbRow.nata_attempt_year,
@@ -295,6 +297,8 @@ export function mergeUsersDuplicateUpdate(
 
   return {
     id: existing.id,
+    // CRITICAL: Preserve existing created_at_tz, never overwrite it
+    created_at_tz: existing.created_at_tz,
     selected_course: mapped.selected_course ?? existing.selected_course,
     nata_attempt_year: mapped.nata_attempt_year ?? existing.nata_attempt_year,
     nata_calculator_sessions: {
