@@ -812,16 +812,30 @@ function LoginPageInner() {
             identifier,
             password
           );
+          // Send branded verification email via custom endpoint
           try {
-            const actionCodeSettings = {
-              url: `${
-                window.location.origin
-              }/auth/action?email=${encodeURIComponent(identifier)}`,
-              handleCodeInApp: true,
-            } as const;
-            await sendEmailVerification(cred.user, actionCodeSettings);
+            await fetch("/api/auth/send-verification-email", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ email: identifier }),
+            });
           } catch (ve) {
-            console.warn("sendEmailVerification (sign-up) failed", ve);
+            console.warn("send-verification-email (sign-up) failed", ve);
+            // Fallback to Firebase's default if custom email fails
+            try {
+              const actionCodeSettings = {
+                url: `${
+                  window.location.origin
+                }/auth/action?email=${encodeURIComponent(identifier)}`,
+                handleCodeInApp: true,
+              } as const;
+              await sendEmailVerification(cred.user, actionCodeSettings);
+            } catch (fallbackErr) {
+              console.warn(
+                "Fallback sendEmailVerification also failed",
+                fallbackErr
+              );
+            }
           }
           // Upsert user to Supabase now while we still have a valid user session.
           try {
