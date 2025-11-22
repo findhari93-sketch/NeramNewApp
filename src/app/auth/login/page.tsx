@@ -469,6 +469,14 @@ function LoginPageInner() {
       try {
         const current = auth.currentUser;
         if (current) {
+          // CRITICAL: Only redirect if email is verified
+          // This prevents email signup users from seeing profile before verification
+          if (!current.emailVerified) {
+            // User is logged in but email not verified - do nothing
+            // They'll be signed out by the signup flow
+            return;
+          }
+
           try {
             await current.getIdToken(true);
             if (!mounted) return;
