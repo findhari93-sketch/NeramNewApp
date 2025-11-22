@@ -1,7 +1,7 @@
+"use client";
+
 // app/apply/components/PhoneAuth.tsx
-import { useEffect, useRef, useState } from "react";
-import PhoneInput from "react-phone-input-2";
-import "react-phone-input-2/lib/style.css";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { auth } from "../../../lib/firebase";
 import { friendlyFirebaseError } from "../../../lib/firebaseErrorMessages";
 // client Supabase no longer used for persisting user; we call server upsert instead
@@ -19,27 +19,57 @@ import Typography from "@mui/material/Typography";
 import IconButton from "@mui/material/IconButton";
 import EditIcon from "@mui/icons-material/Edit";
 import CircularProgress from "@mui/material/CircularProgress";
+import Chip from "@mui/material/Chip";
+import InputBase from "@mui/material/InputBase";
+import Menu from "@mui/material/Menu";
+import MenuItem from "@mui/material/MenuItem";
+import Stack from "@mui/material/Stack";
+import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
+import { isValidPhoneNumber } from "libphonenumber-js";
+import type { CountryDialCode } from "../../../lib/countryDialCodes";
+import {
+  COUNTRY_DIAL_CODES,
+  DEFAULT_COUNTRY,
+  findCountryByDialCode,
+} from "../../../lib/countryDialCodes";
 
 const PHONE_KEY = "phone_verified";
-// reCAPTCHA Enterprise site key — prefer Vite env var VITE_RECAPTCHA_ENTERPRISE_SITE_KEY.
-// Keep the original value as a fallback to avoid breaking runtime during migration,
-// but you should place the key in a .env file instead:
-// VITE_RECAPTCHA_ENTERPRISE_SITE_KEY=6LeVyrsrAAAAAEC_QxBB7aA0B4tDADXcWoRq8EFs
+// reCAPTCHA Enterprise site key from environment variable
+// Must be configured in .env.local as NEXT_PUBLIC_RECAPTCHA_ENTERPRISE_SITE_KEY
 const RECAPTCHA_ENTERPRISE_SITE_KEY =
-  process.env.NEXT_PUBLIC_RECAPTCHA_ENTERPRISE_SITE_KEY ||
-  "6LeVyrsrAAAAAEC_QxBB7aA0B4tDADXcWoRq8EFs";
+  process.env.NEXT_PUBLIC_RECAPTCHA_ENTERPRISE_SITE_KEY;
+
+// Timing constants - centralized configuration
+const TIMING = {
+  RESEND_COOLDOWN_SECONDS: 30,
+  OTP_INPUT_FOCUS_DELAY_MS: 0,
+  RECAPTCHA_TIMEOUT_MS: 20000,
+  THROTTLE_WINDOW_MS: 30000,
+  COUNTDOWN_INTERVAL_MS: 1000,
+} as const;
+
+// Type definitions for grecaptcha enterprise
+interface GreCaptchaEnterprise {
+  execute(siteKey: string, options: { action: string }): Promise<string>;
+}
+
+interface WindowWithGreCaptcha extends Window {
+  grecaptcha?: {
+    enterprise?: GreCaptchaEnterprise;
+  };
+}
 
 // Small helper: detect if grecaptcha.enterprise is available
 function hasEnterpriseGreCaptcha(): boolean {
   try {
-    const win = window as unknown as { grecaptcha?: unknown };
+    const win = window as WindowWithGreCaptcha;
     const g = win.grecaptcha;
     if (!g || typeof g !== "object") return false;
-    const enterprise = (g as { enterprise?: unknown }).enterprise;
+    const enterprise = g.enterprise;
     return !!(
       enterprise &&
       typeof enterprise === "object" &&
-      typeof (enterprise as { execute?: unknown }).execute === "function"
+      typeof enterprise.execute === "function"
     );
   } catch {
     return false;
@@ -51,7 +81,8 @@ function createEnterpriseVerifier(action = "submit") {
   return {
     type: "recaptcha",
     async verify() {
-      const g = (window as any).grecaptcha;
+      const win = window as WindowWithGreCaptcha;
+      const g = win.grecaptcha;
       if (!RECAPTCHA_ENTERPRISE_SITE_KEY)
         throw new Error("RECAPTCHA_ENTERPRISE_SITE_KEY is not configured");
       if (!g || !g.enterprise || typeof g.enterprise.execute !== "function")
@@ -61,13 +92,55 @@ function createEnterpriseVerifier(action = "submit") {
         action,
       });
       if (!token) throw new Error("reCAPTCHA enterprise returned no token");
-      return token as string;
+      return token;
     },
     // optional clear noop
     clear() {
       /* no-op */
     },
   } as const;
+}
+
+// Centralized error handler with consistent logging
+function handleError(error: unknown, context: string): string {
+  console.error(`[PhoneAuth:${context}]`, error);
+  console.error(`[PhoneAuth:${context}] Error details:`, {
+    message: error instanceof Error ? error.message : String(error),
+    code: (error as { code?: string })?.code,
+    stack: error instanceof Error ? error.stack : undefined,
+  });
+
+  // Future: Add error tracking integration
+  // if (window.Sentry) {
+  //   Sentry.captureException(error, { tags: { context } });
+  // }
+
+  return getActionableError(error);
+}
+
+// Get actionable, user-friendly error messages
+function getActionableError(err: unknown): string {
+  const code = (err as { code?: string })?.code;
+
+  switch (code) {
+    case "auth/invalid-phone-number":
+      return "Please check your phone number format and try again.";
+    case "auth/too-many-requests":
+      return "Too many attempts. Please wait a few minutes before trying again.";
+    case "auth/quota-exceeded":
+      return "SMS limit reached. Please try again tomorrow or contact support.";
+    case "auth/invalid-verification-code":
+      return "Invalid code. Please check the code and try again.";
+    case "auth/code-expired":
+      return "This code has expired. Please request a new one.";
+    case "auth/phone-number-already-exists":
+      return "This phone number is already registered to another account.";
+    case "auth/captcha-check-failed":
+      return "Security verification failed. Please try again.";
+    default:
+      // Fall back to friendly Firebase error or generic message
+      return friendlyFirebaseError(err);
+  }
 }
 
 function getErrorMessage(err: unknown): string {
@@ -79,6 +152,51 @@ function getErrorMessage(err: unknown): string {
   return "Something went wrong.";
 }
 
+const MAX_E164_DIGITS = 15;
+const MAX_DIAL_DIGITS = 4;
+const GENERIC_ERROR_MESSAGE = "Something went wrong. Please try again.";
+
+const digitsOnly = (value: string) => value.replace(/\D/g, "");
+
+const buildE164 = (dial: string, national: string) => {
+  const sanitizedDial = digitsOnly(dial);
+  const sanitizedNational = digitsOnly(national);
+  if (!sanitizedDial || !sanitizedNational) return "";
+  const combined = `${sanitizedDial}${sanitizedNational}`.slice(
+    0,
+    MAX_E164_DIGITS
+  );
+  return combined ? `+${combined}` : "";
+};
+
+const matchCountryByExactDial = (dial: string): CountryDialCode | null => {
+  const cleaned = digitsOnly(dial);
+  return (
+    COUNTRY_DIAL_CODES.find((country) => country.dialCode === cleaned) || null
+  );
+};
+
+const deriveCountryFromPhone = (value: string) => {
+  const digits = digitsOnly(value);
+  if (!digits) {
+    return {
+      country: DEFAULT_COUNTRY,
+      dial: DEFAULT_COUNTRY.dialCode,
+      national: "",
+    };
+  }
+  const match = findCountryByDialCode(digits) || DEFAULT_COUNTRY;
+  const national = digits.startsWith(match.dialCode)
+    ? digits.slice(match.dialCode.length)
+    : digits;
+  return { country: match, dial: match.dialCode, national };
+};
+
+const resolveFirebaseError = (err: unknown) => {
+  // Use actionable error messages for better UX
+  return getActionableError(err);
+};
+
 export default function PhoneAuth({
   initialPhone,
   onVerified,
@@ -88,7 +206,11 @@ export default function PhoneAuth({
   onVerified?: (phone: string) => void;
   label?: "on" | "off";
 }) {
-  const [phone, setPhone] = useState("");
+  const [dialCode, setDialCode] = useState(DEFAULT_COUNTRY.dialCode);
+  const [nationalNumber, setNationalNumber] = useState("");
+  const [countrySearch, setCountrySearch] = useState("");
+  const [countryMenuAnchor, setCountryMenuAnchor] =
+    useState<null | HTMLElement>(null);
   const [otp, setOtp] = useState("");
   const [step, setStep] = useState<"phone" | "otp" | "done">("phone");
   const [confirmation, setConfirmation] = useState<ConfirmationResult | null>(
@@ -97,50 +219,120 @@ export default function PhoneAuth({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [popupBlocked, setPopupBlocked] = useState(false);
+  const applyPhoneValue = useCallback((value?: string | null) => {
+    const derived = deriveCountryFromPhone(value ?? "");
+    setDialCode(derived.dial);
+    setNationalNumber(derived.national);
+  }, []);
+  const phone = buildE164(dialCode, nationalNumber);
+  const selectedCountry = matchCountryByExactDial(dialCode) || DEFAULT_COUNTRY;
+  const maxNationalDigits = Math.max(
+    0,
+    MAX_E164_DIGITS - digitsOnly(dialCode || DEFAULT_COUNTRY.dialCode).length
+  );
+  const isCountryMenuOpen = Boolean(countryMenuAnchor);
+  const filteredCountries = COUNTRY_DIAL_CODES.filter((country) => {
+    const query = countrySearch.trim().toLowerCase();
+    if (!query) return true;
+    return (
+      country.name.toLowerCase().includes(query) ||
+      country.dialCode.includes(query) ||
+      country.iso2.toLowerCase().includes(query)
+    );
+  });
+  const canSendPhone = Boolean(phone);
+  const closeCountryMenu = () => {
+    setCountryMenuAnchor(null);
+    setCountrySearch("");
+  };
+  const handleCountrySelect = (country: CountryDialCode) => {
+    setDialCode(country.dialCode);
+    closeCountryMenu();
+    setTimeout(() => phoneInputRef.current?.focus(), 0);
+  };
+
+  useEffect(() => {
+    setNationalNumber((prev) => prev.slice(0, maxNationalDigits));
+  }, [maxNationalDigits]);
 
   // Refs & helpers for OTP inputs focus management (avoid getElementById)
+  const dialInputRef = useRef<HTMLInputElement | null>(null);
+  const phoneInputRef = useRef<HTMLInputElement | null>(null);
   const otpRefs = useRef<Array<HTMLInputElement | null>>([]);
 
   // Throttle/resend cooldown to avoid spamming sendOtp
   const [resendCooldown, setResendCooldown] = useState<number>(0);
   const lastSentAtRef = useRef<number | null>(null);
 
-  // Abort controller for server upsert in verifyOtp
+  // Abort controllers for async operations
+  const sendOtpControllerRef = useRef<AbortController | null>(null);
   const upsertControllerRef = useRef<AbortController | null>(null);
-
-  // Abort any pending upsert when component unmounts
-  useEffect(() => {
-    return () => {
-      try {
-        upsertControllerRef.current?.abort();
-      } catch {}
-      upsertControllerRef.current = null;
-    };
-  }, []);
 
   // Keep a single verifier instance for the component lifetime.
   const verifierRef = useRef<RecaptchaVerifier | null>(null);
   const renderPromiseRef = useRef<Promise<number | void> | null>(null);
 
-  // If already verified on this device, skip the flow.
+  // Comprehensive cleanup on unmount to prevent memory leaks
   useEffect(() => {
-    const verified = localStorage.getItem(PHONE_KEY);
-    if (verified) setStep("done");
+    return () => {
+      // Abort all pending async operations
+      try {
+        sendOtpControllerRef.current?.abort();
+        upsertControllerRef.current?.abort();
+      } catch {}
+      sendOtpControllerRef.current = null;
+      upsertControllerRef.current = null;
+
+      // Clear reCAPTCHA verifier
+      try {
+        verifierRef.current?.clear?.();
+      } catch {}
+      verifierRef.current = null;
+      renderPromiseRef.current = null;
+    };
+  }, []);
+
+  // If already verified (check Firebase Auth phone number), skip the flow.
+  useEffect(() => {
+    const currentUser = auth.currentUser;
+    if (currentUser?.phoneNumber) {
+      // User has a verified phone number in Firebase Auth
+      setStep("done");
+      // Sync localStorage as a UI hint only (not source of truth)
+      try {
+        localStorage.setItem(PHONE_KEY, currentUser.phoneNumber);
+      } catch {}
+    }
   }, []);
 
   // If parent supplied an initial phone (for re-verification), prefill it.
   useEffect(() => {
     if (initialPhone) {
       try {
-        setPhone(String(initialPhone));
+        applyPhoneValue(initialPhone);
       } catch {}
     }
-  }, [initialPhone]);
+  }, [initialPhone, applyPhoneValue]);
 
-  // autofocus first OTP input when entering otp step
+  // Autofocus first OTP input and announce step changes for screen readers
   useEffect(() => {
+    const announcer = document.getElementById("phone-auth-announcer");
+
     if (step === "otp") {
-      setTimeout(() => otpRefs.current[0]?.focus(), 0);
+      setTimeout(() => otpRefs.current[0]?.focus(), TIMING.OTP_INPUT_FOCUS_DELAY_MS);
+      // Announce to screen readers
+      if (announcer) {
+        announcer.textContent =
+          "OTP sent successfully. Please enter the 6-digit verification code.";
+      }
+    } else if (step === "done") {
+      if (announcer) {
+        announcer.textContent = "Phone number verified successfully!";
+      }
+    } else if (step === "phone") {
+      if (announcer) {
+        announcer.textContent = "Enter your phone number to continue.";
+      }
     }
   }, [step]);
 
@@ -155,15 +347,13 @@ export default function PhoneAuth({
     if (renderPromiseRef.current) {
       // Avoid hanging forever if the reCAPTCHA script fails to load.
       const rp = renderPromiseRef.current;
-      // Allow more time for the reCAPTCHA script to load on slow networks
-      const timeoutMs = 20000;
       try {
         await Promise.race([
           rp,
           new Promise((_res, rej) =>
             setTimeout(
               () => rej(new Error("reCAPTCHA render timeout")),
-              timeoutMs
+              TIMING.RECAPTCHA_TIMEOUT_MS
             )
           ),
         ]);
@@ -196,7 +386,7 @@ export default function PhoneAuth({
         }
         return s - 1;
       });
-    }, 1000);
+    }, TIMING.COUNTDOWN_INTERVAL_MS);
     return () => clearInterval(t);
   }, [resendCooldown]);
 
@@ -211,37 +401,62 @@ export default function PhoneAuth({
     renderPromiseRef.current = null;
   };
 
-  // Ensure verifier is cleaned up when the component unmounts to avoid leaked
-  // recaptcha UI or handlers. This mirrors `resetVerifier` but is defensive.
-  useEffect(() => {
-    return () => {
-      try {
-        verifierRef.current?.clear?.();
-      } catch {}
-      verifierRef.current = null;
-      renderPromiseRef.current = null;
-    };
-  }, []);
-
   const normalizeE164 = (v: string) =>
     v.startsWith("+") ? v.replace(/[^\d+]/g, "") : `+${v.replace(/\D/g, "")}`;
 
   const sendOtp = async () => {
+    // Create abort controller for this operation
+    const controller = new AbortController();
+    sendOtpControllerRef.current = controller;
+
+    const hadError = Boolean(error);
     setError("");
+    if (hadError) {
+      try {
+        resetVerifier();
+      } catch {}
+    }
     setLoading(true);
     setPopupBlocked(false);
     try {
-      // Throttle repeated sends (30s)
+      // Throttle repeated sends
       if (
         lastSentAtRef.current &&
-        Date.now() - lastSentAtRef.current < 30_000
+        Date.now() - lastSentAtRef.current < TIMING.THROTTLE_WINDOW_MS
       ) {
         setError("Please wait a moment before requesting another code.");
+        setLoading(false);
+        return;
+      }
+      if (!phone) {
+        console.error("[PhoneAuth] Empty phone number", { dialCode, nationalNumber });
+        setError("Enter a valid phone number.");
+        setLoading(false);
         return;
       }
       const num = normalizeE164(phone);
-      if (!num || num.length < 8)
-        throw new Error("Enter a valid phone number.");
+      console.info("[PhoneAuth] sendOtp attempt", {
+        dialCode,
+        nationalNumber,
+        phone,
+        normalized: num,
+        length: num.length,
+      });
+
+      // Validate phone number using libphonenumber-js for accurate international validation
+      try {
+        if (!isValidPhoneNumber(num)) {
+          console.error("[PhoneAuth] Invalid phone number format", { num });
+          setError("Please enter a valid phone number for your country.");
+          setLoading(false);
+          return;
+        }
+      } catch (validationError) {
+        console.error("[PhoneAuth] Phone validation error", { num, error: validationError });
+        setError("Enter a valid phone number.");
+        setLoading(false);
+        return;
+      }
       // Prefer reCAPTCHA Enterprise if available. If it fails, fall back to Firebase RecaptchaVerifier.
       if (hasEnterpriseGreCaptcha()) {
         try {
@@ -261,20 +476,27 @@ export default function PhoneAuth({
               enterpriseVerifier as any
             );
           }
+          // Check if aborted before updating state
+          if (controller.signal.aborted) return;
           setConfirmation(c);
           setStep("otp");
           // start resend cooldown to avoid spam
           lastSentAtRef.current = Date.now();
-          setResendCooldown(30);
+          setResendCooldown(TIMING.RESEND_COOLDOWN_SECONDS);
           setLoading(false);
           return;
         } catch (err) {
+          // Check if aborted
+          if (controller.signal.aborted) return;
           console.warn("Enterprise reCAPTCHA failed, falling back:", err);
         }
       }
 
       // Create/await the Firebase RecaptchaVerifier
       const verifier = await ensureVerifier();
+
+      // Check if aborted after async operation
+      if (controller.signal.aborted) return;
 
       // Try to send; if verifier is in a destroyed state, recreate and retry once.
       try {
@@ -285,16 +507,22 @@ export default function PhoneAuth({
         } else {
           c = await signInWithPhoneNumber(auth, num, verifier);
         }
+        // Check if aborted before updating state
+        if (controller.signal.aborted) return;
         setConfirmation(c);
         setStep("otp");
         lastSentAtRef.current = Date.now();
-        setResendCooldown(30);
+        setResendCooldown(TIMING.RESEND_COOLDOWN_SECONDS);
       } catch (e) {
+        // Check if aborted
+        if (controller.signal.aborted) return;
         const s = String(e);
         // If verifier was destroyed, recreate and retry once
         if (s.includes("assertNotDestroyed") || s.includes("_reset")) {
           resetVerifier();
           const v2 = await ensureVerifier();
+          // Check if aborted after async operation
+          if (controller.signal.aborted) return;
           const current = auth.currentUser;
           let c;
           if (current) {
@@ -302,6 +530,8 @@ export default function PhoneAuth({
           } else {
             c = await signInWithPhoneNumber(auth, num, v2);
           }
+          // Check if aborted before updating state
+          if (controller.signal.aborted) return;
           setConfirmation(c);
           setStep("otp");
         } else if (
@@ -318,10 +548,19 @@ export default function PhoneAuth({
         }
       }
     } catch (e) {
-      // Map Firebase errors to friendlier messages when possible
-      setError(friendlyFirebaseError(e));
+      // Check if aborted
+      if (controller.signal.aborted) return;
+      // Use centralized error handler for consistent logging
+      setError(handleError(e, "sendOtp"));
     } finally {
-      setLoading(false);
+      // Clean up controller reference if this is still the current operation
+      if (sendOtpControllerRef.current === controller) {
+        sendOtpControllerRef.current = null;
+      }
+      // Only update state if not aborted
+      if (!controller.signal.aborted) {
+        setLoading(false);
+      }
     }
   };
 
@@ -393,7 +632,9 @@ export default function PhoneAuth({
         // Non-fatal: the user is verified; allow proceeding. The next profile save will retry.
       }
     } catch (e) {
-      setError(friendlyFirebaseError(e) || "Invalid OTP. Try again.");
+      // Use centralized error handler for consistent logging
+      const errorMsg = handleError(e, "verifyOtp");
+      setError(errorMsg || "Invalid OTP. Try again.");
     } finally {
       setLoading(false);
     }
@@ -401,19 +642,23 @@ export default function PhoneAuth({
 
   if (step === "done") {
     // show verified phone with edit action to re-verify a different number
-    const storedPhone = localStorage.getItem(PHONE_KEY);
+    // Use Firebase Auth as source of truth, fall back to localStorage only for display
+    const verifiedPhone = auth.currentUser?.phoneNumber || localStorage.getItem(PHONE_KEY);
     return (
       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-        <div>
+        <Typography>
           Phone verified!{" "}
-          <span style={{ color: "#7c1fa0" }}>{storedPhone}</span>
-        </div>
+          <Box component="span" sx={{ color: "primary.main" }}>
+            {verifiedPhone}
+          </Box>
+        </Typography>
         <IconButton
           aria-label="edit phone"
           size="small"
           onClick={() => {
-            // preserve previous value to prefill the input, then clear verified flag
-            const prev = localStorage.getItem(PHONE_KEY);
+            // preserve previous value to prefill the input
+            const prev = auth.currentUser?.phoneNumber || localStorage.getItem(PHONE_KEY);
+            // Clear localStorage hint (actual phone number stays in Firebase Auth)
             try {
               localStorage.removeItem(PHONE_KEY);
             } catch {}
@@ -426,7 +671,7 @@ export default function PhoneAuth({
             setStep("phone");
             if (prev) {
               try {
-                setPhone(prev);
+                applyPhoneValue(prev);
               } catch {}
             }
           }}
@@ -438,7 +683,7 @@ export default function PhoneAuth({
   }
 
   return (
-    <div style={{ maxWidth: 340, margin: "0 auto", width: "100%" }}>
+    <Box sx={{ maxWidth: 340, margin: "0 auto", width: "100%" }}>
       {step === "phone" && (
         <>
           {label !== "off" && (
@@ -446,42 +691,162 @@ export default function PhoneAuth({
               Phone Number
             </Typography>
           )}
-          <PhoneInput
-            country="in"
-            value={phone}
-            onChange={(value: string, data?: { dialCode?: string }) => {
-              const digits = String(value || "").replace(/\D/g, "");
-              const dial = (data?.dialCode || "").replace(/\D/g, "");
-              const full =
-                dial && digits.startsWith(dial)
-                  ? `+${digits}`
-                  : `+${dial}${digits}`;
-              setPhone(full);
-            }}
-            inputProps={{
-              name: "phone",
-              required: true,
-              autoFocus: true,
-              "aria-label": "Phone number",
-            }}
-            inputStyle={{
-              width: "100%",
-              padding: 10,
-              paddingLeft: 45,
-              marginBottom: 12,
-            }}
-            specialLabel=""
-            enableSearch
-          />
+          <Stack
+            direction="row"
+            spacing={1}
+            alignItems="flex-start"
+            sx={{ mb: 1.5 }}
+          >
+            <Chip
+              component="div"
+              variant="outlined"
+              onClick={(event) => {
+                if ((event.target as HTMLElement)?.tagName === "INPUT") return;
+                setCountryMenuAnchor(event.currentTarget);
+                setCountrySearch("");
+              }}
+              sx={{
+                height: 56,
+                borderRadius: 2,
+                borderColor: "rgba(255,255,255,0.4)",
+                bgcolor: "rgba(255,255,255,0.06)",
+                flexShrink: 0,
+                "& .MuiChip-label": {
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 0.5,
+                  px: 1,
+                },
+              }}
+              label={
+                <Stack direction="row" spacing={0.5} alignItems="center">
+                  <span style={{ fontSize: 20 }}>{selectedCountry.flag}</span>
+                  <InputBase
+                    inputRef={dialInputRef}
+                    value={dialCode ? `+${dialCode}` : "+"}
+                    onChange={(event) => {
+                      const digits = digitsOnly(event.target.value).slice(
+                        0,
+                        MAX_DIAL_DIGITS
+                      );
+                      setDialCode(digits);
+                    }}
+                    onClick={(event) => event.stopPropagation()}
+                    onKeyDown={(event) => event.stopPropagation()}
+                    sx={{
+                      width: 78,
+                      fontWeight: 600,
+                      color: "inherit",
+                      "& input": {
+                        textAlign: "center",
+                        fontWeight: 600,
+                        color: "inherit",
+                      },
+                    }}
+                    inputProps={{
+                      inputMode: "numeric",
+                      pattern: "[0-9]*",
+                      "aria-label": "Country code",
+                    }}
+                  />
+                  <IconButton
+                    size="small"
+                    aria-label="Select country"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setCountryMenuAnchor(event.currentTarget);
+                      setCountrySearch("");
+                    }}
+                    sx={{ color: "inherit" }}
+                  >
+                    <ArrowDropDownIcon fontSize="small" />
+                  </IconButton>
+                </Stack>
+              }
+            />
+            <TextField
+              fullWidth
+              inputRef={phoneInputRef}
+              placeholder="9876543210"
+              value={nationalNumber}
+              onChange={(event) => {
+                const raw = event.target.value;
+                const digits = digitsOnly(raw);
+                const trimmedRaw = raw.trim();
+                const looksInternational =
+                  trimmedRaw.startsWith("+") || trimmedRaw.startsWith("00");
+                let normalized = digits.slice(0, maxNationalDigits);
+                if (
+                  looksInternational &&
+                  digits.startsWith(dialCode) &&
+                  digits.length > dialCode.length
+                ) {
+                  normalized = digits
+                    .slice(dialCode.length)
+                    .slice(0, maxNationalDigits);
+                }
+                setNationalNumber(normalized);
+              }}
+              InputProps={{
+                inputMode: "tel",
+              }}
+              inputProps={{
+                maxLength: maxNationalDigits,
+                "aria-label": "Phone number",
+              }}
+              helperText={
+                phone
+                  ? `We'll send an OTP to ${phone}`
+                  : "Enter your phone number"
+              }
+            />
+          </Stack>
+          <Menu
+            anchorEl={countryMenuAnchor}
+            open={isCountryMenuOpen}
+            onClose={closeCountryMenu}
+            anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+            transformOrigin={{ vertical: "top", horizontal: "left" }}
+            PaperProps={{ sx: { width: 280, maxHeight: 360 } }}
+          >
+            <Box sx={{ p: 1 }}>
+              <TextField
+                size="small"
+                fullWidth
+                placeholder="Search country or code"
+                value={countrySearch}
+                onChange={(event) => setCountrySearch(event.target.value)}
+                autoFocus
+              />
+            </Box>
+            {filteredCountries.length === 0 && (
+              <MenuItem disabled>No matches</MenuItem>
+            )}
+            {filteredCountries.map((country) => (
+              <MenuItem
+                key={country.iso2}
+                selected={country.dialCode === dialCode}
+                onClick={() => handleCountrySelect(country)}
+              >
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <span>{country.flag}</span>
+                  <Typography>{country.name}</Typography>
+                  <Typography sx={{ marginLeft: "auto", fontWeight: 600 }}>
+                    +{country.dialCode}
+                  </Typography>
+                </Stack>
+              </MenuItem>
+            ))}
+          </Menu>
           <Button
             variant="contained"
             fullWidth
             onClick={sendOtp}
-            disabled={loading || !phone}
+            disabled={loading || !canSendPhone}
             startIcon={loading ? <CircularProgress size={16} /> : undefined}
             sx={{ py: 1.25 }}
           >
-            Send OTP
+            {error ? "Retry Send OTP" : "Send OTP"}
           </Button>
 
           {/* Fallback for popup blocked */}
@@ -498,9 +863,15 @@ export default function PhoneAuth({
                   setError("");
                   setLoading(true);
                   try {
+                    if (!phone) {
+                      setError("Enter a valid phone number.");
+                      return;
+                    }
                     const num = normalizeE164(phone);
-                    if (!num || num.length < 8)
-                      throw new Error("Enter a valid phone number.");
+                    if (!num || num.length < 8) {
+                      setError("Enter a valid phone number.");
+                      return;
+                    }
                     // signInWithRedirect is not a supported fallback for
                     // PhoneAuthProvider (it expects OAuth providers).
                     // Show a clear instruction to the user instead of
@@ -514,7 +885,7 @@ export default function PhoneAuth({
                     setLoading(false);
                   }
                 }}
-                disabled={loading || !phone}
+                disabled={loading || !canSendPhone}
                 sx={{ py: 1.25 }}
               >
                 Use Fallback (Redirect)
@@ -530,6 +901,17 @@ export default function PhoneAuth({
       {step === "otp" && (
         <>
           <Typography sx={{ mb: 1, color: "#fff" }}>Enter OTP</Typography>
+          {phone && (
+            <Typography
+              sx={{
+                mb: 2,
+                color: "rgba(255,255,255,0.85)",
+                fontSize: 14,
+              }}
+            >
+              Sending OTP to <strong>{phone}</strong>
+            </Typography>
+          )}
           <Box
             sx={{ display: "flex", gap: 1, justifyContent: "center", mb: 1.5 }}
           >
@@ -618,7 +1000,16 @@ export default function PhoneAuth({
             Verify OTP
           </Button>
 
-          <Box sx={{ display: "flex", gap: 1, mt: 1 }}>
+          <Box
+            sx={{
+              display: "flex",
+              gap: 1,
+              mt: 1,
+              flexWrap: "wrap",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
             <Button
               variant="text"
               onClick={async () => {
@@ -635,50 +1026,60 @@ export default function PhoneAuth({
             >
               {resendCooldown > 0 ? `Resend (${resendCooldown}s)` : "Resend"}
             </Button>
-            <Button
-              variant="text"
-              onClick={() => {
-                // change number — go back to phone entry
-                try {
-                  resetVerifier();
-                } catch {}
-                setOtp("");
-                setConfirmation(null);
-                setError("");
-                setStep("phone");
-              }}
-            >
-              Change number
-            </Button>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              {phone && (
+                <Typography
+                  sx={{ color: "rgba(255,255,255,0.75)", fontSize: 13 }}
+                >
+                  {phone}
+                </Typography>
+              )}
+              <Button
+                variant="text"
+                onClick={() => {
+                  // change number — go back to phone entry
+                  try {
+                    resetVerifier();
+                  } catch {}
+                  setOtp("");
+                  setConfirmation(null);
+                  setError("");
+                  setStep("phone");
+                }}
+              >
+                Change number
+              </Button>
+            </Box>
           </Box>
         </>
       )}
 
-      {error && <div style={{ color: "red", marginTop: 10 }}>{error}</div>}
-      {/* Retry button shown when an error occurs so users can try again without reloading */}
+      {/* Accessible error message with ARIA live region */}
       {error && (
-        <Box sx={{ mt: 1 }}>
-          <Button
-            variant="outlined"
-            fullWidth
-            onClick={async () => {
-              try {
-                setError("");
-                resetVerifier();
-                await sendOtp();
-              } catch (e) {
-                try {
-                  setError(getErrorMessage(e));
-                } catch {}
-              }
-            }}
-            disabled={loading || !phone}
-            sx={{ py: 1.25 }}
-          >
-            Retry
-          </Button>
+        <Box
+          role="alert"
+          aria-live="polite"
+          aria-atomic="true"
+          sx={{ color: "error.main", mt: 2 }}
+        >
+          <Typography color="error">{error}</Typography>
         </Box>
       )}
-    </div>
+
+      {/* Hidden screen reader announcer for step changes */}
+      <div
+        id="phone-auth-announcer"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        style={{
+          position: "absolute",
+          left: "-10000px",
+          width: "1px",
+          height: "1px",
+          overflow: "hidden",
+        }}
+      />
+    </Box>
   );
 }

@@ -76,10 +76,19 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const recaptchaKey = process.env.NEXT_PUBLIC_RECAPTCHA_ENTERPRISE_SITE_KEY;
+
   return (
     <html lang="en">
       <head>
         <meta name="emotion-insertion-point" content="" />
+        {recaptchaKey && (
+          <script
+            src={`https://www.google.com/recaptcha/enterprise.js?render=${recaptchaKey}`}
+            async
+            defer
+          />
+        )}
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${handlee.variable} ${roboto.variable} ${bakbakOne.variable} ${poppins.variable} ${suezOne.variable}`}
