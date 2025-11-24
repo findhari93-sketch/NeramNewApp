@@ -28,6 +28,7 @@ import {
   User,
 } from "firebase/auth";
 import { signInWithEmailOrUsername } from "../../../lib/auth/firebaseAuth";
+import { validateEmailForAuth } from "../../../lib/validation/email";
 import { signInSchema, passwordSchema } from "../../../lib/auth/validation";
 import { Container } from "@mui/material";
 import GoogleProfileCompletionModal from "../../components/shared/GoogleProfileCompletionModal";
@@ -59,6 +60,7 @@ function LoginPageInner() {
   const [snackMessage, setSnackMessage] = useState<string | null>(null);
   const [isSigningUp, setIsSigningUp] = useState(false);
   const [isAttemptingLogin, setIsAttemptingLogin] = useState(false);
+  const [signupStatus, setSignupStatus] = useState<string | null>(null);
 
   const getUserLabel = (u: unknown) => {
     if (!u || typeof u !== "object") return null;
@@ -577,6 +579,13 @@ function LoginPageInner() {
     const n = searchParams?.get("notice");
     const email = searchParams?.get("email");
     if (email) setEmailFromQuery(email);
+
+    // Clear signup status when notice is shown
+    if (n) {
+      setSignupStatus(null);
+      setIsSigningUp(false);
+    }
+
     if (n === "verify_email_sent") {
       setNotice(
         `We sent a verification link to ${
@@ -694,14 +703,29 @@ function LoginPageInner() {
         let cancelled = false;
         (async () => {
           setCheckingEmail(true);
+          setEmailPasswordError(null); // Clear previous errors
+
+          // Validate email first (syntax + typo check)
+          const emailValidation = validateEmailForAuth(value);
+          if (!emailValidation.success) {
+            if (!cancelled) {
+              setEmailPasswordError(emailValidation.error);
+              setCheckingEmail(false);
+              setEmailExists(null);
+              setEmailProviders(null);
+            }
+            return;
+          }
+
           try {
-            let methods = await fetchSignInMethodsForEmail(auth, value);
+            const validatedEmail = emailValidation.data.email;
+            let methods = await fetchSignInMethodsForEmail(auth, validatedEmail);
             console.log("[DEBUG] fetchSignInMethodsForEmail", value, methods);
             // If Firebase returned empty, fallback to server-side Supabase lookup
             if (Array.isArray(methods) && methods.length === 0) {
               try {
                 const res = await fetch(
-                  `/api/auth/check-email?email=${encodeURIComponent(value)}`
+                  `/api/auth/check-email?email=${encodeURIComponent(validatedEmail)}`
                 );
                 if (res.ok) {
                   const j = await res.json();
@@ -821,6 +845,19 @@ function LoginPageInner() {
           }
 
           // create new email/password user
+          // Email is already validated during "Checking account..." phase,
+          // but validate again as a safety check
+          const emailValidation = validateEmailForAuth(identifier);
+          if (!emailValidation.success) {
+            // This shouldn't happen if the user went through the normal flow
+            setEmailPasswordError(emailValidation.error);
+            setEmailPasswordLoading(false);
+            return;
+          }
+
+          // Use the validated (normalized) email
+          const validatedEmail = emailValidation.data.email;
+
           // Validate password strength and confirm password when creating account
           const pwValidation = passwordSchema.safeParse(password);
           if (!pwValidation.success) {
@@ -838,64 +875,113 @@ function LoginPageInner() {
           }
           // Set flag to prevent redirect during signup flow
           setIsSigningUp(true);
-          const cred = await createUserWithEmailAndPassword(
-            auth,
-            identifier,
-            password
-          );
-          // Send branded verification email via custom endpoint
+          setSignupStatus("Creating your account...");
+
+          let cred;
+          let emailSendSuccess = false;
+
           try {
-            await fetch("/api/auth/send-verification-email", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ email: identifier }),
-            });
-          } catch (ve) {
-            console.warn("send-verification-email (sign-up) failed", ve);
-            // Fallback to Firebase's default if custom email fails
+            // Step 1: Create user account with validated email
+            cred = await createUserWithEmailAndPassword(
+              auth,
+              validatedEmail,
+              password
+            );
+
+            setSignupStatus("Sending verification email...");
+
+            // Step 2: Immediately try to send verification email
             try {
-              const actionCodeSettings = {
-                url: `${
-                  window.location.origin
-                }/auth/action?email=${encodeURIComponent(identifier)}`,
-                handleCodeInApp: true,
-              } as const;
-              await sendEmailVerification(cred.user, actionCodeSettings);
-            } catch (fallbackErr) {
-              console.warn(
-                "Fallback sendEmailVerification also failed",
-                fallbackErr
-              );
+              const emailResponse = await fetch("/api/auth/send-verification-email", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: validatedEmail }),
+              });
+
+              const emailResult = await emailResponse.json();
+
+              if (!emailResponse.ok) {
+                throw new Error(emailResult.error || "Failed to send verification email");
+              }
+
+              emailSendSuccess = true;
+            } catch (ve) {
+              console.warn("send-verification-email (sign-up) failed", ve);
+              // Fallback to Firebase's default if custom email fails
+              try {
+                const actionCodeSettings = {
+                  url: `${
+                    window.location.origin
+                  }/auth/action?email=${encodeURIComponent(validatedEmail)}`,
+                  handleCodeInApp: true,
+                } as const;
+                await sendEmailVerification(cred.user, actionCodeSettings);
+                emailSendSuccess = true;
+              } catch (fallbackErr) {
+                console.error("Both verification email methods failed", fallbackErr);
+                // Delete the user if email sending failed
+                try {
+                  await cred.user.delete();
+                } catch (deleteErr) {
+                  console.error("Failed to delete user after email send failure", deleteErr);
+                }
+                throw new Error("Unable to send verification email. Please check your email address and try again.");
+              }
             }
-          }
-          // Upsert user to Supabase now while we still have a valid user session.
-          try {
-            const idToken = await cred.user.getIdToken();
+
+            // Step 3: Only upsert to DB if email was sent successfully
+            if (emailSendSuccess) {
+              try {
+                const idToken = await cred.user.getIdToken();
+                try {
+                  localStorage.setItem("firebase_id_token", idToken);
+                } catch {}
+                await fetch("/api/users/upsert", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${idToken}`,
+                  },
+                  body: JSON.stringify({}),
+                });
+              } catch (upsertErr) {
+                console.warn("upsert after sign-up failed", upsertErr);
+              }
+            }
+
+            // Step 4: Sign out and redirect with success message
             try {
-              localStorage.setItem("firebase_id_token", idToken);
+              await signOut(auth);
             } catch {}
-            await fetch("/api/users/upsert", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${idToken}`,
-              },
-              body: JSON.stringify({}),
-            });
-          } catch (upsertErr) {
-            console.warn("upsert after sign-up failed", upsertErr);
+
+            // Clear all signup states before redirect
+            setIsSigningUp(false);
+            setSignupStatus(null);
+            setEmailPasswordLoading(false);
+
+            router.replace(
+              `/auth/login?notice=verify_email_sent&email=${encodeURIComponent(
+                validatedEmail
+              )}`
+            );
+            return;
+          } catch (signupError: any) {
+            setIsSigningUp(false);
+            setSignupStatus(null);
+            setEmailPasswordLoading(false);
+
+            // Handle specific Firebase errors
+            if (signupError.code === "auth/email-already-in-use") {
+              setEmailPasswordError("This email is already registered. Please sign in instead.");
+            } else if (signupError.code === "auth/invalid-email") {
+              setEmailPasswordError("Please enter a valid email address.");
+            } else if (signupError.message) {
+              setEmailPasswordError(signupError.message);
+            } else {
+              setEmailPasswordError("Failed to create account. Please try again.");
+            }
+            return;
           }
-          try {
-            await signOut(auth);
-          } catch {}
-          // Clear the signup flag before redirect
-          setIsSigningUp(false);
-          router.replace(
-            `/auth/login?notice=verify_email_sent&email=${encodeURIComponent(
-              identifier
-            )}`
-          );
-          return;
         }
 
         // For existing users: attempt sign-in
@@ -925,28 +1011,46 @@ function LoginPageInner() {
             setEmailPasswordLoading(false);
             return;
           }
-          // Show clear error message before signing out
-          setEmailPasswordError(
-            `Please verify your email before signing in. We've sent a new verification link to ${
-              u.email || identifier
-            }. Check your inbox and spam folder.`
-          );
+
+          // User needs to verify email - send verification and redirect to notice
+          const userEmail = u.email || identifier;
+
           try {
-            const actionCodeSettings = {
-              url: `${
-                window.location.origin
-              }/auth/action?email=${encodeURIComponent(u.email || identifier)}`,
-              handleCodeInApp: true,
-            } as const;
-            await sendEmailVerification(u, actionCodeSettings);
+            // Try custom branded email first
+            await fetch("/api/auth/send-verification-email", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ email: userEmail }),
+            });
           } catch (ve) {
-            console.warn("sendEmailVerification (unverified login) failed", ve);
+            console.warn("send-verification-email (unverified login) failed", ve);
+            // Fallback to Firebase default
+            try {
+              const actionCodeSettings = {
+                url: `${
+                  window.location.origin
+                }/auth/action?email=${encodeURIComponent(userEmail)}`,
+                handleCodeInApp: true,
+              } as const;
+              await sendEmailVerification(u, actionCodeSettings);
+            } catch (fallbackErr) {
+              console.warn("Fallback sendEmailVerification also failed", fallbackErr);
+            }
           }
+
           try {
             await signOut(auth);
           } catch {}
+
           setIsAttemptingLogin(false);
           setEmailPasswordLoading(false);
+
+          // Redirect to verification notice page with resend option
+          router.replace(
+            `/auth/login?notice=verify_email_required&email=${encodeURIComponent(
+              userEmail
+            )}`
+          );
           return;
         }
         if (u) {
@@ -1012,7 +1116,9 @@ function LoginPageInner() {
     };
 
     const buttonLabel = emailPasswordLoading
-      ? "Signing in..."
+      ? isSigningUp
+        ? "Creating account..."
+        : "Signing in..."
       : checkingEmail
       ? "Checking account..."
       : emailExists === false && stagedNewEmail
@@ -1142,8 +1248,18 @@ function LoginPageInner() {
           {emailPasswordLoading && <CircularProgress size={20} color="inherit" />}
           {buttonLabel}
         </Button>
+        {signupStatus && (
+          <Alert severity="info" icon={<CircularProgress size={20} />}>
+            {signupStatus}
+          </Alert>
+        )}
         {emailPasswordError && (
-          <Alert severity="error">{emailPasswordError}</Alert>
+          <Alert
+            severity="error"
+            onClose={() => setEmailPasswordError(null)}
+          >
+            {emailPasswordError}
+          </Alert>
         )}
       </Box>
     );
@@ -1255,72 +1371,96 @@ function LoginPageInner() {
               {notice && <Alert severity="success">{notice}</Alert>}
               {error && <Alert severity="error">{error}</Alert>}
 
-              {/* Resend verification helper */}
+              {/* Resend verification section - Professional grade */}
               {notice && notice.toLowerCase().includes("verify") && (
-                <Alert severity="info">
-                  <Box
-                    sx={{ display: "flex", flexDirection: "column", gap: 1 }}
-                  >
-                    <Typography variant="body2">
-                      Tip: Check your spam/junk folder before resending.
-                    </Typography>
-                    <Box
-                      sx={{ display: "flex", flexDirection: "column", gap: 1 }}
-                    >
-                      {resendAttempts >= MAX_RESEND_ATTEMPTS ? (
-                        <Box
-                          sx={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: 1,
-                          }}
-                        >
-                          <Typography variant="body2" color="error">
-                            You have reached the maximum resend attempts.
-                          </Typography>
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            onClick={resetResendSession}
-                          >
-                            Try Again
-                          </Button>
-                        </Box>
-                      ) : cooldown > 0 ? (
-                        <Typography variant="body2" color="text.secondary">
-                          You can resend in {cooldown}s…
-                        </Typography>
-                      ) : (
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          onClick={handleResendVerification}
-                          disabled={resendLoading}
-                        >
-                          {resendLoading ? (
-                            <CircularProgress size={16} />
-                          ) : (
-                            "Resend verification email"
-                          )}
-                        </Button>
-                      )}
-                      {resendResult && (
-                        <Typography variant="body2">{resendResult}</Typography>
-                      )}
-                      {resendAttempts > 0 &&
-                        resendAttempts < MAX_RESEND_ATTEMPTS && (
-                          <Typography variant="caption" color="text.secondary">
-                            Attempt {resendAttempts} of {MAX_RESEND_ATTEMPTS}
-                          </Typography>
-                        )}
+                <Box
+                  sx={{
+                    border: "1px solid",
+                    borderColor: "divider",
+                    borderRadius: 1,
+                    p: 2,
+                    backgroundColor: "background.paper",
+                  }}
+                >
+                  <Stack spacing={2}>
+                    <Box>
+                      <Typography
+                        variant="subtitle2"
+                        fontWeight={600}
+                        gutterBottom
+                      >
+                        Didn&apos;t receive the email?
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ mb: 1.5 }}
+                      >
+                        Check your spam folder, or request a new verification
+                        email below.
+                      </Typography>
                     </Box>
-                    <Typography variant="caption" color="text.secondary">
-                      If you&apos;re signed out, re-enter your email and
-                      password above and click Sign In — we&apos;ll resend
-                      automatically if your email isn&apos;t verified.
-                    </Typography>
-                  </Box>
-                </Alert>
+
+                    {resendResult && (
+                      <Alert
+                        severity={
+                          resendResult.includes("Failed") ? "error" : "success"
+                        }
+                        sx={{ fontSize: "0.875rem" }}
+                      >
+                        {resendResult}
+                      </Alert>
+                    )}
+
+                    {resendAttempts >= MAX_RESEND_ATTEMPTS ? (
+                      <Box>
+                        <Alert severity="warning" sx={{ mb: 1.5 }}>
+                          Maximum resend attempts reached. Please wait before
+                          trying again.
+                        </Alert>
+                        <Button
+                          fullWidth
+                          variant="outlined"
+                          onClick={resetResendSession}
+                          size="medium"
+                        >
+                          Reset and Try Again
+                        </Button>
+                      </Box>
+                    ) : (
+                      <Box>
+                        <Button
+                          fullWidth
+                          variant="contained"
+                          onClick={handleResendVerification}
+                          disabled={resendLoading || cooldown > 0}
+                          size="medium"
+                          startIcon={
+                            resendLoading ? (
+                              <CircularProgress size={20} color="inherit" />
+                            ) : undefined
+                          }
+                        >
+                          {cooldown > 0
+                            ? `Resend in ${cooldown}s`
+                            : resendLoading
+                            ? "Sending..."
+                            : "Resend Verification Email"}
+                        </Button>
+                        {resendAttempts > 0 &&
+                          resendAttempts < MAX_RESEND_ATTEMPTS && (
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              sx={{ display: "block", textAlign: "center", mt: 1 }}
+                            >
+                              Attempt {resendAttempts} of {MAX_RESEND_ATTEMPTS}
+                            </Typography>
+                          )}
+                      </Box>
+                    )}
+                  </Stack>
+                </Box>
               )}
 
               {/* Email/Password first */}
