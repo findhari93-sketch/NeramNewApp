@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import supabaseServer from "../../../lib/supabaseServer";
 import admin from "firebase-admin";
+import { mapFromUsersDuplicate, type UsersDuplicateRow } from "../../../lib/userFieldMapping";
 
 // initialize firebase-admin with service account if not already
 if (!admin.apps.length) {
@@ -62,39 +63,106 @@ export async function GET(req: Request) {
       try {
         const idToken = authHeader.split(" ")[1];
         const decoded = await admin.auth().verifyIdToken(idToken);
+        const firebaseUid = decoded.uid as string;
         const phone = (decoded.phone_number || null) as string | null;
         const email = (decoded.email || null) as string | null;
-        // Lookup user by phone first, then by email if available
-        let userRow: Record<string, unknown> | null = null;
-        if (phone) {
+
+        // Lookup user in users_duplicate table with JSONB structure
+        // Priority: firebase_uid > phone > email
+        let userRow: UsersDuplicateRow | null = null;
+
+        // First try to find by firebase_uid in account JSONB
+        if (firebaseUid) {
           const { data } = await supabaseServer
-            .from("users")
+            .from("users_duplicate")
             .select("*")
-            .eq("phone", phone)
+            .filter("account->>firebase_uid", "eq", firebaseUid)
             .limit(1)
             .maybeSingle();
-          userRow = data || null;
-        }
-        if (!userRow && email) {
-          const { data } = await supabaseServer
-            .from("users")
-            .select("*")
-            .eq("email", email)
-            .limit(1)
-            .maybeSingle();
-          userRow = data || null;
+          userRow = data as UsersDuplicateRow | null;
         }
 
-        // CRITICAL: Reject deleted users - if user not found in database, return 404
+        // Fallback to phone in contact JSONB
+        if (!userRow && phone) {
+          const { data } = await supabaseServer
+            .from("users_duplicate")
+            .select("*")
+            .filter("contact->>phone", "eq", phone)
+            .limit(1)
+            .maybeSingle();
+          userRow = data as UsersDuplicateRow | null;
+        }
+
+        // Fallback to email in contact JSONB
+        if (!userRow && email) {
+          const { data } = await supabaseServer
+            .from("users_duplicate")
+            .select("*")
+            .filter("contact->>email", "ilike", email)
+            .limit(1)
+            .maybeSingle();
+          userRow = data as UsersDuplicateRow | null;
+        }
+
+        // MIGRATION FALLBACK: If user not found in users_duplicate, try old users table
+        // This prevents existing users from being logged out during migration
+        if (!userRow) {
+          console.log("[SESSION] User not found in users_duplicate, checking old users table for migration");
+          let legacyUserRow: Record<string, unknown> | null = null;
+
+          // Try old table by firebase_uid
+          if (firebaseUid) {
+            const { data } = await supabaseServer
+              .from("users")
+              .select("*")
+              .eq("firebase_uid", firebaseUid)
+              .limit(1)
+              .maybeSingle();
+            legacyUserRow = data || null;
+          }
+
+          // Fallback to phone
+          if (!legacyUserRow && phone) {
+            const { data } = await supabaseServer
+              .from("users")
+              .select("*")
+              .eq("phone", phone)
+              .limit(1)
+              .maybeSingle();
+            legacyUserRow = data || null;
+          }
+
+          // Fallback to email
+          if (!legacyUserRow && email) {
+            const { data } = await supabaseServer
+              .from("users")
+              .select("*")
+              .eq("email", email)
+              .limit(1)
+              .maybeSingle();
+            legacyUserRow = data || null;
+          }
+
+          if (legacyUserRow) {
+            console.log("[SESSION] Found user in old users table, returning legacy data");
+            // Return legacy user data directly without migration
+            return NextResponse.json({ ok: true, user: legacyUserRow });
+          }
+        }
+
+        // CRITICAL: Reject deleted users - if user not found in either table, return 404
         // This ensures deleted users are signed out immediately on next session check
         if (!userRow) {
+          console.warn("[SESSION] User not found in either users_duplicate or users table");
           return NextResponse.json(
             { ok: false, error: "user_not_found" },
             { status: 404 }
           );
         }
 
-        return NextResponse.json({ ok: true, user: userRow });
+        // Map from JSONB structure to flat structure for backward compatibility
+        const flatUser = mapFromUsersDuplicate(userRow);
+        return NextResponse.json({ ok: true, user: flatUser });
       } catch (e) {
         console.warn("/api/session: token verification failed", e);
         // Dev-only diagnostics to help pinpoint project mismatch or clock issues

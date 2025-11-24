@@ -98,7 +98,11 @@ function createEnterpriseVerifier(action = "submit") {
     clear() {
       /* no-op */
     },
-  } as const;
+    // Firebase internally calls _reset on verifiers, so provide a no-op implementation
+    _reset() {
+      /* no-op */
+    },
+  } as any;
 }
 
 // Centralized error handler with consistent logging
