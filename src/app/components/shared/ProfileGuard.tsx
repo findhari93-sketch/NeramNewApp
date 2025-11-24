@@ -2,7 +2,12 @@
 
 import React from "react";
 import { auth } from "../../../lib/firebase";
-import { onAuthStateChanged, signOut, type Unsubscribe, type User } from "firebase/auth";
+import {
+  onAuthStateChanged,
+  signOut,
+  type Unsubscribe,
+  type User,
+} from "firebase/auth";
 import GoogleProfileCompletionModal from "./GoogleProfileCompletionModal";
 import { clearAllAuthCaches } from "../../../lib/clearAuthCache";
 import { useRouter } from "next/navigation";
@@ -253,6 +258,22 @@ export default function ProfileGuard({
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [profileForceComplete]);
 
+  // Listen for external phone verification events (e.g. PhoneAuth completing
+  // in a different flow) and close the modal gracefully even if the server
+  // upsert later fails. This prevents a stale forceComplete state trapping
+  // the user after successful Firebase phone linking.
+  React.useEffect(() => {
+    const handler = () => {
+      const u = auth.currentUser;
+      if (u?.phoneNumber) {
+        setProfileForceComplete(false);
+        setOpen(false);
+      }
+    };
+    window.addEventListener("neram:phoneVerified", handler);
+    return () => window.removeEventListener("neram:phoneVerified", handler);
+  }, []);
+
   return (
     <>
       {children}
@@ -261,6 +282,15 @@ export default function ProfileGuard({
         onClose={() => {
           // When forceComplete is true, block the close and show a clear message.
           if (profileForceComplete) {
+            // Re-check current user phone; if already verified allow close.
+            try {
+              const u = auth.currentUser;
+              if (u?.phoneNumber) {
+                setProfileForceComplete(false);
+                setOpen(false);
+                return;
+              }
+            } catch {}
             try {
               window.dispatchEvent(
                 new CustomEvent("neram:forceCompleteCloseAttempt", {
@@ -320,30 +350,34 @@ export default function ProfileGuard({
             const j = await res.json().catch(() => ({}));
             // clear controller after response
             upsertControllerRef.current = null;
-            if (res.ok && j && j.ok) {
-              // Reset forceComplete before closing to prevent alert
-              setProfileForceComplete(false);
-              setOpen(false);
-              try {
-                window.dispatchEvent(
-                  new CustomEvent("neram:phoneVerified", {
-                    detail: {
-                      message:
-                        "Welcome to the Neram Classes family! All our app resources you can access freely without any interruption.",
-                    },
-                  })
-                );
-              } catch {}
-              return true;
-            }
+            // Treat phone verification as success even if upsert response is not ok;
+            // we don't want to trap the user in the modal due to a transient network/db issue.
+            const success = Boolean(res.ok && j && (j as any).ok);
+            setProfileForceComplete(false);
+            setOpen(false);
+            try {
+              window.dispatchEvent(
+                new CustomEvent("neram:phoneVerified", {
+                  detail: {
+                    message: success
+                      ? "Welcome to the Neram Classes family! All our app resources you can access freely without any interruption."
+                      : "Phone verified successfully. We will finish syncing your profile shortly.",
+                  },
+                })
+              );
+            } catch {}
+            return true;
           } catch (e) {
             if ((e as any)?.name === "AbortError") {
               // request aborted due to unmount — treat as not completed
               return false;
             }
             reportError("ProfileGuard save failed", e, true);
+            // Allow closing anyway; phone auth succeeded but save failed.
+            setProfileForceComplete(false);
+            setOpen(false);
+            return true;
           }
-          return false;
         }}
         forceComplete={profileForceComplete}
         initialPhone={profileInitialPhone || undefined}
