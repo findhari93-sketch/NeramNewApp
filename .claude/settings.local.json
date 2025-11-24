@@ -7,7 +7,9 @@
       "Bash(if [ -e \"nul\" ])",
       "Bash(then rm -f \"nul\")",
       "Bash(fi)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git branch:*)",
+      "Bash(npm run dev:*)"
     ],
     "deny": [],
     "ask": []

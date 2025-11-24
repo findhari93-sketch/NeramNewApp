@@ -12,13 +12,32 @@ export default function SnackbarNotice() {
   const pathname = usePathname();
   const notice = searchParams?.get("notice") ?? null;
   const [open, setOpen] = React.useState(false);
+  const [message, setMessage] = React.useState<string>("");
   // Prevent SSR -> hydration flicker when `notice` is present. Don't render
   // the snackbar until the client has hydrated.
   const [hydrated, setHydrated] = React.useState(false);
   React.useEffect(() => setHydrated(true), []);
 
+  // Listen for custom phone verification event
+  React.useEffect(() => {
+    const handlePhoneVerified = (event: Event) => {
+      const customEvent = event as CustomEvent<{ message: string }>;
+      const msg = customEvent.detail?.message || "Welcome to Neram Classes family! All our app resources you can access freely without any interruption.";
+      setMessage(msg);
+      setOpen(true);
+    };
+
+    window.addEventListener("neram:phoneVerified", handlePhoneVerified);
+    return () => window.removeEventListener("neram:phoneVerified", handlePhoneVerified);
+  }, []);
+
   React.useEffect(() => {
     if (notice === "already_logged_in" || notice === "login_success") {
+      setMessage(
+        notice === "login_success"
+          ? "Signed in successfully"
+          : "You're already logged in"
+      );
       setOpen(true);
       try {
         window.dispatchEvent(
@@ -60,13 +79,9 @@ export default function SnackbarNotice() {
   return (
     <Snackbar
       open={open}
-      autoHideDuration={5000}
+      autoHideDuration={6000}
       onClose={handleClose}
-      message={
-        notice === "login_success"
-          ? "Signed in successfully"
-          : "You\u2019re already logged in"
-      }
+      message={message}
       action={action}
     />
   );

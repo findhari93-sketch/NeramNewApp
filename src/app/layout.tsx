@@ -11,6 +11,7 @@ import {
 import ThemeRegistry from "./ThemeRegistry";
 import ProfileGuard from "./components/shared/ProfileGuard";
 import ChatBubbles from "../components/ChatBubbles";
+import SnackbarNotice from "./components/shared/SnackbarNotice";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -96,6 +97,7 @@ export default function RootLayout({
         <ThemeRegistry>
           <ProfileGuard>{children}</ProfileGuard>
           <ChatBubbles />
+          <SnackbarNotice />
         </ThemeRegistry>
       </body>
     </html>

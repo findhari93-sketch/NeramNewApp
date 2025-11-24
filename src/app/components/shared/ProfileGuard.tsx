@@ -327,7 +327,7 @@ export default function ProfileGuard({
                   new CustomEvent("neram:phoneVerified", {
                     detail: {
                       message:
-                        "🎉 Phone Verification Successful! Check your WhatsApp — we’ve sent you the Q&A set of the 2024 NATA / JEE2 Exam along with bonus study materials!",
+                        "Welcome to the Neram Classes family! All our app resources you can access freely without any interruption.",
                     },
                   })
                 );
