@@ -1,81 +1,51 @@
 # NeramNextApp — Copilot instructions (practical & concise)
 
-This file captures the minimal, actionable knowledge an AI coding agent needs to be productive in this repo. Follow examples referenced below.
+Minimal repo knowledge to keep AI agents productive. Reference paths are relative to repo root.
 
-- Stack & layout
+- **Stack & layout**
 
-  - Next.js App Router (App directory) under `src/app`. API routes live at `src/app/api/**`.
-  - React 19 + MUI 7 + Emotion. Theme provider: `src/app/ThemeRegistry.tsx` (client component using "use client").
+  - Next.js App Router under `src/app`; routed features live in `(main)/*`. API routes stay in `src/app/api/**` and should remain server-only (no client-side imports).
+  - React 19 + MUI 7 + Emotion. Always wrap client shells with `src/app/ThemeRegistry.tsx`; any file touching MUI hooks, contexts, or `next/navigation` must start with `"use client"`.
 
-- Authentication & data flow (must-follow)
+- **Authentication layers**
 
-  - Client auth is Firebase (client SDK). Client code obtains a Firebase ID token and calls internal API routes (see `src/lib/apiClient.ts`).
-  - Server uses Supabase (Postgres + Storage). Use `src/lib/supabaseServer.ts` only inside server/runtime (API routes, server components). The server client requires SUPABASE_SERVICE_ROLE_KEY and will throw if missing.
-  - Data model convention: user data is stored in grouped JSONB columns on `users` / `users_duplicate` (see `supabase_migrations/` and `src/lib/userFieldMapping`). Map/merge JSONB rather than replacing.
+  - Client auth = Firebase Web SDK (`src/lib/firebase.ts`). Fetch helpers (`src/lib/apiClient.ts`) attach the ID token and retry once on `invalid_token` responses.
+  - Server auth = Firebase Admin + Supabase. Initialize Admin exactly as `src/app/api/users/upsert/route.ts` does (JSON blob first, fall back to discrete env vars with `\n`-restored private key). Never import `supabaseServer` outside server code.
+  - `src/app/components/shared/ProfileGuard.tsx` wraps the entire app: it pings `/api/session`, forces phone collection via `/api/users/upsert`, and calls `clearAllAuthCaches` + `signOut` if the session API returns 404 (user deleted). Don’t break this handshake.
 
-- Canonical API pattern (example: `/api/users/upsert`)
+- **User data model**
 
-  - All profile/application writes should follow `POST /api/users/upsert` behavior: verify Firebase bearer token, resolve firebase_uid → user row, then merge incoming fields into JSONB columns instead of overwriting. See `src/app/api/users/upsert/route.ts` for full logic.
-  - Normalization rules used by upsert:
-    - Convert camelCase → snake_case when writing to DB.
-    - Lowercase `username`.
-    - Preserve non-empty `student_name`; do not overwrite with blank values.
-    - Preserve `providers[]` array and `phone_auth_used` once true.
-  - Authentication expectations: API routes expect Authorization: Bearer <Firebase ID token> and use firebase-admin on the server to verify tokens. The admin SDK is initialized from `FIREBASE_SERVICE_ACCOUNT_JSON` or discrete env vars (`FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`).
+  - `users_duplicate` stores grouped JSONB (`account`, `basic`, `contact`, `about_user`, `education`, `application_details`). Always map using `mapToUsersDuplicate`, merge via `mergeUsersDuplicateUpdate`, and respond with the flattened object from `mapFromUsersDuplicate`.
+  - `/api/users/upsert` is canonical: verify Firebase token, look up by `firebase_uid` → phone → email, merge updates (never drop `created_at_tz`), and preserve one-way flags like `providers[]` or `phone_auth_used`.
+  - Realtime sync (`src/hooks/useSyncedUser.ts`) caches rows under `user-cache:<id>`, listens to Supabase channels, and immediately signs the user out if their row disappears. Respect that behavior when changing schema fields or cache keys.
 
-- Client/server boundaries & rules
+- **Session + middleware contracts**
 
-  - Any file that uses MUI, Emotion, React context, or Next navigation must start with "use client".
-  - Never import `src/lib/supabaseServer.ts` into client code. For server-only actions (signing storage URLs, admin queries), add a server API route and call `supabaseServer` there.
-  - Use `src/lib/apiClient.ts` for client → internal API calls: it auto-attaches the Firebase token and retries once if the server returns `invalid_token`.
+  - `/api/session` only trusts a Firebase Bearer token, checks `users` table (not `users_duplicate`), and intentionally returns 404 to signal “user deleted” so `ProfileGuard` can log the person out.
+  - `src/middleware.ts` guards `/dashboard/**` by verifying an HMAC’d `neram_session` cookie (secret = `SESSION_SECRET`). Update both `protectedPaths` and `config.matcher` if you add new protected sections.
 
-- Realtime, caching, and helpers
+- **Payments & tokens**
 
-  - Local cache key prefix: `user-cache:` (see `src/lib/userCache.ts`). Use read/write helpers rather than direct localStorage where possible.
-  - Realtime subscriptions use Supabase channels around `users_duplicate` (see `src/hooks/useSyncedUser.ts`). Prefer resolving firebase_uid → Supabase id before subscribing.
+  - Payment links run through `/pay` (see `src/app/(main)/pay/page.tsx`). Query param `v` is a JWT created by admin tools and decoded client-side only for UX; the server re-verifies using `verifyPaymentTokenServer` (`PAYMENT_TOKEN_SECRET` required).
+  - `/api/payments/razorpay/create-order` supports three flows: signed JWT tokens, legacy DB tokens (looked up inside `application_details.final_fee_payment`), or direct authenticated amounts when `ALLOW_UNAUTH_RAZORPAY` is false. Always persist `razorpay_order_id` back onto the application row.
+  - `/api/payments/razorpay/webhook` is the source of truth. It requires the raw body for HMAC verification, searches `users_duplicate.application_details.final_fee_payment.razorpay_order_id`, appends to `payment_history`, and is fully idempotent. Use `npm run test:webhook` + `scripts/test-webhook.mjs` with ngrok to simulate events (details live in `RAZORPAY_IMPLEMENTATION_SUMMARY.md` and `RAZORPAY_WEBHOOK_SETUP.md`).
 
-- Middleware & session protection
+- **Client patterns & helpers**
 
-  - `src/middleware.ts` protects `/dashboard/*` using an HMAC-signed `neram_session` cookie (signed with `SESSION_SECRET`). If you modify protected paths, update `config.matcher`.
+  - Use `SafeSearchParams` (`src/components/SafeSearchParams.tsx`) to access query params inside client components without Suspense churn.
+  - `src/lib/clearAuthCache.ts` nukes every local auth artifact (localStorage, sessionStorage, IndexedDB, SW caches). Call it before forced sign-outs or when handling deleted accounts.
+  - Avatar URLs, uploads, or other Supabase Storage actions belong in server routes (see `src/app/api/avatar-url` and `src/lib/uploadAvatar.ts` for precedent).
 
-- Storage & avatars
+- **Tooling & commands**
 
-  - Avatar URL endpoint checks `users.avatar_path` then legacy `profiles.avatar_path`, then signs a bucket URL (`avatars`) via `supabaseServer` (search for `avatar` in `src/app/api`).
+  - `npm run dev | build | start | lint | typecheck | test` follow standard meanings; `npm run format` uses Prettier. Payment debugging relies on `npm run test:webhook`.
+  - Scripts in `scripts/*.mjs` (database, migrations, webhook) assume Node ESM; run them with `node` or the npm alias.
 
-- Dev / CI commands (from `package.json`)
+- **Environment checklist**
+  - Core: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+  - Firebase: either `FIREBASE_SERVICE_ACCOUNT_JSON` or (`FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY` with literal newlines). Client keys live under `NEXT_PUBLIC_FIREBASE_*`.
+  - Sessions & UI: `SESSION_SECRET`, `NEXT_PUBLIC_RECAPTCHA_ENTERPRISE_SITE_KEY`, `NEXT_PUBLIC_SITE_URL`.
+  - Payments: `PAYMENT_TOKEN_SECRET`, `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`, optional `ALLOW_UNAUTH_RAZORPAY`.
+  - Email: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`.
 
-  - npm run dev — Next dev server
-  - npm run build — Next build
-  - npm run start — Next start
-  - npm run lint — eslint
-  - npm run typecheck — tsc --noEmit
-  - npm run test — jest (jest + ts-jest)
-
-- Required environment variables (observed patterns)
-
-  - SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (server)
-  - NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY (client)
-  - FIREBASE_SERVICE_ACCOUNT_JSON OR FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY (server)
-  - SESSION_SECRET for middleware cookie signing
-
-- Quick places to look first (examples)
-
-  - Upsert normalization & merge: `src/app/api/users/upsert/route.ts`
-  - Server Supabase client: `src/lib/supabaseServer.ts` (requires service role key)
-  - Client API helper: `src/lib/apiClient.ts` (token attach + invalid_token retry)
-  - Cache & realtime: `src/lib/userCache.ts`, `src/hooks/useSyncedUser.ts`
-  - Theme provider: `src/app/ThemeRegistry.tsx`
-
-- Small contract for new API routes touching users
-
-  - Inputs: JSON payload from authenticated client (Authorization: Bearer <Firebase token>). Accept both camelCase and snake_case.
-  - Outputs: { ok: boolean, user?: <flat user>, error?: string }
-  - Error modes: 401 for missing/invalid token, 500 for DB errors. Preserve existing fields during merges.
-
-- Edge cases to be mindful of (from code)
-
-  - Firebase admin init: either FIREBASE_SERVICE_ACCOUNT_JSON or discrete env vars (private key must replace \n sequences).
-  - Supabase server client throws if SUPABASE_SERVICE_ROLE_KEY is missing — don't run server routes without it.
-  - `apiClient` retries once when server returns `invalid_token`; avoid infinite refresh loops.
-
-If anything above is unclear or you want snippets showing the normalization helpers in `src/lib/userFieldMapping`, tell me which area to expand and I’ll iterate.
+Need more color on any section (e.g., merging rules or Razorpay flows)? Ask and specify the file/feature so we can expand the playbook.

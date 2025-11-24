@@ -27,6 +27,7 @@ export default function AudioCard({ url, title, year, miniTitle }: Props) {
         title={title}
         height={100}
         width={290}
+        allow="encrypted-media"
         sx={{
           border: "2px solid #88206d",
           borderRadius: "16px",

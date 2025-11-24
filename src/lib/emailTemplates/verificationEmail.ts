@@ -181,7 +181,7 @@ export function generateVerificationEmailHTML({
   <div class="email-container">
     <!-- Header with Logo -->
     <div class="header">
-      <img src="https://neramclasses.com/brand/neramclasses-logo.svg" alt="Neram Classes" class="logo" />
+      <img src="https://neramclasses.com/images/email%20images/social/logo.png" alt="Neram Classes" class="logo" />
     </div>
 
     <!-- Main Content -->

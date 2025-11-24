@@ -133,56 +133,45 @@ export default function AuthActionPage() {
             // analytics failure should not block UX
             console.warn("analytics event failed", e);
           }
+          // CRITICAL: Ensure user exists in Supabase after verification
           // If the user happens to be signed in already, seed/update DB now
           try {
             const u = auth.currentUser;
             if (u) {
-              const idToken = await u.getIdToken();
-              await fetch("/api/users/upsert", {
+              const idToken = await u.getIdToken(true); // Force refresh token
+              const upsertRes = await fetch("/api/users/upsert", {
                 method: "POST",
                 headers: {
                   "Content-Type": "application/json",
                   Authorization: `Bearer ${idToken}`,
                 },
-                body: JSON.stringify({}),
+                body: JSON.stringify({
+                  uid: u.uid,
+                  email: u.email,
+                  displayName: u.displayName,
+                  phone: u.phoneNumber,
+                }),
               });
+              if (!upsertRes.ok) {
+                console.error("upsert after verify failed with status:", upsertRes.status);
+                const errorText = await upsertRes.text().catch(() => "");
+                console.error("upsert error details:", errorText);
+              } else {
+                console.log("✓ User successfully upserted to database after verification");
+              }
             }
           } catch (e) {
-            console.warn("upsert after verify failed", e);
+            console.error("upsert after verify failed", e);
           }
-          // If a session exists, redirect to home; otherwise, send to login with a success notice
+          // Redirect immediately to login page without showing intermediate success page
           const u = auth.currentUser;
-          if (u) {
-            // Instead of redirecting straight to home, send the user to the
-            // login flow so the app can check profile completeness and prompt
-            // for missing student name/phone before allowing full access.
-            setStatus("success");
-            setMessage("Email verified. Redirecting to complete your profile…");
-            setTimeout(() => {
-              const emailForQP = continueEmail || u.email || "";
-              const qp = emailForQP
-                ? `?notice=verify_email_success&email=${encodeURIComponent(
-                    emailForQP
-                  )}&auto_signin=1`
-                : `?notice=verify_email_success&auto_signin=1`;
-              router.replace(`/auth/login${qp}`);
-            }, 300);
-          } else {
-            setStatus("success");
-            setMessage(
-              `Your email${
-                continueEmail ? ` (${continueEmail})` : ""
-              } has been verified. You can now sign in.`
-            );
-            setTimeout(() => {
-              const qp = continueEmail
-                ? `?notice=verify_email_success&email=${encodeURIComponent(
-                    continueEmail
-                  )}`
-                : `?notice=verify_email_success`;
-              router.replace(`/auth/login${qp}`);
-            }, 600);
-          }
+          const emailForQP = continueEmail || u?.email || "";
+          const qp = emailForQP
+            ? `?notice=verify_email_success&email=${encodeURIComponent(
+                emailForQP
+              )}${u ? "&auto_signin=1" : ""}`
+            : `?notice=verify_email_success${u ? "&auto_signin=1" : ""}`;
+          router.replace(`/auth/login${qp}`);
         } catch (e) {
           console.warn("applyActionCode failed", e);
           setStatus("error");
@@ -193,23 +182,12 @@ export default function AuthActionPage() {
       // If there's no oobCode but we received an `email` param, this is
       // likely the post-verification redirect from Firebase's hosted action
       // page: Firebase already applied the action and then redirects to our
-      // continueUrl without the oobCode. Treat this as success and route to
-      // the login page with a success notice.
+      // continueUrl without the oobCode. Redirect immediately to login.
       if (continueEmail) {
-        setStatus("success");
-        setMessage(
-          `Your email${
-            continueEmail ? ` (${continueEmail})` : ""
-          } has been verified. You can now sign in.`
-        );
-        setTimeout(() => {
-          const qp = continueEmail
-            ? `?notice=verify_email_success&email=${encodeURIComponent(
-                continueEmail
-              )}`
-            : `?notice=verify_email_success`;
-          router.replace(`/auth/login${qp}`);
-        }, 600);
+        const qp = `?notice=verify_email_success&email=${encodeURIComponent(
+          continueEmail
+        )}`;
+        router.replace(`/auth/login${qp}`);
         return;
       }
 

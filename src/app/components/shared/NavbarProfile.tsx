@@ -90,9 +90,6 @@ export default function NavbarProfile({
     [user?.accountType, user?.role]
   );
 
-  // Treat any falsy avatarUrl (null, undefined, empty string) as "no avatar" to show skeleton
-  const hasAvatar = Boolean(user?.avatarUrl);
-
   return (
     <>
       <Box sx={{ display: "flex", alignItems: "center", gap: 1, px: 1 }}>
@@ -131,23 +128,17 @@ export default function NavbarProfile({
           ))}
 
         {user ? (
-          // If the passed user doesn't yet have an avatarUrl (or it's falsy), show a circular skeleton
-          // to avoid layout shift while the avatar is being resolved.
-          !hasAvatar ? (
-            <Skeleton variant="circular" width={36} height={36} />
-          ) : (
-            <ButtonBase
-              id="profile-button"
-              onClick={handleToggle}
-              aria-haspopup="true"
-              aria-controls={popoverId}
-              aria-expanded={open ? "true" : "false"}
-              aria-label="Open profile menu"
-              sx={{ borderRadius: "50%" }}
-            >
-              <UserAvatar user={user} size={36} showRing />
-            </ButtonBase>
-          )
+          <ButtonBase
+            id="profile-button"
+            onClick={handleToggle}
+            aria-haspopup="true"
+            aria-controls={popoverId}
+            aria-expanded={open ? "true" : "false"}
+            aria-label="Open profile menu"
+            sx={{ borderRadius: "50%" }}
+          >
+            <UserAvatar user={user} size={36} showRing />
+          </ButtonBase>
         ) : (
           <Skeleton variant="circular" width={36} height={36} />
         )}

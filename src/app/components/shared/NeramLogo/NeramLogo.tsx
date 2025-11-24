@@ -18,6 +18,7 @@ function NeramLogo({ sx }: LogoProps) {
         alt="Online NATA Coaching center in coimbatore"
         width={120}
         height={40}
+        priority
         style={{
           width: "auto",
           height: typeof height === "number" ? `${height}px` : height,

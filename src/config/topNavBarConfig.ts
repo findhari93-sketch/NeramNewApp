@@ -170,6 +170,13 @@ export const topNavBarConfigs: Record<string, Partial<TopNavBarConfig>> = {
     breadcrumbs: { enabled: false },
   },
 
+  "/auth/forgot": {
+    visible: true,
+    backgroundMode: "transparent",
+    breadcrumbs: { enabled: false },
+    showBackButton: true,
+  },
+
   "/auth/complete-signup": {
     visible: false,
   },

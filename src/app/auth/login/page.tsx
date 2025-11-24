@@ -57,6 +57,8 @@ function LoginPageInner() {
     useState<boolean>(false);
   const [snackOpen, setSnackOpen] = useState(false);
   const [snackMessage, setSnackMessage] = useState<string | null>(null);
+  const [isSigningUp, setIsSigningUp] = useState(false);
+  const [isAttemptingLogin, setIsAttemptingLogin] = useState(false);
 
   const getUserLabel = (u: unknown) => {
     if (!u || typeof u !== "object") return null;
@@ -376,7 +378,7 @@ function LoginPageInner() {
     // If a user is already signed in, redirect them to profile — they should
     // never be able to view the login page while authenticated.
     const current = auth.currentUser;
-    if (current) {
+    if (current && !isSigningUp && !isAttemptingLogin) {
       try {
         // If a specific redirect target is provided (e.g. next=/calculator),
         // do not override it here. Let the targeted redirect flow handle it.
@@ -388,7 +390,7 @@ function LoginPageInner() {
 
     const unsub = onAuthStateChanged(auth, (u) => {
       setFirebaseUser(u || null);
-      if (u) {
+      if (u && !isSigningUp && !isAttemptingLogin) {
         // enforce redirect for any signed-in user who navigates to this page
         try {
           // Respect next=... param when present and avoid forcing /profile
@@ -403,7 +405,14 @@ function LoginPageInner() {
       if (pv) setPhoneVerified(true);
     } catch {}
     return () => unsub();
-  }, [router, showGoogleModal, emailFlowPendingProfile, nextTarget]);
+  }, [
+    router,
+    showGoogleModal,
+    emailFlowPendingProfile,
+    nextTarget,
+    isSigningUp,
+    isAttemptingLogin,
+  ]);
 
   // If a verified Firebase user signs in (for example after verification),
   // ensure their Supabase profile has required fields before allowing
@@ -579,6 +588,10 @@ function LoginPageInner() {
         `You must verify your email${
           email ? ` (${email})` : ""
         } before signing in. We just sent you a new link.`
+      );
+    } else if (n === "verify_email_success") {
+      setNotice(
+        `✅ Your email has been verified successfully! You can now sign in with your account.`
       );
     } else if (n === "login_success") {
       setNotice("Signed in successfully.");
@@ -762,9 +775,17 @@ function LoginPageInner() {
         // If email appears to be new (no providers), proceed with signup flow.
         if (emailExists === false) {
           // Double-check server-side what providers exist in case the effect was stale.
-          let methods = isEmail
-            ? await fetchSignInMethodsForEmail(auth, identifier)
-            : [];
+          let methods: string[] = [];
+          if (isEmail) {
+            try {
+              methods = await fetchSignInMethodsForEmail(auth, identifier);
+            } catch (methodsErr) {
+              console.warn(
+                "fetchSignInMethodsForEmail failed during signup check, will try fallback",
+                methodsErr
+              );
+            }
+          }
           if (Array.isArray(methods) && methods.length === 0 && isEmail) {
             try {
               const res = await fetch(
@@ -815,6 +836,8 @@ function LoginPageInner() {
             setEmailPasswordLoading(false);
             return;
           }
+          // Set flag to prevent redirect during signup flow
+          setIsSigningUp(true);
           const cred = await createUserWithEmailAndPassword(
             auth,
             identifier,
@@ -865,6 +888,8 @@ function LoginPageInner() {
           try {
             await signOut(auth);
           } catch {}
+          // Clear the signup flag before redirect
+          setIsSigningUp(false);
           router.replace(
             `/auth/login?notice=verify_email_sent&email=${encodeURIComponent(
               identifier
@@ -874,22 +899,38 @@ function LoginPageInner() {
         }
 
         // For existing users: attempt sign-in
+        setIsAttemptingLogin(true);
         await signInWithEmailOrUsername(identifier, password);
         const u = auth.currentUser;
         if (u && !u.emailVerified) {
           // Check if Google is a provider for this email before sending verification
-          const methods = await fetchSignInMethodsForEmail(
-            auth,
-            u.email || identifier
-          );
+          let methods: string[] = [];
+          try {
+            methods = await fetchSignInMethodsForEmail(
+              auth,
+              u.email || identifier
+            );
+          } catch (methodsErr) {
+            console.warn(
+              "fetchSignInMethodsForEmail failed, continuing anyway",
+              methodsErr
+            );
+          }
           if (methods.includes("google.com")) {
             setEmailPasswordError(
               "This email is registered with Google. Please use 'Sign in with Google' or set a password from your profile."
             );
             await signOut(auth);
+            setIsAttemptingLogin(false);
             setEmailPasswordLoading(false);
             return;
           }
+          // Show clear error message before signing out
+          setEmailPasswordError(
+            `Please verify your email before signing in. We've sent a new verification link to ${
+              u.email || identifier
+            }. Check your inbox and spam folder.`
+          );
           try {
             const actionCodeSettings = {
               url: `${
@@ -904,11 +945,8 @@ function LoginPageInner() {
           try {
             await signOut(auth);
           } catch {}
-          router.replace(
-            `/auth/login?notice=verify_email_required&email=${encodeURIComponent(
-              u?.email || identifier
-            )}`
-          );
+          setIsAttemptingLogin(false);
+          setEmailPasswordLoading(false);
           return;
         }
         if (u) {
@@ -931,22 +969,34 @@ function LoginPageInner() {
         }
         if (u) {
           const idToken = await u.getIdToken();
+          // Reset the login flag before redirecting to allow normal auth state changes
+          setIsAttemptingLogin(false);
           await redirectAfterLogin(idToken);
         }
       } catch (err) {
+        // Reset signup and login flags on error
+        setIsSigningUp(false);
+        setIsAttemptingLogin(false);
         const code = (err as { code?: string } | undefined)?.code || "";
         // If login fails for a Google-linked email, show a helpful message
         if (
           isEmail &&
           (code === "auth/wrong-password" || code === "auth/user-not-found")
         ) {
-          const methods = await fetchSignInMethodsForEmail(auth, identifier);
-          if (methods.includes("google.com")) {
-            setEmailPasswordError(
-              "This email is registered with Google. Please use 'Sign in with Google' or set a password from your profile."
+          try {
+            const methods = await fetchSignInMethodsForEmail(auth, identifier);
+            if (methods.includes("google.com")) {
+              setEmailPasswordError(
+                "This email is registered with Google. Please use 'Sign in with Google' or set a password from your profile."
+              );
+              setEmailPasswordLoading(false);
+              return;
+            }
+          } catch (methodsErr) {
+            console.warn(
+              "fetchSignInMethodsForEmail failed in error handler",
+              methodsErr
             );
-            setEmailPasswordLoading(false);
-            return;
           }
         }
         if (
@@ -1064,7 +1114,13 @@ function LoginPageInner() {
               <Button
                 variant="text"
                 size="small"
-                onClick={() => router.push("/account")}
+                onClick={() => {
+                  const target = form.identifier.trim();
+                  const qp = target
+                    ? `?email=${encodeURIComponent(target)}`
+                    : "";
+                  router.push(`/auth/forgot${qp}`);
+                }}
                 sx={{ alignSelf: "flex-end" }}
               >
                 Forgot password?
@@ -1162,7 +1218,7 @@ function LoginPageInner() {
                   fontSize: { xs: "0.875rem", sm: "0.75rem" },
                 }}
               >
-                Log In to your Account
+                Sign up / Log in into your Account
               </Typography>
             </Box>
 

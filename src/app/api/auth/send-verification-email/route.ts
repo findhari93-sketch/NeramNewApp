@@ -92,22 +92,41 @@ export async function POST(req: Request) {
 
     // Generate email verification link using Firebase Admin SDK
     // This link will expire in 48 hours (172800000 ms)
-    const actionCodeSettings = {
-      url: `${process.env.NEXT_PUBLIC_APP_URL || "https://neramclasses.com"}/auth/action?email=${encodeURIComponent(email)}`,
-      handleCodeInApp: true,
-    };
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://neramclasses.com";
 
-    let verificationLink: string;
+    // Generate the Firebase verification link
+    let firebaseLink: string;
     try {
-      verificationLink = await admin
+      firebaseLink = await admin
         .auth()
-        .generateEmailVerificationLink(email, actionCodeSettings);
+        .generateEmailVerificationLink(email, {
+          url: `${baseUrl}/auth/action?email=${encodeURIComponent(email)}`,
+          handleCodeInApp: false, // Don't handle in app, use web redirect
+        });
     } catch (e) {
       console.error("Failed to generate verification link:", e);
       return NextResponse.json(
         { ok: false, error: "Failed to generate verification link" },
         { status: 500 }
       );
+    }
+
+    // Extract oobCode from Firebase link and create custom link
+    let verificationLink: string;
+    try {
+      const firebaseUrl = new URL(firebaseLink);
+      const oobCode = firebaseUrl.searchParams.get("oobCode");
+
+      if (!oobCode) {
+        throw new Error("No oobCode in generated link");
+      }
+
+      // Create custom verification link pointing to our domain
+      verificationLink = `${baseUrl}/auth/action?mode=verifyEmail&oobCode=${oobCode}&email=${encodeURIComponent(email)}`;
+    } catch (e) {
+      console.error("Failed to create custom verification link:", e);
+      // Fallback to Firebase link if custom link creation fails
+      verificationLink = firebaseLink;
     }
 
     // Generate branded HTML and text email content
