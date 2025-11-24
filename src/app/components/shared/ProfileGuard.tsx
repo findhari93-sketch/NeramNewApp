@@ -321,6 +321,8 @@ export default function ProfileGuard({
             // clear controller after response
             upsertControllerRef.current = null;
             if (res.ok && j && j.ok) {
+              // Reset forceComplete before closing to prevent alert
+              setProfileForceComplete(false);
               setOpen(false);
               try {
                 window.dispatchEvent(
