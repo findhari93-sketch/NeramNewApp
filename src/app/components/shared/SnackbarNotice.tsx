@@ -1,12 +1,12 @@
 "use client";
-import React from "react";
+import React, { Suspense } from "react";
 import type { SnackbarCloseReason } from "@mui/material";
 import Snackbar from "@mui/material/Snackbar";
 import IconButton from "@mui/material/IconButton";
 import CloseIcon from "@mui/icons-material/Close";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 
-export default function SnackbarNotice() {
+function SnackbarNoticeContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -84,5 +84,13 @@ export default function SnackbarNotice() {
       message={message}
       action={action}
     />
+  );
+}
+
+export default function SnackbarNotice() {
+  return (
+    <Suspense fallback={null}>
+      <SnackbarNoticeContent />
+    </Suspense>
   );
 }
