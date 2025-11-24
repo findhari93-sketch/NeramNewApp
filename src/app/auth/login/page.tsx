@@ -632,32 +632,53 @@ function LoginPageInner() {
     setResendLoading(true);
     setResendResult(null);
     try {
-      const u = auth.currentUser;
-      if (!u) {
+      // Use email from URL query parameter (set when user was redirected here)
+      const targetEmail = emailFromQuery;
+
+      if (!targetEmail) {
+        setResendResult("Please refresh the page and try again.");
+        return;
+      }
+
+      // Send verification email via our branded email endpoint
+      try {
+        const emailResponse = await fetch("/api/auth/send-verification-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: targetEmail }),
+        });
+
+        const emailResult = await emailResponse.json();
+
+        if (!emailResponse.ok) {
+          throw new Error(emailResult.error || "Failed to send email");
+        }
+
         setResendResult(
-          "To resend, enter your email and password above and click Sign In — we'll resend automatically."
+          `Verification email sent to ${targetEmail}. Please check your inbox and spam folder.`
         );
-        return;
+      } catch (apiError) {
+        console.warn("Branded email failed, trying Firebase fallback", apiError);
+
+        // Fallback: Try to get user and send via Firebase
+        const u = auth.currentUser;
+        if (!u) {
+          throw new Error("Please sign in again to resend verification email.");
+        }
+
+        const actionCodeSettings = {
+          url: `${window.location.origin}/auth/action?email=${encodeURIComponent(targetEmail)}`,
+          handleCodeInApp: true,
+        } as const;
+        await sendEmailVerification(u, actionCodeSettings);
+
+        setResendResult(
+          `Verification email sent to ${targetEmail}. Please check your inbox and spam folder.`
+        );
       }
-      if (u.emailVerified) {
-        setResendResult("Your email is already verified.");
-        return;
-      }
-      const targetEmail = u.email || emailFromQuery || undefined;
-      const actionCodeSettings = {
-        url: `${window.location.origin}/auth/action?email=${encodeURIComponent(
-          targetEmail || ""
-        )}`,
-        handleCodeInApp: true,
-      } as const;
-      await sendEmailVerification(u, actionCodeSettings);
-      setResendResult(
-        `Verification link sent${
-          targetEmail ? ` to ${targetEmail}` : ""
-        }. Please check your inbox and spam folder.`
-      );
-    } catch {
-      setResendResult("Failed to resend verification. Please try again later.");
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to resend verification email.";
+      setResendResult(errorMessage);
     } finally {
       setResendLoading(false);
       setResendAttempts((a) => a + 1);
@@ -1372,20 +1393,20 @@ function LoginPageInner() {
               {error && <Alert severity="error">{error}</Alert>}
 
               {/* Resend verification section - Professional grade */}
-              {notice && notice.toLowerCase().includes("verify") && (
+              {notice && notice.toLowerCase().includes("verify") && emailFromQuery && (
                 <Box
                   sx={{
                     border: "1px solid",
                     borderColor: "divider",
                     borderRadius: 1,
-                    p: 2,
+                    p: 3,
                     backgroundColor: "background.paper",
                   }}
                 >
-                  <Stack spacing={2}>
+                  <Stack spacing={2.5}>
                     <Box>
                       <Typography
-                        variant="subtitle2"
+                        variant="subtitle1"
                         fontWeight={600}
                         gutterBottom
                       >
@@ -1394,17 +1415,19 @@ function LoginPageInner() {
                       <Typography
                         variant="body2"
                         color="text.secondary"
-                        sx={{ mb: 1.5 }}
                       >
-                        Check your spam folder, or request a new verification
-                        email below.
+                        We sent a verification link to <strong>{emailFromQuery}</strong>.
+                        Check your spam folder, or request a new email below.
                       </Typography>
                     </Box>
 
                     {resendResult && (
                       <Alert
                         severity={
-                          resendResult.includes("Failed") ? "error" : "success"
+                          resendResult.toLowerCase().includes("failed") ||
+                          resendResult.toLowerCase().includes("error")
+                            ? "error"
+                            : "success"
                         }
                         sx={{ fontSize: "0.875rem" }}
                       >
@@ -1415,14 +1438,14 @@ function LoginPageInner() {
                     {resendAttempts >= MAX_RESEND_ATTEMPTS ? (
                       <Box>
                         <Alert severity="warning" sx={{ mb: 1.5 }}>
-                          Maximum resend attempts reached. Please wait before
+                          Maximum resend attempts reached. Please wait a few minutes before
                           trying again.
                         </Alert>
                         <Button
                           fullWidth
                           variant="outlined"
                           onClick={resetResendSession}
-                          size="medium"
+                          size="large"
                         >
                           Reset and Try Again
                         </Button>
@@ -1434,7 +1457,7 @@ function LoginPageInner() {
                           variant="contained"
                           onClick={handleResendVerification}
                           disabled={resendLoading || cooldown > 0}
-                          size="medium"
+                          size="large"
                           startIcon={
                             resendLoading ? (
                               <CircularProgress size={20} color="inherit" />
@@ -1459,17 +1482,43 @@ function LoginPageInner() {
                           )}
                       </Box>
                     )}
+
+                    <Divider />
+
+                    <Box sx={{ textAlign: "center" }}>
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        gutterBottom
+                      >
+                        Want to use a different email?
+                      </Typography>
+                      <Button
+                        variant="text"
+                        size="small"
+                        onClick={() => {
+                          router.push("/auth/login");
+                        }}
+                      >
+                        Back to Sign In
+                      </Button>
+                    </Box>
                   </Stack>
                 </Box>
               )}
 
-              {/* Email/Password first */}
-              <EmailPasswordAuth />
+              {/* Email/Password form - Hide when showing verification notice */}
+              {!(notice && notice.toLowerCase().includes("verify") && emailFromQuery) && (
+                <EmailPasswordAuth />
+              )}
 
-              <Divider>OR</Divider>
+              {/* Hide other sign-in options when showing verification notice */}
+              {!(notice && notice.toLowerCase().includes("verify") && emailFromQuery) && (
+                <>
+                  <Divider>OR</Divider>
 
-              {/* Google next */}
-              <Button
+                  {/* Google next */}
+                  <Button
                 variant="outlined"
                 onClick={googleSignIn}
                 disabled={loading}
@@ -1548,6 +1597,8 @@ function LoginPageInner() {
                   </Typography>
                 )}
               </Box>
+                </>
+              )}
             </Stack>
           </Box>
         </Container>
