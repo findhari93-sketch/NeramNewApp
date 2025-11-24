@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { Suspense } from "react";
 import Box from "@mui/material/Box";
 import Container from "@mui/material/Container";
 import Typography from "@mui/material/Typography";
@@ -12,7 +12,7 @@ import Footer from "./components/shared/Footer/footer";
 import Image from "next/image";
 import Link from "next/link";
 
-export default function NotFound() {
+function NotFoundContent() {
   return (
     <Box
       sx={{
@@ -89,5 +89,15 @@ export default function NotFound() {
         <Footer />
       </Box>
     </Box>
+  );
+}
+
+export default function NotFound() {
+  return (
+    <Suspense
+      fallback={<Box sx={{ minHeight: "100dvh", bgcolor: "#2b2d4e" }} />}
+    >
+      <NotFoundContent />
+    </Suspense>
   );
 }

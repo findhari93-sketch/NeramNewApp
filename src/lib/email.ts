@@ -20,16 +20,39 @@ export function getTransport() {
   const secure =
     String(process.env.SMTP_SECURE || "false").toLowerCase() === "true";
 
+  // Log configuration (mask password for security)
+  console.log("[email] SMTP Configuration:", {
+    host,
+    port,
+    secure,
+    hasUser: !!user,
+    hasPass: !!pass,
+    passLength: pass?.length || 0,
+    environment: process.env.NODE_ENV,
+  });
+
   if (!host || !user || !pass) {
-    throw new Error("SMTP not configured (SMTP_HOST/SMTP_USER/SMTP_PASS)");
+    const missingVars = [];
+    if (!host) missingVars.push("SMTP_HOST");
+    if (!user) missingVars.push("SMTP_USER");
+    if (!pass) missingVars.push("SMTP_PASS");
+
+    const error = `SMTP not configured. Missing: ${missingVars.join(", ")}`;
+    console.error("[email] Configuration error:", error);
+    throw new Error(error);
   }
 
-  return nodemailer.createTransport({
+  const transporter = nodemailer.createTransport({
     host,
     port,
     secure,
     auth: { user, pass },
+    // Enable debug logging in development
+    debug: process.env.NODE_ENV === "development",
+    logger: process.env.NODE_ENV === "development",
   });
+
+  return transporter;
 }
 
 export async function sendMail(opts: MailOptions) {
@@ -37,14 +60,47 @@ export async function sendMail(opts: MailOptions) {
     process.env.MAIL_FROM ||
     process.env.FROM_EMAIL ||
     "no-reply@neramclasses.com";
-  const transporter = getTransport();
-  const info = await transporter.sendMail({
+
+  console.log("[email] Sending email:", {
     from,
     to: opts.to,
     subject: opts.subject,
-    html: opts.html,
-    text: opts.text,
-    attachments: opts.attachments as any,
+    hasHtml: !!opts.html,
+    hasText: !!opts.text,
+    attachmentCount: opts.attachments?.length || 0,
   });
-  return info;
+
+  try {
+    const transporter = getTransport();
+
+    // Verify connection before sending
+    await transporter.verify();
+    console.log("[email] SMTP connection verified successfully");
+
+    const info = await transporter.sendMail({
+      from,
+      to: opts.to,
+      subject: opts.subject,
+      html: opts.html,
+      text: opts.text,
+      attachments: opts.attachments as any,
+    });
+
+    console.log("[email] Email sent successfully:", {
+      messageId: info.messageId,
+      response: info.response,
+      accepted: info.accepted,
+      rejected: info.rejected,
+    });
+
+    return info;
+  } catch (error) {
+    console.error("[email] Failed to send email:", {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      to: opts.to,
+      subject: opts.subject,
+    });
+    throw error;
+  }
 }

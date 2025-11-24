@@ -1012,7 +1012,7 @@ function LoginPageInner() {
     };
 
     const buttonLabel = emailPasswordLoading
-      ? ""
+      ? "Signing in..."
       : checkingEmail
       ? "Checking account..."
       : emailExists === false && stagedNewEmail
@@ -1136,9 +1136,11 @@ function LoginPageInner() {
           sx={{
             py: { xs: 1.5, sm: 1 },
             fontSize: { xs: "1rem", sm: "0.875rem" },
+            gap: 1,
           }}
         >
-          {emailPasswordLoading ? <CircularProgress size={20} /> : buttonLabel}
+          {emailPasswordLoading && <CircularProgress size={20} color="inherit" />}
+          {buttonLabel}
         </Button>
         {emailPasswordError && (
           <Alert severity="error">{emailPasswordError}</Alert>
