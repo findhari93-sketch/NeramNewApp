@@ -279,6 +279,11 @@ export default function ApplicationDetail({ params }: Props) {
     app?.id ??
     "#";
 
+  // Check if application is approved
+  const normalized = String(app.status || "pending").toLowerCase();
+  const isApproved =
+    normalized.includes("approve") || normalized.includes("accept");
+
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <Box sx={{ mb: 3 }}>
@@ -366,27 +371,44 @@ export default function ApplicationDetail({ params }: Props) {
         ))}
       </MUIGrid>
 
-      <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 4 }}>
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "flex-end",
+          mt: 4,
+          gap: 1,
+        }}
+      >
         <Button
           variant="contained"
           color="primary"
           size="large"
           startIcon={<PaymentIcon />}
           onClick={createPayment}
+          disabled={!isApproved}
           sx={{
             textTransform: "none",
             fontWeight: 600,
             px: 4,
             py: 1.5,
             borderRadius: 2,
-            boxShadow: 2,
+            boxShadow: isApproved ? 2 : 0,
             "&:hover": {
-              boxShadow: 4,
+              boxShadow: isApproved ? 4 : 0,
             },
           }}
         >
           Complete Payment
         </Button>
+        {!isApproved && (
+          <Typography
+            variant="body2"
+            sx={{ color: "text.secondary", textAlign: "right" }}
+          >
+            Wait for admin approval or contact 9176137043 for reminder
+          </Typography>
+        )}
       </Box>
     </Container>
   );
