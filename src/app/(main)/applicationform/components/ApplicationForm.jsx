@@ -33,8 +33,8 @@ export default function ApplicationForm() {
   const [diplomaYear, setDiplomaYear] = useState("Third Year");
   const [diplomaCollege, setDiplomaCollege] = useState("");
   const [otherDescription, setOtherDescription] = useState("");
-  const [selectedCourse, setSelectedCourse] = useState(null);
-  const [softwareCourse, setSoftwareCourse] = useState("Revit");
+  const [selectedCourse, setSelectedCourse] = useState("nata-jee-2yr");
+  const [softwareCourse, setSoftwareCourse] = useState("");
   const [isCompactSelector, setIsCompactSelector] = useState(false);
   const [showStdPopup, setShowStdPopup] = useState(false);
   const [instagramId, setInstagramId] = useState("");
@@ -49,6 +49,16 @@ export default function ApplicationForm() {
   const [currentStep, setCurrentStep] = useState(1);
   const [stepLoading, setStepLoading] = useState(false);
   const fieldRefs = useRef({});
+
+  // Normalize an international phone number to +<digits>, guessing India (+91) when 10 digits provided.
+  const normalizeIntlPhone = React.useCallback((raw) => {
+    if (!raw) return "";
+    const digits = String(raw).replace(/[^0-9]/g, "");
+    if (!digits) return "";
+    if (String(raw).trim().startsWith("+")) return "+" + digits; // strip formatting after plus
+    if (digits.length === 10) return "+91" + digits; // assume India for 10-digit local numbers
+    return "+" + digits; // fallback: just prefix '+'
+  }, []);
 
   // Keep form.classGrade in sync with schoolStd when form state is lifted here.
   React.useEffect(() => {
@@ -467,7 +477,17 @@ export default function ApplicationForm() {
                     undefined,
                 };
               });
-              setAltPhone((p) => p || db.alt_phone || "");
+              // Load and normalize alternate phone from any recognized flattened key.
+              const rawAlt =
+                db.altPhone || db.alternate_phone || db.alternatePhone;
+              if (rawAlt) {
+                setAltPhone(normalizeIntlPhone(rawAlt));
+                if (!showAltContact) {
+                  try {
+                    setShowAltContact(true);
+                  } catch {}
+                }
+              }
               setInstagramId((p) => p || db.instagram_handle || "");
               setEducationType((p) => p || db.education_type || "school");
               setSchoolStd((p) => p || db.school_std || "12th");
@@ -480,7 +500,7 @@ export default function ApplicationForm() {
               setSelectedCourse((p) =>
                 p == null ? db.selected_course ?? null : p
               );
-              setSoftwareCourse((p) => p || db.software_course || "Revit");
+              setSoftwareCourse((p) => p || db.software_course || "");
             }
           }
         }
@@ -524,7 +544,7 @@ export default function ApplicationForm() {
             diplomaCollege: diplomaCollege,
             otherDescription: otherDescription,
             selectedCourse: selectedCourse,
-            softwareCourse: softwareCourse || "Revit",
+            softwareCourse: softwareCourse,
           };
 
           localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(payload));
@@ -658,7 +678,14 @@ export default function ApplicationForm() {
               : undefined,
           // removed payment/course fields
         });
-        setAltPhone(db.alt_phone ?? "");
+        // Only update altPhone if user hasn't entered anything yet (preserve user input during typing)
+        setAltPhone((prevAltPhone) => {
+          // If user has typed something (non-empty), keep it. Otherwise use DB value.
+          if (prevAltPhone && prevAltPhone.trim()) {
+            return prevAltPhone;
+          }
+          return db.alternate_phone ?? db.alt_phone ?? "";
+        });
         setInstagramId(db.instagram_handle ?? "");
         // removed languages/youtube/course mapping
         setEducationType(db.education_type ?? "school");
@@ -669,7 +696,7 @@ export default function ApplicationForm() {
         setDiplomaYear(db.diploma_year ?? "Third Year");
         setDiplomaCollege(db.diploma_college ?? "");
         setOtherDescription(db.other_description ?? "");
-        setSoftwareCourse(db.software_course ?? "Revit");
+        setSoftwareCourse(db.software_course ?? "");
       } catch {
       } finally {
         if (!cancelled) setStepLoading(false);
@@ -833,6 +860,17 @@ export default function ApplicationForm() {
           setReviewMode={setReviewMode}
           setEditField={setEditField}
           setCurrentStep={setStep}
+          setForm={setForm}
+          setAltPhone={setAltPhone}
+          setInstagramId={setInstagramId}
+          setSchoolStd={setSchoolStd}
+          setCollegeName={setCollegeName}
+          setCollegeYear={setCollegeYear}
+          setDiplomaCourse={setDiplomaCourse}
+          setDiplomaYear={setDiplomaYear}
+          setDiplomaCollege={setDiplomaCollege}
+          setOtherDescription={setOtherDescription}
+          setSelectedCourse={setSelectedCourse}
           saveToDatabase={async (overrides) => {
             const result = await saveToDatabase("review", overrides);
             // Return result without redirecting - StepReview will handle redirect after admin notification

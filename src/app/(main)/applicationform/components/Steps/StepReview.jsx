@@ -9,8 +9,18 @@ import {
   Button,
   Snackbar,
   Alert,
+  TextField,
+  Select,
+  MenuItem,
+  IconButton,
+  FormControl,
+  InputLabel,
+  CircularProgress,
 } from "@mui/material";
+import EditIcon from "@mui/icons-material/Edit";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import StepHeader from "../ui/TitleWsteps";
+import PhoneInput from "react-phone-input-2";
 
 export default function StepReview(props) {
   const {
@@ -28,20 +38,32 @@ export default function StepReview(props) {
     selectedCourse,
     hoveredKey,
     setHoveredKey,
-    setReviewMode,
-    setEditField,
-    handleGoToStep,
     onSubmitSuccess,
+    saveToDatabase,
+    setForm,
+    setAltPhone,
+    setInstagramId,
+    setSchoolStd,
+    setCollegeName,
+    setCollegeYear,
+    setDiplomaCourse,
+    setDiplomaYear,
+    setDiplomaCollege,
+    setOtherDescription,
+    setSelectedCourse,
+    handleGoToStep,
   } = props;
 
-  // dialog state for edit confirmation
-  const [confirmOpen, setConfirmOpen] = React.useState(false);
-  const [pendingEdit, setPendingEdit] = React.useState({
-    key: null,
-    step: null,
-  });
+  // Edit dialog state
+  const [editDialogOpen, setEditDialogOpen] = React.useState(false);
+  const [editingField, setEditingField] = React.useState(null);
+  const [editValue, setEditValue] = React.useState("");
+  const [isSaving, setIsSaving] = React.useState(false);
 
-  // Snackbar state for non-blocking messages (replaces alert())
+  // Confirmation dialog for education type edit
+  const [confirmDialogOpen, setConfirmDialogOpen] = React.useState(false);
+
+  // Snackbar state for non-blocking messages
   const [snackbarOpen, setSnackbarOpen] = React.useState(false);
   const [snackbarMsg, setSnackbarMsg] = React.useState("");
   const [snackbarSeverity, setSnackbarSeverity] = React.useState("success");
@@ -52,38 +74,382 @@ export default function StepReview(props) {
     setSnackbarOpen(true);
   };
 
-  // map section title to step index (used when navigating back)
-  // 3-step flow: 1=Basic, 2=Education, 3=Review
-  const sectionToStep = (title) => {
-    switch (title) {
-      case "Basic Details":
-      case "Address":
-        return 1; // Basic details / address step
-      case "Education":
-        return 2; // Education step
-      case "Selected Course":
-        return 2; // Course selection lives under Education
-      default:
-        return 1;
+  // Field metadata: type, options, etc.
+  const getFieldMetadata = (key) => {
+    const metadata = {
+      studentName: {
+        type: "text",
+        label: "Student Name",
+        dbField: "studentName",
+      },
+      fatherName: { type: "text", label: "Father Name", dbField: "fatherName" },
+      phone: { type: "phone", label: "Phone", readonly: true },
+      altPhone: {
+        type: "phone",
+        label: "Additional Contact",
+        dbField: "altPhone",
+      },
+      instagramId: { type: "text", label: "Instagram", dbField: "instagramId" },
+      zipCode: { type: "text", label: "Zip Code", dbField: "zipCode" },
+      city: { type: "text", label: "City", dbField: "city" },
+      state: { type: "text", label: "State", dbField: "state" },
+      country: { type: "text", label: "Country", dbField: "country" },
+      educationType: {
+        type: "select",
+        label: "Education Type",
+        options: [
+          { value: "school", label: "School" },
+          { value: "college", label: "College" },
+          { value: "diploma", label: "Diploma" },
+          { value: "other", label: "Other" },
+        ],
+        navigateToStep: true,
+      },
+      classGrade: {
+        type: "select",
+        label: "Class / Standard",
+        dbField: "schoolStd",
+        options: [
+          { value: "Below 10th", label: "Below 10th" },
+          { value: "10th", label: "10th" },
+          { value: "11th", label: "11th" },
+          { value: "12th", label: "12th" },
+        ],
+      },
+      board: {
+        type: "select",
+        label: "Board",
+        dbField: "board",
+        options: [
+          { value: "CBSE", label: "CBSE" },
+          { value: "State Board", label: "State Board" },
+          { value: "ICSE", label: "ICSE" },
+          { value: "Other", label: "Other" },
+        ],
+      },
+      collegeName: {
+        type: "text",
+        label: "College Name",
+        dbField: "collegeName",
+      },
+      collegeYear: {
+        type: "select",
+        label: "College Year",
+        dbField: "collegeYear",
+        options: [
+          { value: "1st Year", label: "1st Year" },
+          { value: "2nd Year", label: "2nd Year" },
+          { value: "3rd Year", label: "3rd Year" },
+          { value: "4th Year", label: "4th Year" },
+          { value: "5th Year", label: "5th Year" },
+        ],
+      },
+      diplomaCourse: {
+        type: "text",
+        label: "Diploma Course",
+        dbField: "diplomaCourse",
+      },
+      diplomaYear: {
+        type: "select",
+        label: "Diploma Year",
+        dbField: "diplomaYear",
+        options: [
+          { value: "First Year", label: "First Year" },
+          { value: "Second Year", label: "Second Year" },
+          { value: "Third Year", label: "Third Year" },
+          { value: "Completed", label: "Completed" },
+        ],
+      },
+      diplomaCollege: {
+        type: "text",
+        label: "Diploma College",
+        dbField: "diplomaCollege",
+      },
+      otherDescription: {
+        type: "textarea",
+        label: "Description",
+        dbField: "otherDescription",
+      },
+      selectedCourse: {
+        type: "select",
+        label: "Selected Course",
+        dbField: "selectedCourse",
+        options: [
+          { value: "nata-jee-2yr", label: "NATA/JEE 2 Year long" },
+          { value: "crash", label: "Crash course" },
+          { value: "revit", label: "Revit Architecture" },
+          { value: "other", label: "Other" },
+        ],
+      },
+    };
+    return metadata[key] || { type: "text", label: key };
+  };
+
+  // Open edit dialog - directly show the edit field
+  const handleEditClick = (key, label, value) => {
+    const metadata = getFieldMetadata(key);
+
+    // If field is readonly, show message
+    if (metadata.readonly) {
+      showSnackbar("This field cannot be edited from here", "info");
+      return;
+    }
+
+    // If field requires navigation to step (like educationType), show confirmation
+    if (metadata.navigateToStep && key === "educationType") {
+      setConfirmDialogOpen(true);
+      return;
+    }
+
+    setEditingField({ key, label, metadata });
+    setEditValue(value || "");
+    setEditDialogOpen(true);
+  };
+
+  // Handle education type edit confirmation
+  const handleConfirmNavigateToEducation = () => {
+    setConfirmDialogOpen(false);
+    if (handleGoToStep) {
+      handleGoToStep(2, "educationType"); // Navigate to step 2 (Education step)
     }
   };
 
-  // helper to format academic year start -> "YYYY-YY"
-  const getAcademicStartYear = (d = new Date()) => {
-    const y = d.getFullYear();
-    const m = d.getMonth();
-    const date = d.getDate();
-    return m > 5 || (m === 5 && date >= 25) ? y : y - 1;
+  // Handle back button click
+  const handleBackClick = () => {
+    if (handleGoToStep) {
+      handleGoToStep(2); // Go back to step 2 (Education step)
+    }
   };
-  const formatAcademicYear = (start) => {
-    const s = Number(start) || getAcademicStartYear();
-    const end = (s + 1) % 100;
-    return `${s}-${String(end).padStart(2, "0")}`;
+
+  // Save edit to database
+  const handleSaveEdit = async () => {
+    if (!editingField) return;
+
+    setIsSaving(true);
+
+    try {
+      const { auth } = await import("../../../../../lib/firebase");
+      const currentUser = auth.currentUser;
+
+      if (!currentUser) {
+        showSnackbar("Please log in to save changes", "error");
+        setIsSaving(false);
+        return;
+      }
+
+      const token = await currentUser.getIdToken();
+      const fieldKey = editingField.key;
+
+      // Prepare payload based on field
+      const payload = {
+        uid: currentUser.uid,
+      };
+
+      // Map field to database column
+      if (fieldKey === "altPhone") {
+        payload.alternate_phone = editValue;
+      } else if (fieldKey === "instagramId") {
+        payload.instagram = editValue;
+      } else if (fieldKey === "studentName") {
+        payload.displayName = editValue;
+      } else if (fieldKey === "fatherName") {
+        payload.fatherName = editValue;
+      } else if (fieldKey === "zipCode") {
+        payload.zipCode = editValue;
+      } else if (fieldKey === "city") {
+        payload.city = editValue;
+      } else if (fieldKey === "state") {
+        payload.state = editValue;
+      } else if (fieldKey === "country") {
+        payload.country = editValue;
+      } else if (fieldKey === "classGrade") {
+        payload.schoolStd = editValue;
+      } else if (fieldKey === "board") {
+        payload.board = editValue;
+      } else if (fieldKey === "collegeName") {
+        payload.collegeName = editValue;
+      } else if (fieldKey === "collegeYear") {
+        payload.collegeYear = editValue;
+      } else if (fieldKey === "diplomaCourse") {
+        payload.diplomaCourse = editValue;
+      } else if (fieldKey === "diplomaYear") {
+        payload.diplomaYear = editValue;
+      } else if (fieldKey === "diplomaCollege") {
+        payload.diplomaCollege = editValue;
+      } else if (fieldKey === "otherDescription") {
+        payload.otherDescription = editValue;
+      } else if (fieldKey === "selectedCourse") {
+        payload.selectedCourse = editValue;
+      }
+
+      // Make API call to save data
+      const response = await fetch("/api/users/upsert", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const result = await response.json();
+        showSnackbar(result.error || "Failed to save changes", "error");
+        setIsSaving(false);
+        return;
+      }
+
+      // Success - show message
+      showSnackbar("Changes saved successfully!", "success");
+
+      // Update local state immediately to reflect changes in UI
+      const editedFieldKey = editingField.key;
+      if (editedFieldKey === "altPhone" && setAltPhone) {
+        setAltPhone(editValue);
+      } else if (editedFieldKey === "instagramId" && setInstagramId) {
+        setInstagramId(editValue);
+      } else if (editedFieldKey === "studentName" && setForm) {
+        setForm((prev) => ({ ...prev, studentName: editValue }));
+      } else if (editedFieldKey === "fatherName" && setForm) {
+        setForm((prev) => ({ ...prev, fatherName: editValue }));
+      } else if (editedFieldKey === "zipCode" && setForm) {
+        setForm((prev) => ({ ...prev, zipCode: editValue }));
+      } else if (editedFieldKey === "city" && setForm) {
+        setForm((prev) => ({ ...prev, city: editValue }));
+      } else if (editedFieldKey === "state" && setForm) {
+        setForm((prev) => ({ ...prev, state: editValue }));
+      } else if (editedFieldKey === "country" && setForm) {
+        setForm((prev) => ({ ...prev, country: editValue }));
+      } else if (editedFieldKey === "classGrade" && setSchoolStd) {
+        setSchoolStd(editValue);
+        setForm((prev) => ({ ...prev, classGrade: editValue }));
+      } else if (editedFieldKey === "board" && setForm) {
+        setForm((prev) => ({ ...prev, board: editValue }));
+      } else if (editedFieldKey === "collegeName" && setCollegeName) {
+        setCollegeName(editValue);
+      } else if (editedFieldKey === "collegeYear" && setCollegeYear) {
+        setCollegeYear(editValue);
+      } else if (editedFieldKey === "diplomaCourse" && setDiplomaCourse) {
+        setDiplomaCourse(editValue);
+      } else if (editedFieldKey === "diplomaYear" && setDiplomaYear) {
+        setDiplomaYear(editValue);
+      } else if (editedFieldKey === "diplomaCollege" && setDiplomaCollege) {
+        setDiplomaCollege(editValue);
+      } else if (editedFieldKey === "otherDescription" && setOtherDescription) {
+        setOtherDescription(editValue);
+      } else if (editedFieldKey === "selectedCourse" && setSelectedCourse) {
+        setSelectedCourse(editValue);
+      }
+
+      setIsSaving(false);
+
+      // Close dialog after a brief delay
+      setTimeout(() => {
+        setEditDialogOpen(false);
+        setEditingField(null);
+        setEditValue("");
+      }, 500);
+    } catch (error) {
+      console.error("Error saving edit:", error);
+      showSnackbar("An error occurred while saving", "error");
+      setIsSaving(false);
+    }
+  };
+
+  // Cancel edit
+  const handleCancelEdit = () => {
+    setEditDialogOpen(false);
+    setEditingField(null);
+    setEditValue("");
+  };
+
+  // Render edit control based on field type
+  const renderEditControl = () => {
+    if (!editingField) return null;
+
+    const { metadata } = editingField;
+
+    if (metadata.type === "phone") {
+      return (
+        <PhoneInput
+          country={"in"}
+          value={editValue}
+          onChange={(value) => setEditValue(value)}
+          inputStyle={{ width: "100%", height: 40 }}
+          containerStyle={{ marginTop: 8 }}
+          enableSearch
+          autoFocus
+        />
+      );
+    }
+
+    if (metadata.type === "select") {
+      return (
+        <FormControl fullWidth sx={{ mt: 2 }}>
+          <InputLabel>{metadata.label}</InputLabel>
+          <Select
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            label={metadata.label}
+            autoFocus
+          >
+            {metadata.options?.map((opt) => (
+              <MenuItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      );
+    }
+
+    if (metadata.type === "textarea") {
+      return (
+        <TextField
+          fullWidth
+          multiline
+          rows={4}
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          variant="outlined"
+          label={metadata.label}
+          sx={{ mt: 2 }}
+          autoFocus
+        />
+      );
+    }
+
+    // Default: text field
+    return (
+      <TextField
+        fullWidth
+        value={editValue}
+        onChange={(e) => setEditValue(e.target.value)}
+        variant="outlined"
+        label={metadata.label}
+        sx={{ mt: 2 }}
+        autoFocus
+      />
+    );
   };
 
   return (
     <Box sx={{ maxWidth: 520, m: { xs: 2, md: 5 } }}>
-      <StepHeader title="Review your details" steps="Step 3 of 3" />
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+        <IconButton
+          onClick={handleBackClick}
+          sx={{
+            color: "#7c1fa0",
+            "&:hover": { bgcolor: "rgba(124, 31, 160, 0.08)" },
+          }}
+          aria-label="Go back to previous step"
+        >
+          <ArrowBackIcon />
+        </IconButton>
+        <Box sx={{ flex: 1 }}>
+          <StepHeader title="Review your details" steps="Step 3 of 3" />
+        </Box>
+      </Box>
       <Box
         sx={{
           background: "#fff",
@@ -96,7 +462,7 @@ export default function StepReview(props) {
         {(() => {
           const sections = [];
 
-          // Basic Details (Step 2)
+          // Basic Details
           sections.push({
             title: "Basic Details",
             items: [
@@ -108,7 +474,7 @@ export default function StepReview(props) {
             ],
           });
 
-          // Education (Step 3)
+          // Education
           const educationLabel =
             educationType === "school"
               ? "School"
@@ -121,13 +487,14 @@ export default function StepReview(props) {
           const educationItems = [
             ["educationType", "Education (type)", educationLabel],
           ];
-          // add selected course as its own section in review
+
           const courseItems = [];
           courseItems.push([
             "selectedCourse",
             "Selected course",
             selectedCourse || "-",
           ]);
+
           if (educationType === "school") {
             educationItems.push([
               "classGrade",
@@ -162,7 +529,7 @@ export default function StepReview(props) {
           // Selected course section
           sections.push({ title: "Selected Course", items: courseItems });
 
-          // Address (Step 2/basic as well)
+          // Address
           sections.push({
             title: "Address",
             items: [
@@ -173,12 +540,10 @@ export default function StepReview(props) {
             ],
           });
 
-          // Removed Course/Payment and Preferences sections
-
-          // Render sections
+          // Render sections with improved UX
           return sections.map((sec) => (
             <div key={sec.title} style={{ marginBottom: 12 }}>
-              <Typography sx={{ fontWeight: 600, mb: 1 }}>
+              <Typography sx={{ fontWeight: 600, mb: 1, fontSize: 14 }}>
                 {sec.title}
               </Typography>
               <div
@@ -196,60 +561,60 @@ export default function StepReview(props) {
                       key={k}
                       onMouseEnter={() => setHoveredKey && setHoveredKey(k)}
                       onMouseLeave={() => setHoveredKey && setHoveredKey(null)}
-                      onClick={() => {
-                        // open confirmation dialog before navigating
-                        const stepIdx = sectionToStep(sec.title);
-                        setPendingEdit({ key: k, step: stepIdx, label });
-                        setConfirmOpen(true);
-                      }}
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          setReviewMode && setReviewMode(false);
-                          setEditField && setEditField(k);
-                        }
-                      }}
                       style={{
                         display: "flex",
                         justifyContent: "space-between",
                         alignItems: "center",
-                        padding: "8px 6px",
+                        padding: "10px 8px",
                         borderBottom: "1px solid #f6f6f6",
-                        background: isHover ? "#fbfbfb" : "transparent",
-                        cursor: "pointer",
+                        background: isHover ? "#fafafa" : "transparent",
+                        transition: "background 0.2s ease",
                       }}
                     >
-                      <div style={{ color: "#666" }}>{label}</div>
+                      <div style={{ color: "#666", fontSize: 13 }}>{label}</div>
                       <div
                         style={{
                           display: "flex",
                           alignItems: "center",
-                          gap: 8,
+                          gap: 12,
                         }}
                       >
                         <div
                           style={{
                             color: "#111",
-                            minWidth: 160,
+                            minWidth: 140,
                             textAlign: "right",
+                            fontSize: 14,
+                            fontWeight: 500,
                           }}
                         >
                           {value !== undefined && value !== null
                             ? String(value)
                             : "-"}
                         </div>
+                        {/* Fixed-width edit icon space - no dancing! */}
                         <div
                           style={{
-                            width: 28,
-                            height: 28,
-                            display: isHover ? "flex" : "none",
+                            width: 32,
+                            height: 32,
+                            display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
-                            cursor: "pointer",
+                            flexShrink: 0,
                           }}
                         >
-                          <span style={{ opacity: 0.9 }}>✎</span>
+                          <IconButton
+                            size="small"
+                            onClick={() => handleEditClick(k, label, value)}
+                            sx={{
+                              opacity: isHover ? 1 : 0,
+                              transition: "opacity 0.2s ease",
+                              width: 28,
+                              height: 28,
+                            }}
+                          >
+                            <EditIcon sx={{ fontSize: 16, color: "#7c1fa0" }} />
+                          </IconButton>
                         </div>
                       </div>
                     </div>
@@ -261,9 +626,10 @@ export default function StepReview(props) {
         })()}
       </Box>
 
-      {/* Agreement checkbox and submit button: require checkbox before allowing submission */}
+      {/* Agreement checkbox and submit button */}
       {(() => {
         const [agreed, setAgreed] = React.useState(false);
+        const [isSubmitting, setIsSubmitting] = React.useState(false);
         return (
           <Box
             sx={{ display: "flex", flexDirection: "column", gap: 1, mt: 1.5 }}
@@ -289,11 +655,12 @@ export default function StepReview(props) {
 
             <button
               type="submit"
-              disabled={!agreed}
+              disabled={!agreed || isSubmitting}
               onClick={async (e) => {
                 e.preventDefault();
-                if (!agreed) return;
+                if (!agreed || isSubmitting) return;
 
+                setIsSubmitting(true);
                 try {
                   // Save final application data to database
                   if (props.saveToDatabase) {
@@ -304,10 +671,12 @@ export default function StepReview(props) {
                         "error"
                       );
                       console.error("Final submission failed:", result.error);
+                      setIsSubmitting(false);
                       return;
                     }
                   } else {
                     console.warn("saveToDatabase not provided.");
+                    setIsSubmitting(false);
                     return;
                   }
 
@@ -320,6 +689,7 @@ export default function StepReview(props) {
                       "Please log in again and try submitting.",
                       "error"
                     );
+                    setIsSubmitting(false);
                     return;
                   }
 
@@ -352,60 +722,57 @@ export default function StepReview(props) {
                 } catch (error) {
                   console.error("Error during submission:", error);
                   showSnackbar("An error occurred. Please try again.", "error");
+                  setIsSubmitting(false);
                 }
               }}
               style={{
                 padding: "10px 14px",
-                background: agreed ? "#7c1fa0" : "#e6cfee",
-                color: agreed ? "#fff" : "#7a4a7a",
+                background: agreed && !isSubmitting ? "#7c1fa0" : "#e6cfee",
+                color: agreed && !isSubmitting ? "#fff" : "#7a4a7a",
                 border: "none",
                 borderRadius: 4,
-                cursor: agreed ? "pointer" : "not-allowed",
+                cursor: agreed && !isSubmitting ? "pointer" : "not-allowed",
+                fontSize: 14,
+                fontWeight: 500,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
               }}
             >
-              Confirm &amp; Submit
+              {isSubmitting && (
+                <CircularProgress size={16} sx={{ color: "#7a4a7a" }} />
+              )}
+              {isSubmitting ? "Submitting..." : "Confirm & Submit"}
             </button>
           </Box>
         );
       })()}
-      {/* Confirmation dialog for edit navigation */}
-      <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
-        <DialogTitle>Confirm edit</DialogTitle>
-        <DialogContent>
-          <Typography>
-            Do you want to edit{" "}
-            {pendingEdit && pendingEdit.label
-              ? `"${pendingEdit.label}"`
-              : "this field"}
-            ?
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={() => {
-              // Cancel
-              setConfirmOpen(false);
-              setPendingEdit({ key: null, step: null });
-            }}
-          >
+
+      {/* Edit Dialog - Direct inline editing */}
+      <Dialog
+        open={editDialogOpen}
+        onClose={handleCancelEdit}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Edit {editingField?.label}</DialogTitle>
+        <DialogContent>{renderEditControl()}</DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={handleCancelEdit} disabled={isSaving}>
             Cancel
           </Button>
           <Button
             variant="contained"
-            onClick={() => {
-              // Yes: navigate back to the step and close dialog
-              setConfirmOpen(false);
-              if (pendingEdit && pendingEdit.step != null) {
-                handleGoToStep &&
-                  handleGoToStep(pendingEdit.step, pendingEdit.key);
-              }
-              setPendingEdit({ key: null, step: null });
-            }}
+            onClick={handleSaveEdit}
+            disabled={isSaving}
+            startIcon={isSaving ? <CircularProgress size={16} /> : null}
           >
-            Yes
+            {isSaving ? "Saving..." : "Save"}
           </Button>
         </DialogActions>
       </Dialog>
+
       {/* Non-blocking feedback popup */}
       <Snackbar
         open={snackbarOpen}
@@ -421,6 +788,34 @@ export default function StepReview(props) {
           {snackbarMsg}
         </Alert>
       </Snackbar>
+
+      {/* Confirmation dialog for education type edit */}
+      <Dialog
+        open={confirmDialogOpen}
+        onClose={() => setConfirmDialogOpen(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Edit Education Information?</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Education type has multiple associated fields. Do you want to go
+            back to the education step to edit this information?
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setConfirmDialogOpen(false)} color="inherit">
+            No
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleConfirmNavigateToEducation}
+            autoFocus
+          >
+            Yes
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

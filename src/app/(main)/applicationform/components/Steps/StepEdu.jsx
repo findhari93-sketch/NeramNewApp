@@ -231,6 +231,19 @@ export default function StepEdu(props) {
     }
   }, [educationType, form?.boardYear, handleChange]);
 
+  // Ensure board has a default value when educationType is 'school'
+  React.useEffect(() => {
+    if (educationType === "school" && !form?.board) {
+      try {
+        handleChange({
+          target: { name: "board", value: "State Board" },
+        });
+      } catch (e) {
+        console.warn("Failed to set default board:", e);
+      }
+    }
+  }, [educationType, form?.board, handleChange]);
+
   return (
     <Box sx={{ maxWidth: 520, m: { xs: 2, md: 5 } }}>
       <Box sx={{ mt: 1.5 }}>
@@ -319,7 +332,7 @@ export default function StepEdu(props) {
                 <TextField
                   size="small"
                   select
-                  value={form.board || ""}
+                  value={form.board || "State Board"}
                   onChange={(e) =>
                     handleChange({
                       target: { name: "board", value: e.target.value },
@@ -716,13 +729,7 @@ export default function StepEdu(props) {
           </FormLabel>
           <RadioGroup
             aria-labelledby="course-selection-label"
-            value={
-              selectedCourse ||
-              (softwareCourse &&
-              String(softwareCourse).toLowerCase() === "revit"
-                ? "revit"
-                : "")
-            }
+            value={selectedCourse || ""}
             onChange={(e) => {
               const v = e.target.value;
               try {

@@ -57,6 +57,8 @@ export const saveApplicationStep = async (
       if (stepData.form?.state) payload.state = stepData.form.state;
       if (stepData.form?.country) payload.country = stepData.form.country;
       if (stepData.instagramId) payload.instagram = stepData.instagramId;
+      // Save alternate phone to contact JSONB group
+      if (stepData.altPhone) payload.alternate_phone = stepData.altPhone;
     }
 
     if (step === "education") {
