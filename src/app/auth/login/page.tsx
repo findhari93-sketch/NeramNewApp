@@ -39,11 +39,21 @@ function LoginPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const nextTarget = searchParams?.get("next");
+  // Consolidated auth state - single source of truth
+  const [authState, setAuthState] = useState<{
+    user: User | null;
+    loading: boolean;
+    initialized: boolean;
+  }>({
+    user: null,
+    loading: true,
+    initialized: false,
+  });
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [emailFromQuery, setEmailFromQuery] = useState<string | null>(null);
-  const [firebaseUser, setFirebaseUser] = useState<unknown | null>(null);
   const [phoneVerified, setPhoneVerified] = useState<boolean>(false);
   const [resendLoading, setResendLoading] = useState(false);
   const [resendResult, setResendResult] = useState<string | null>(null);
@@ -61,6 +71,21 @@ function LoginPageInner() {
   const [isSigningUp, setIsSigningUp] = useState(false);
   const [isAttemptingLogin, setIsAttemptingLogin] = useState(false);
   const [signupStatus, setSignupStatus] = useState<string | null>(null);
+
+  const emailParam = React.useMemo(
+    () => searchParams?.get("email") || emailFromQuery,
+    [searchParams, emailFromQuery]
+  );
+  const isVerificationNotice = React.useMemo(
+    () =>
+      Boolean(
+        notice &&
+          notice.toLowerCase().includes("verify") &&
+          typeof emailParam === "string" &&
+          emailParam.trim().length > 0
+      ),
+    [notice, emailParam]
+  );
 
   const getUserLabel = (u: unknown) => {
     if (!u || typeof u !== "object") return null;
@@ -117,9 +142,16 @@ function LoginPageInner() {
       const user = res.user;
       // Immediately upsert Google user data to Supabase
       const idToken = await user.getIdToken();
+      // Store token in secure httpOnly cookie instead of localStorage
       try {
-        localStorage.setItem("firebase_id_token", idToken);
-      } catch {}
+        await fetch("/api/auth/set-session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ idToken }),
+        });
+      } catch (err) {
+        console.warn("Failed to set session cookie:", err);
+      }
       await fetch("/api/users/upsert", {
         method: "POST",
         headers: {
@@ -246,6 +278,7 @@ function LoginPageInner() {
   }, []);
 
   // Handler for Google profile completion modal
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleGoogleProfileComplete = async ({
     studentName,
     username,
@@ -334,6 +367,7 @@ function LoginPageInner() {
   };
 
   // Handler when email-verified user completes the modal.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleEmailProfileComplete = async ({
     studentName,
     username,
@@ -376,37 +410,67 @@ function LoginPageInner() {
     }
   };
 
+  // Consolidated auth state management - prevents race conditions
   React.useEffect(() => {
-    // If a user is already signed in, redirect them to profile — they should
-    // never be able to view the login page while authenticated.
-    const current = auth.currentUser;
-    if (current && !isSigningUp && !isAttemptingLogin) {
-      try {
-        // If a specific redirect target is provided (e.g. next=/calculator),
-        // do not override it here. Let the targeted redirect flow handle it.
-        if (!nextTarget) {
-          router.replace("/profile");
-        }
-      } catch {}
-    }
+    let mounted = true;
 
-    const unsub = onAuthStateChanged(auth, (u) => {
-      setFirebaseUser(u || null);
-      if (u && !isSigningUp && !isAttemptingLogin) {
-        // enforce redirect for any signed-in user who navigates to this page
+    const unsub = onAuthStateChanged(auth, async (user) => {
+      if (!mounted) return;
+
+      // User signed out
+      if (!user) {
+        setAuthState({ user: null, loading: false, initialized: true });
         try {
-          // Respect next=... param when present and avoid forcing /profile
-          if (!nextTarget) {
-            router.replace("/profile");
-          }
+          localStorage.removeItem("phone_verified");
         } catch {}
+        return;
+      }
+
+      // User signed in - check if we should redirect
+      if (user.emailVerified && !isSigningUp && !isAttemptingLogin) {
+        try {
+          const idToken = await user.getIdToken();
+
+          // Store session cookie
+          try {
+            await fetch("/api/auth/set-session", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ idToken }),
+            });
+          } catch (err) {
+            console.warn("Failed to set session cookie:", err);
+          }
+
+          // Only redirect if not in modal flow
+          if (!showGoogleModal && !emailFlowPendingProfile) {
+            if (mounted) {
+              setAuthState({ user, loading: false, initialized: true });
+              if (!nextTarget) {
+                router.replace("/profile");
+              }
+            }
+            return;
+          }
+        } catch (err) {
+          console.warn("Auth state update failed:", err);
+        }
+      }
+
+      if (mounted) {
+        setAuthState({ user, loading: false, initialized: true });
       }
     });
+
     try {
       const pv = localStorage.getItem("phone_verified");
       if (pv) setPhoneVerified(true);
     } catch {}
-    return () => unsub();
+
+    return () => {
+      mounted = false;
+      unsub();
+    };
   }, [
     router,
     showGoogleModal,
@@ -416,59 +480,58 @@ function LoginPageInner() {
     isAttemptingLogin,
   ]);
 
-  // If a verified Firebase user signs in (for example after verification),
-  // ensure their Supabase profile has required fields before allowing
-  // automatic navigation into the app. If missing fields are detected,
-  // show the profile completion modal and prevent redirect.
+  // Profile completeness check - only runs when auth state changes
   React.useEffect(() => {
     let mounted = true;
+
     (async () => {
+      const u = authState.user;
+      if (!u || !u.emailVerified || !authState.initialized) return;
+
       try {
-        const u = auth.currentUser;
-        if (u && u.emailVerified) {
-          // ask server for profile status
-          try {
-            const idToken = await u.getIdToken();
-            const res = await fetch("/api/session", {
-              headers: { Authorization: `Bearer ${idToken}` },
-            });
-            if (!mounted) return;
-            const j = await res.json().catch(() => ({} as any));
-            // Only proceed if the response was OK and a user row exists
-            if (!res.ok) return;
-            const userRow = (j?.user ?? j) || null;
-            if (!userRow) return;
-            const studentName =
-              (userRow.student_name as string | undefined) ??
-              (userRow.profile?.student_name as string | undefined) ??
-              null;
-            const phoneVal =
-              (userRow.phone as string | undefined) ??
-              (userRow.profile?.phone as string | undefined) ??
-              null;
-            const usernameVal =
-              (userRow.username as string | undefined) ??
-              (userRow.profile?.username as string | undefined) ??
-              null;
-            const missingName = !studentName || studentName.trim() === "";
-            const missingPhone = !phoneVal || phoneVal.trim() === "";
-            const missingUsername = !usernameVal || usernameVal.trim() === "";
-            if (missingName || missingPhone || missingUsername) {
-              setGoogleProfile(u as any);
-              setShowGoogleModal(true);
-            }
-          } catch (e) {
-            console.warn("profile completion check failed", e);
-          }
+        const idToken = await u.getIdToken();
+        const res = await fetch("/api/session", {
+          headers: { Authorization: `Bearer ${idToken}` },
+        });
+
+        if (!mounted) return;
+
+        const j = await res.json().catch(() => ({} as any));
+        if (!res.ok) return;
+
+        const userRow = (j?.user ?? j) || null;
+        if (!userRow) return;
+
+        const studentName =
+          (userRow.student_name as string | undefined) ??
+          (userRow.profile?.student_name as string | undefined) ??
+          null;
+        const phoneVal =
+          (userRow.phone as string | undefined) ??
+          (userRow.profile?.phone as string | undefined) ??
+          null;
+        const usernameVal =
+          (userRow.username as string | undefined) ??
+          (userRow.profile?.username as string | undefined) ??
+          null;
+
+        const missingName = !studentName || studentName.trim() === "";
+        const missingPhone = !phoneVal || phoneVal.trim() === "";
+        const missingUsername = !usernameVal || usernameVal.trim() === "";
+
+        if (missingName || missingPhone || missingUsername) {
+          setGoogleProfile(u);
+          setShowGoogleModal(true);
         }
-      } catch {
-        /* ignore */
+      } catch (e) {
+        console.warn("profile completion check failed", e);
       }
     })();
+
     return () => {
       mounted = false;
     };
-  }, [firebaseUser]);
+  }, [authState.user, authState.initialized]);
 
   // Removed duplicate profile-check effect: the redirect flow will now run
   // profile checks just-before-redirect to ensure modal can block navigation.
@@ -561,7 +624,7 @@ function LoginPageInner() {
             try {
               localStorage.removeItem("phone_verified");
             } catch {}
-            setFirebaseUser(null);
+            setAuthState({ user: null, loading: false, initialized: true });
             return;
           }
         }
@@ -639,7 +702,7 @@ function LoginPageInner() {
     setResendResult(null);
     try {
       // Use email from URL query parameter (set when user was redirected here)
-      const targetEmail = emailFromQuery;
+      const targetEmail = emailParam;
 
       if (!targetEmail) {
         setResendResult("Please refresh the page and try again.");
@@ -664,7 +727,10 @@ function LoginPageInner() {
           `Verification email sent to ${targetEmail}. Please check your inbox and spam folder.`
         );
       } catch (apiError) {
-        console.warn("Branded email failed, trying Firebase fallback", apiError);
+        console.warn(
+          "Branded email failed, trying Firebase fallback",
+          apiError
+        );
 
         // Fallback: Try to get user and send via Firebase
         const u = auth.currentUser;
@@ -673,7 +739,9 @@ function LoginPageInner() {
         }
 
         const actionCodeSettings = {
-          url: `${window.location.origin}/auth/action?email=${encodeURIComponent(targetEmail)}`,
+          url: `${
+            window.location.origin
+          }/auth/action?email=${encodeURIComponent(targetEmail)}`,
           handleCodeInApp: true,
         } as const;
         await sendEmailVerification(u, actionCodeSettings);
@@ -683,7 +751,10 @@ function LoginPageInner() {
         );
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to resend verification email.";
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : "Failed to resend verification email.";
       setResendResult(errorMessage);
     } finally {
       setResendLoading(false);
@@ -695,15 +766,17 @@ function LoginPageInner() {
   const handleLogout = async () => {
     setError(null);
     try {
+      // Clear server-side session cookie
+      await fetch("/api/auth/set-session", { method: "DELETE" });
       await signOut(auth);
-    } catch {
-      console.warn("signOut error");
+    } catch (err) {
+      console.warn("signOut error:", err);
     }
     try {
       localStorage.removeItem("phone_verified");
     } catch {}
     setPhoneVerified(false);
-    setFirebaseUser(null);
+    setAuthState({ user: null, loading: false, initialized: true });
   };
 
   const EmailPasswordAuth = () => {
@@ -746,13 +819,18 @@ function LoginPageInner() {
 
           try {
             const validatedEmail = emailValidation.data.email;
-            let methods = await fetchSignInMethodsForEmail(auth, validatedEmail);
+            let methods = await fetchSignInMethodsForEmail(
+              auth,
+              validatedEmail
+            );
             console.log("[DEBUG] fetchSignInMethodsForEmail", value, methods);
             // If Firebase returned empty, fallback to server-side Supabase lookup
             if (Array.isArray(methods) && methods.length === 0) {
               try {
                 const res = await fetch(
-                  `/api/auth/check-email?email=${encodeURIComponent(validatedEmail)}`
+                  `/api/auth/check-email?email=${encodeURIComponent(
+                    validatedEmail
+                  )}`
                 );
                 if (res.ok) {
                   const j = await res.json();
@@ -919,16 +997,21 @@ function LoginPageInner() {
 
             // Step 2: Immediately try to send verification email
             try {
-              const emailResponse = await fetch("/api/auth/send-verification-email", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email: validatedEmail }),
-              });
+              const emailResponse = await fetch(
+                "/api/auth/send-verification-email",
+                {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ email: validatedEmail }),
+                }
+              );
 
               const emailResult = await emailResponse.json();
 
               if (!emailResponse.ok) {
-                throw new Error(emailResult.error || "Failed to send verification email");
+                throw new Error(
+                  emailResult.error || "Failed to send verification email"
+                );
               }
 
               emailSendSuccess = true;
@@ -945,14 +1028,22 @@ function LoginPageInner() {
                 await sendEmailVerification(cred.user, actionCodeSettings);
                 emailSendSuccess = true;
               } catch (fallbackErr) {
-                console.error("Both verification email methods failed", fallbackErr);
+                console.error(
+                  "Both verification email methods failed",
+                  fallbackErr
+                );
                 // Delete the user if email sending failed
                 try {
                   await cred.user.delete();
                 } catch (deleteErr) {
-                  console.error("Failed to delete user after email send failure", deleteErr);
+                  console.error(
+                    "Failed to delete user after email send failure",
+                    deleteErr
+                  );
                 }
-                throw new Error("Unable to send verification email. Please check your email address and try again.");
+                throw new Error(
+                  "Unable to send verification email. Please check your email address and try again."
+                );
               }
             }
 
@@ -960,9 +1051,16 @@ function LoginPageInner() {
             if (emailSendSuccess) {
               try {
                 const idToken = await cred.user.getIdToken();
+                // Store token in secure httpOnly cookie instead of localStorage
                 try {
-                  localStorage.setItem("firebase_id_token", idToken);
-                } catch {}
+                  await fetch("/api/auth/set-session", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ idToken }),
+                  });
+                } catch (err) {
+                  console.warn("Failed to set session cookie:", err);
+                }
                 await fetch("/api/users/upsert", {
                   method: "POST",
                   headers: {
@@ -999,13 +1097,17 @@ function LoginPageInner() {
 
             // Handle specific Firebase errors
             if (signupError.code === "auth/email-already-in-use") {
-              setEmailPasswordError("This email is already registered. Please sign in instead.");
+              setEmailPasswordError(
+                "This email is already registered. Please sign in instead."
+              );
             } else if (signupError.code === "auth/invalid-email") {
               setEmailPasswordError("Please enter a valid email address.");
             } else if (signupError.message) {
               setEmailPasswordError(signupError.message);
             } else {
-              setEmailPasswordError("Failed to create account. Please try again.");
+              setEmailPasswordError(
+                "Failed to create account. Please try again."
+              );
             }
             return;
           }
@@ -1050,7 +1152,10 @@ function LoginPageInner() {
               body: JSON.stringify({ email: userEmail }),
             });
           } catch (ve) {
-            console.warn("send-verification-email (unverified login) failed", ve);
+            console.warn(
+              "send-verification-email (unverified login) failed",
+              ve
+            );
             // Fallback to Firebase default
             try {
               const actionCodeSettings = {
@@ -1061,7 +1166,10 @@ function LoginPageInner() {
               } as const;
               await sendEmailVerification(u, actionCodeSettings);
             } catch (fallbackErr) {
-              console.warn("Fallback sendEmailVerification also failed", fallbackErr);
+              console.warn(
+                "Fallback sendEmailVerification also failed",
+                fallbackErr
+              );
             }
           }
 
@@ -1083,9 +1191,16 @@ function LoginPageInner() {
         if (u) {
           try {
             const idToken = await u.getIdToken();
+            // Store token in secure httpOnly cookie instead of localStorage
             try {
-              localStorage.setItem("firebase_id_token", idToken);
-            } catch {}
+              await fetch("/api/auth/set-session", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ idToken }),
+              });
+            } catch (err) {
+              console.warn("Failed to set session cookie:", err);
+            }
             await fetch("/api/users/upsert", {
               method: "POST",
               headers: {
@@ -1272,7 +1387,9 @@ function LoginPageInner() {
             gap: 1,
           }}
         >
-          {emailPasswordLoading && <CircularProgress size={20} color="inherit" />}
+          {emailPasswordLoading && (
+            <CircularProgress size={20} color="inherit" />
+          )}
           {buttonLabel}
         </Button>
         {signupStatus && (
@@ -1281,10 +1398,7 @@ function LoginPageInner() {
           </Alert>
         )}
         {emailPasswordError && (
-          <Alert
-            severity="error"
-            onClose={() => setEmailPasswordError(null)}
-          >
+          <Alert severity="error" onClose={() => setEmailPasswordError(null)}>
             {emailPasswordError}
           </Alert>
         )}
@@ -1373,12 +1487,12 @@ function LoginPageInner() {
                 <Typography>Redirecting...</Typography>
               </Box>
             ) : (
-              (firebaseUser || phoneVerified) && (
+              (authState.user || phoneVerified) && (
                 <Box
                   sx={{ mb: 2, display: "flex", gap: 2, alignItems: "center" }}
                 >
                   <Typography>
-                    Signed in as {getUserLabel(firebaseUser) || "phone user"}
+                    Signed in as {getUserLabel(authState.user) || "phone user"}
                   </Typography>
                   <Button
                     variant="outlined"
@@ -1391,254 +1505,253 @@ function LoginPageInner() {
               )
             )}
 
-            <Stack
-              spacing={{ xs: 1.2, sm: 2 }}
-              sx={{ mb: { xs: 1, sm: 2 }, flex: "1 1 auto" }}
-            >
-              {/* Show verification notice when email verification is pending */}
-              {notice && notice.toLowerCase().includes("verify") && emailFromQuery ? (
-                <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                  {/* Verification message with icon */}
-                  <Alert
-                    severity="success"
-                    icon={
-                      <Box
-                        sx={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          width: 24,
-                          height: 24,
-                        }}
-                      >
-                        <svg
-                          width="24"
-                          height="24"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          xmlns="http://www.w3.org/2000/svg"
-                        >
-                          <path
-                            d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"
-                            fill="currentColor"
-                          />
-                        </svg>
-                      </Box>
-                    }
-                    sx={{
-                      fontSize: "0.95rem",
-                      "& .MuiAlert-message": { width: "100%" },
-                    }}
-                  >
-                    {notice}
-                  </Alert>
-
-                  {/* Resend section */}
-                  <Box
-                    sx={{
-                      border: "1px solid",
-                      borderColor: "divider",
-                      borderRadius: 2,
-                      p: 3,
-                      backgroundColor: "background.paper",
-                    }}
-                  >
-                    <Stack spacing={2.5}>
-                      <Box>
-                        <Typography
-                          variant="subtitle1"
-                          fontWeight={600}
-                          gutterBottom
-                        >
-                          Didn&apos;t receive the email?
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          Check your spam folder, or request a new email below.
-                        </Typography>
-                      </Box>
-
-                      {resendResult && (
-                        <Alert
-                          severity={
-                            resendResult.toLowerCase().includes("failed") ||
-                            resendResult.toLowerCase().includes("error")
-                              ? "error"
-                              : "success"
-                          }
-                          sx={{ fontSize: "0.875rem" }}
-                        >
-                          {resendResult}
-                        </Alert>
-                      )}
-
-                      {resendAttempts >= MAX_RESEND_ATTEMPTS ? (
-                        <Box>
-                          <Alert severity="warning" sx={{ mb: 1.5 }}>
-                            Maximum resend attempts reached. Please wait a few
-                            minutes before trying again.
-                          </Alert>
-                          <Button
-                            fullWidth
-                            variant="outlined"
-                            onClick={resetResendSession}
-                            size="large"
-                          >
-                            Reset and Try Again
-                          </Button>
-                        </Box>
-                      ) : (
-                        <Box>
-                          <Button
-                            fullWidth
-                            variant="contained"
-                            onClick={handleResendVerification}
-                            disabled={resendLoading || cooldown > 0}
-                            size="large"
-                            startIcon={
-                              resendLoading ? (
-                                <CircularProgress size={20} color="inherit" />
-                              ) : undefined
-                            }
-                          >
-                            {cooldown > 0
-                              ? `Resend in ${cooldown}s`
-                              : resendLoading
-                              ? "Sending..."
-                              : "Resend Verification Email"}
-                          </Button>
-                          {resendAttempts > 0 &&
-                            resendAttempts < MAX_RESEND_ATTEMPTS && (
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                                sx={{
-                                  display: "block",
-                                  textAlign: "center",
-                                  mt: 1,
-                                }}
-                              >
-                                Attempt {resendAttempts} of {MAX_RESEND_ATTEMPTS}
-                              </Typography>
-                            )}
-                        </Box>
-                      )}
-                    </Stack>
-                  </Box>
-
-                  {/* Back to Sign In button */}
-                  <Button
-                    fullWidth
-                    variant="outlined"
-                    size="large"
-                    onClick={() => {
-                      setEmailFromQuery(null);
-                      setNotice(null);
-                      setResendAttempts(0);
-                      setResendResult(null);
-                      setCooldown(0);
-                      router.push("/auth/login");
-                    }}
-                    sx={{
-                      textTransform: "none",
-                      fontWeight: 600,
-                    }}
-                  >
-                    Back to Sign In
-                  </Button>
-                </Box>
-              ) : (
-                <>
-                  {/* Show normal login form when no verification is pending */}
-                  {notice && <Alert severity="success">{notice}</Alert>}
-                  {error && <Alert severity="error">{error}</Alert>}
-
-                  <EmailPasswordAuth />
-
-                  <Divider>OR</Divider>
-
-                  {/* Google next */}
-                  <Button
-                variant="outlined"
-                onClick={googleSignIn}
-                disabled={loading}
-                startIcon={
-                  loading ? (
-                    <CircularProgress size={18} />
-                  ) : (
+            {/* Conditionally render ONLY verification UI or ONLY sign-in UI, never both */}
+            {isVerificationNotice ? (
+              // ==================== EMAIL VERIFICATION FLOW ====================
+              <Stack spacing={3} sx={{ py: 2 }}>
+                {/* Success message with check icon */}
+                <Alert
+                  severity="success"
+                  icon={
                     <Box
-                      sx={{ width: 18, height: 18, display: "inline-flex" }}
-                      aria-hidden
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        width: 24,
+                        height: 24,
+                      }}
                     >
                       <svg
+                        width="24"
+                        height="24"
+                        viewBox="0 0 24 24"
+                        fill="none"
                         xmlns="http://www.w3.org/2000/svg"
-                        viewBox="0 0 48 48"
-                        width="18"
-                        height="18"
                       >
                         <path
-                          fill="#FFC107"
-                          d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12  s5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C33.643,6.053,29.082,4,24,4C12.955,4,4,12.955,4,24s8.955,20,20,20  s20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"
-                        />
-                        <path
-                          fill="#FF3D00"
-                          d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039  l5.657-5.657C33.643,6.053,29.082,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"
-                        />
-                        <path
-                          fill="#4CAF50"
-                          d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36  c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"
-                        />
-                        <path
-                          fill="#1976D2"
-                          d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.236-2.231,4.166-3.994,5.571  c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.97,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"
+                          d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"
+                          fill="currentColor"
                         />
                       </svg>
                     </Box>
-                  )
-                }
-                fullWidth
-                sx={{
-                  textTransform: "none",
-                  bgcolor: "#fff",
-                  color: "#3c4043",
-                  borderColor: "#dadce0",
-                  borderRadius: 999,
-                  py: { xs: 1.5, sm: 1 },
-                  fontSize: { xs: "1rem", sm: "0.875rem" },
-                  "&:hover": {
+                  }
+                  sx={{
+                    fontSize: "0.95rem",
+                    "& .MuiAlert-message": { width: "100%" },
+                  }}
+                >
+                  {notice}
+                </Alert>
+
+                {/* Resend email section */}
+                <Box
+                  sx={{
+                    border: "1px solid",
+                    borderColor: "divider",
+                    borderRadius: 2,
+                    p: 3,
+                    backgroundColor: "grey.50",
+                  }}
+                >
+                  <Stack spacing={2.5}>
+                    <Box>
+                      <Typography
+                        variant="subtitle1"
+                        fontWeight={600}
+                        gutterBottom
+                      >
+                        Didn&apos;t receive the email?
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Check your spam folder, or request a new verification
+                        email below.
+                      </Typography>
+                    </Box>
+
+                    {resendResult && (
+                      <Alert
+                        severity={
+                          resendResult.toLowerCase().includes("failed") ||
+                          resendResult.toLowerCase().includes("error")
+                            ? "error"
+                            : "success"
+                        }
+                        sx={{ fontSize: "0.875rem" }}
+                      >
+                        {resendResult}
+                      </Alert>
+                    )}
+
+                    {resendAttempts >= MAX_RESEND_ATTEMPTS ? (
+                      <Box>
+                        <Alert severity="warning" sx={{ mb: 1.5 }}>
+                          Maximum resend attempts reached. Please wait a few
+                          minutes before trying again.
+                        </Alert>
+                        <Button
+                          fullWidth
+                          variant="outlined"
+                          onClick={resetResendSession}
+                          size="large"
+                        >
+                          Reset and Try Again
+                        </Button>
+                      </Box>
+                    ) : (
+                      <Box>
+                        <Button
+                          fullWidth
+                          variant="contained"
+                          onClick={handleResendVerification}
+                          disabled={resendLoading || cooldown > 0}
+                          size="large"
+                          startIcon={
+                            resendLoading ? (
+                              <CircularProgress size={20} color="inherit" />
+                            ) : undefined
+                          }
+                        >
+                          {cooldown > 0
+                            ? `Resend in ${cooldown}s`
+                            : resendLoading
+                            ? "Sending..."
+                            : "Resend Verification Email"}
+                        </Button>
+                        {resendAttempts > 0 &&
+                          resendAttempts < MAX_RESEND_ATTEMPTS && (
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              sx={{
+                                display: "block",
+                                textAlign: "center",
+                                mt: 1,
+                              }}
+                            >
+                              Attempt {resendAttempts} of {MAX_RESEND_ATTEMPTS}
+                            </Typography>
+                          )}
+                      </Box>
+                    )}
+                  </Stack>
+                </Box>
+
+                {/* Back to Sign In button */}
+                <Button
+                  fullWidth
+                  variant="outlined"
+                  size="large"
+                  onClick={() => {
+                    setEmailFromQuery(null);
+                    setNotice(null);
+                    setResendAttempts(0);
+                    setResendResult(null);
+                    setCooldown(0);
+                    router.push("/auth/login");
+                  }}
+                  sx={{
+                    textTransform: "none",
+                    fontWeight: 600,
+                  }}
+                >
+                  ← Back to Sign In
+                </Button>
+              </Stack>
+            ) : (
+              // ==================== NORMAL SIGN IN / SIGN UP FLOW ====================
+              <Stack
+                spacing={{ xs: 1.2, sm: 2 }}
+                sx={{ mb: { xs: 1, sm: 2 }, flex: "1 1 auto" }}
+              >
+                {notice && <Alert severity="success">{notice}</Alert>}
+                {error && <Alert severity="error">{error}</Alert>}
+
+                <EmailPasswordAuth />
+
+                <Divider>OR</Divider>
+
+                <Button
+                  variant="outlined"
+                  onClick={googleSignIn}
+                  disabled={loading}
+                  startIcon={
+                    loading ? (
+                      <CircularProgress size={18} />
+                    ) : (
+                      <Box
+                        sx={{ width: 18, height: 18, display: "inline-flex" }}
+                        aria-hidden
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          viewBox="0 0 48 48"
+                          width="18"
+                          height="18"
+                        >
+                          <path
+                            fill="#FFC107"
+                            d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12  s5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C33.643,6.053,29.082,4,24,4C12.955,4,4,12.955,4,24s8.955,20,20,20  s20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"
+                          />
+                          <path
+                            fill="#FF3D00"
+                            d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039  l5.657-5.657C33.643,6.053,29.082,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"
+                          />
+                          <path
+                            fill="#4CAF50"
+                            d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36  c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"
+                          />
+                          <path
+                            fill="#1976D2"
+                            d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.236-2.231,4.166-3.994,5.571  c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.97,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"
+                          />
+                        </svg>
+                      </Box>
+                    )
+                  }
+                  fullWidth
+                  sx={{
+                    textTransform: "none",
                     bgcolor: "#fff",
+                    color: "#3c4043",
                     borderColor: "#dadce0",
-                    boxShadow: 1,
-                  },
-                  "&:disabled": {
-                    bgcolor: "#fff",
-                    color: "text.disabled",
-                    borderColor: "#e0e0e0",
-                  },
-                }}
-              >
-                Continue with Google
-              </Button>
-              {/* Reserved inline message area below social buttons to avoid card height jump */}
-              <Box
-                sx={{
-                  mt: { xs: 0.5, sm: 1 },
-                  minHeight: { xs: 24, sm: 56 }, // Further reduced for mobile
-                  display: "flex",
-                  flexDirection: "column",
-                  justifyContent: "center",
-                  flexShrink: 0, // Prevent shrinking
-                }}
-              >
-                {/* Show resend status or general notice moved from above if desired */}
-                {!notice && resendResult && (
-                  <Typography variant="caption" color="text.secondary">
-                    {resendResult}
-                  </Typography>
-                )}
-              </Box>
-                </>
-              )}
-            </Stack>
+                    borderRadius: 999,
+                    py: { xs: 1.5, sm: 1 },
+                    fontSize: { xs: "1rem", sm: "0.875rem" },
+                    "&:hover": {
+                      bgcolor: "#fff",
+                      borderColor: "#dadce0",
+                      boxShadow: 1,
+                    },
+                    "&:disabled": {
+                      bgcolor: "#fff",
+                      color: "text.disabled",
+                      borderColor: "#e0e0e0",
+                    },
+                  }}
+                >
+                  Continue with Google
+                </Button>
+
+                {/* Reserved space for messages to prevent layout shift */}
+                <Box
+                  sx={{
+                    mt: { xs: 0.5, sm: 1 },
+                    minHeight: { xs: 24, sm: 56 },
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  {!notice && resendResult && (
+                    <Typography variant="caption" color="text.secondary">
+                      {resendResult}
+                    </Typography>
+                  )}
+                </Box>
+              </Stack>
+            )}
           </Box>
         </Container>
       </Box>
