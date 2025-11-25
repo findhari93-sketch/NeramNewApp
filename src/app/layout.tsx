@@ -9,6 +9,7 @@ import {
   Suez_One,
 } from "next/font/google";
 import ThemeRegistry from "./ThemeRegistry";
+import { SessionProvider } from "@/contexts/SessionContext";
 import ProfileGuard from "./components/shared/ProfileGuard";
 import ChatBubbles from "../components/ChatBubbles";
 import SnackbarNotice from "./components/shared/SnackbarNotice";
@@ -153,9 +154,11 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} ${handlee.variable} ${roboto.variable} ${bakbakOne.variable} ${poppins.variable} ${suezOne.variable}`}
       >
         <ThemeRegistry>
-          <ProfileGuard>{children}</ProfileGuard>
-          <ChatBubbles />
-          <SnackbarNotice />
+          <SessionProvider enableTracking={true} autoTrackNavigation={true}>
+            <ProfileGuard>{children}</ProfileGuard>
+            <ChatBubbles />
+            <SnackbarNotice />
+          </SessionProvider>
         </ThemeRegistry>
       </body>
     </html>
