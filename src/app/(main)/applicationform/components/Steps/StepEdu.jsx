@@ -217,12 +217,9 @@ export default function StepEdu(props) {
   }, []);
 
   // Ensure boardYear has a default start year when educationType is 'school'
+  // Run on mount to initialize, and whenever educationType changes
   React.useEffect(() => {
-    if (
-      educationType === "school" &&
-      form &&
-      typeof form.boardYear === "undefined"
-    ) {
+    if (educationType === "school" && typeof form?.boardYear === "undefined") {
       try {
         const start = getAcademicStartYear();
         handleChange({
@@ -232,9 +229,7 @@ export default function StepEdu(props) {
         console.warn("Failed to set default boardYear:", e);
       }
     }
-    // Run when educationType toggles to school; avoid depending on form to prevent loops
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [educationType]);
+  }, [educationType, form?.boardYear, handleChange]);
 
   return (
     <Box sx={{ maxWidth: 520, m: { xs: 2, md: 5 } }}>
