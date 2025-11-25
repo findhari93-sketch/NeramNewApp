@@ -31,6 +31,7 @@ export default function StepReview(props) {
     setReviewMode,
     setEditField,
     handleGoToStep,
+    onSubmitSuccess,
   } = props;
 
   // dialog state for edit confirmation
@@ -342,16 +343,11 @@ export default function StepReview(props) {
                     console.warn(
                       "Admin notification failed, but application was saved"
                     );
-                    // still inform the user non-blockingly
-                    showSnackbar(
-                      "Application submitted, but admin notification failed.",
-                      "warning"
-                    );
-                  } else {
-                    showSnackbar(
-                      "Application submitted successfully! Admin has been notified.",
-                      "success"
-                    );
+                  }
+
+                  // Redirect to applications page after submission completes
+                  if (onSubmitSuccess) {
+                    onSubmitSuccess();
                   }
                 } catch (error) {
                   console.error("Error during submission:", error);

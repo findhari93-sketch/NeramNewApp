@@ -36,7 +36,9 @@ function ApplicationsPageContent() {
   const searchParams = useSearchParams();
   const [checkingAuth, setCheckingAuth] = useState(true);
   // Whether we were redirected after submitting an application
-  const submittedBanner = Boolean(searchParams?.get("submitted") === "1");
+  const [submittedBanner, setSubmittedBanner] = useState(
+    Boolean(searchParams?.get("submitted") === "1")
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -54,6 +56,11 @@ function ApplicationsPageContent() {
           return;
         }
 
+        // If user just submitted, wait a bit for database to commit
+        if (searchParams?.get("submitted") === "1") {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+
         const res = await apiClient("/api/applications");
         const json = await res.json().catch(() => []);
         if (mounted) setApps(json || []);
@@ -67,7 +74,7 @@ function ApplicationsPageContent() {
     return () => {
       mounted = false;
     };
-  }, [router]);
+  }, [router, searchParams]);
 
   // Loading state
   if (checkingAuth)
@@ -126,7 +133,11 @@ function ApplicationsPageContent() {
           Submitted Applications
         </Typography>
         {submittedBanner && (
-          <Alert severity="success" sx={{ mb: 2 }}>
+          <Alert
+            severity="success"
+            sx={{ mb: 2 }}
+            onClose={() => setSubmittedBanner(false)}
+          >
             Application submitted successfully!
           </Alert>
         )}
@@ -162,7 +173,11 @@ function ApplicationsPageContent() {
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       {submittedBanner && (
-        <Alert severity="success" sx={{ mb: 2 }}>
+        <Alert
+          severity="success"
+          sx={{ mb: 2 }}
+          onClose={() => setSubmittedBanner(false)}
+        >
           Application submitted successfully!
         </Alert>
       )}

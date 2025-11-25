@@ -835,13 +835,12 @@ export default function ApplicationForm() {
           setCurrentStep={setStep}
           saveToDatabase={async (overrides) => {
             const result = await saveToDatabase("review", overrides);
-            if (result?.ok) {
-              // After final review save, send user to the applications list so they
-              // can view submitted applications and their statuses.
-              // Note: `(main)` is a route-group folder and does not appear in URLs.
-              router.replace("/applications?submitted=1");
-            }
+            // Return result without redirecting - StepReview will handle redirect after admin notification
             return result;
+          }}
+          onSubmitSuccess={() => {
+            // Redirect to applications page after successful submission and admin notification
+            router.replace("/applications?submitted=1");
           }}
           handleGoToStep={(stepIdx, fieldKey) => {
             try {
