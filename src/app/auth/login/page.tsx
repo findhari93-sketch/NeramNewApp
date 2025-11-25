@@ -1389,132 +1389,165 @@ function LoginPageInner() {
               spacing={{ xs: 1.2, sm: 2 }}
               sx={{ mb: { xs: 1, sm: 2 }, flex: "1 1 auto" }}
             >
-              {notice && <Alert severity="success">{notice}</Alert>}
-              {error && <Alert severity="error">{error}</Alert>}
-
-              {/* Resend verification section - Professional grade */}
-              {notice && notice.toLowerCase().includes("verify") && emailFromQuery && (
-                <Box
-                  sx={{
-                    border: "1px solid",
-                    borderColor: "divider",
-                    borderRadius: 1,
-                    p: 3,
-                    backgroundColor: "background.paper",
-                  }}
-                >
-                  <Stack spacing={2.5}>
-                    <Box>
-                      <Typography
-                        variant="subtitle1"
-                        fontWeight={600}
-                        gutterBottom
-                      >
-                        Didn&apos;t receive the email?
-                      </Typography>
-                      <Typography
-                        variant="body2"
-                        color="text.secondary"
-                      >
-                        We sent a verification link to <strong>{emailFromQuery}</strong>.
-                        Check your spam folder, or request a new email below.
-                      </Typography>
-                    </Box>
-
-                    {resendResult && (
-                      <Alert
-                        severity={
-                          resendResult.toLowerCase().includes("failed") ||
-                          resendResult.toLowerCase().includes("error")
-                            ? "error"
-                            : "success"
-                        }
-                        sx={{ fontSize: "0.875rem" }}
-                      >
-                        {resendResult}
-                      </Alert>
-                    )}
-
-                    {resendAttempts >= MAX_RESEND_ATTEMPTS ? (
-                      <Box>
-                        <Alert severity="warning" sx={{ mb: 1.5 }}>
-                          Maximum resend attempts reached. Please wait a few minutes before
-                          trying again.
-                        </Alert>
-                        <Button
-                          fullWidth
-                          variant="outlined"
-                          onClick={resetResendSession}
-                          size="large"
-                        >
-                          Reset and Try Again
-                        </Button>
-                      </Box>
-                    ) : (
-                      <Box>
-                        <Button
-                          fullWidth
-                          variant="contained"
-                          onClick={handleResendVerification}
-                          disabled={resendLoading || cooldown > 0}
-                          size="large"
-                          startIcon={
-                            resendLoading ? (
-                              <CircularProgress size={20} color="inherit" />
-                            ) : undefined
-                          }
-                        >
-                          {cooldown > 0
-                            ? `Resend in ${cooldown}s`
-                            : resendLoading
-                            ? "Sending..."
-                            : "Resend Verification Email"}
-                        </Button>
-                        {resendAttempts > 0 &&
-                          resendAttempts < MAX_RESEND_ATTEMPTS && (
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                              sx={{ display: "block", textAlign: "center", mt: 1 }}
-                            >
-                              Attempt {resendAttempts} of {MAX_RESEND_ATTEMPTS}
-                            </Typography>
-                          )}
-                      </Box>
-                    )}
-
-                    <Divider />
-
-                    <Box sx={{ textAlign: "center" }}>
-                      <Typography
-                        variant="body2"
-                        color="text.secondary"
-                        gutterBottom
-                      >
-                        Want to use a different email?
-                      </Typography>
-                      <Button
-                        variant="text"
-                        size="small"
-                        onClick={() => {
-                          router.push("/auth/login");
+              {/* Show verification notice when email verification is pending */}
+              {notice && notice.toLowerCase().includes("verify") && emailFromQuery ? (
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                  {/* Verification message with icon */}
+                  <Alert
+                    severity="success"
+                    icon={
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          width: 24,
+                          height: 24,
                         }}
                       >
-                        Back to Sign In
-                      </Button>
-                    </Box>
-                  </Stack>
+                        <svg
+                          width="24"
+                          height="24"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"
+                            fill="currentColor"
+                          />
+                        </svg>
+                      </Box>
+                    }
+                    sx={{
+                      fontSize: "0.95rem",
+                      "& .MuiAlert-message": { width: "100%" },
+                    }}
+                  >
+                    {notice}
+                  </Alert>
+
+                  {/* Resend section */}
+                  <Box
+                    sx={{
+                      border: "1px solid",
+                      borderColor: "divider",
+                      borderRadius: 2,
+                      p: 3,
+                      backgroundColor: "background.paper",
+                    }}
+                  >
+                    <Stack spacing={2.5}>
+                      <Box>
+                        <Typography
+                          variant="subtitle1"
+                          fontWeight={600}
+                          gutterBottom
+                        >
+                          Didn&apos;t receive the email?
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Check your spam folder, or request a new email below.
+                        </Typography>
+                      </Box>
+
+                      {resendResult && (
+                        <Alert
+                          severity={
+                            resendResult.toLowerCase().includes("failed") ||
+                            resendResult.toLowerCase().includes("error")
+                              ? "error"
+                              : "success"
+                          }
+                          sx={{ fontSize: "0.875rem" }}
+                        >
+                          {resendResult}
+                        </Alert>
+                      )}
+
+                      {resendAttempts >= MAX_RESEND_ATTEMPTS ? (
+                        <Box>
+                          <Alert severity="warning" sx={{ mb: 1.5 }}>
+                            Maximum resend attempts reached. Please wait a few
+                            minutes before trying again.
+                          </Alert>
+                          <Button
+                            fullWidth
+                            variant="outlined"
+                            onClick={resetResendSession}
+                            size="large"
+                          >
+                            Reset and Try Again
+                          </Button>
+                        </Box>
+                      ) : (
+                        <Box>
+                          <Button
+                            fullWidth
+                            variant="contained"
+                            onClick={handleResendVerification}
+                            disabled={resendLoading || cooldown > 0}
+                            size="large"
+                            startIcon={
+                              resendLoading ? (
+                                <CircularProgress size={20} color="inherit" />
+                              ) : undefined
+                            }
+                          >
+                            {cooldown > 0
+                              ? `Resend in ${cooldown}s`
+                              : resendLoading
+                              ? "Sending..."
+                              : "Resend Verification Email"}
+                          </Button>
+                          {resendAttempts > 0 &&
+                            resendAttempts < MAX_RESEND_ATTEMPTS && (
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                                sx={{
+                                  display: "block",
+                                  textAlign: "center",
+                                  mt: 1,
+                                }}
+                              >
+                                Attempt {resendAttempts} of {MAX_RESEND_ATTEMPTS}
+                              </Typography>
+                            )}
+                        </Box>
+                      )}
+                    </Stack>
+                  </Box>
+
+                  {/* Back to Sign In button */}
+                  <Button
+                    fullWidth
+                    variant="outlined"
+                    size="large"
+                    onClick={() => {
+                      setEmailFromQuery(null);
+                      setNotice(null);
+                      setResendAttempts(0);
+                      setResendResult(null);
+                      setCooldown(0);
+                      router.push("/auth/login");
+                    }}
+                    sx={{
+                      textTransform: "none",
+                      fontWeight: 600,
+                    }}
+                  >
+                    Back to Sign In
+                  </Button>
                 </Box>
-              )}
-
-              {/* Email/Password form - Hide when showing verification notice */}
-              {!(notice && notice.toLowerCase().includes("verify") && emailFromQuery) && (
-                <EmailPasswordAuth />
-              )}
-
-              {/* Hide other sign-in options when showing verification notice */}
-              {!(notice && notice.toLowerCase().includes("verify") && emailFromQuery) && (
+              ) : (
                 <>
+                  {/* Show normal login form when no verification is pending */}
+                  {notice && <Alert severity="success">{notice}</Alert>}
+                  {error && <Alert severity="error">{error}</Alert>}
+
+                  <EmailPasswordAuth />
+
                   <Divider>OR</Divider>
 
                   {/* Google next */}
