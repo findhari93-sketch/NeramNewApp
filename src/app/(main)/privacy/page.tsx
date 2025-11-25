@@ -268,7 +268,7 @@ export default function PrivacyPage() {
             </Typography>
             <Typography variant="body1" paragraph>
               <strong>4.3 Firebase Security:</strong> We use Firebase
-              Authentication and Firestore, which are secured by Google's
+              Authentication and Firestore, which are secured by Google&apos;s
               infrastructure. Firebase may collect authentication data and
               usage analytics as described in{" "}
               <Link
@@ -278,7 +278,7 @@ export default function PrivacyPage() {
                 color="primary"
                 underline="hover"
               >
-                Firebase's Privacy Policy
+                Firebase&apos;s Privacy Policy
               </Link>
               .
             </Typography>
@@ -490,7 +490,7 @@ export default function PrivacyPage() {
           {/* Children's Privacy */}
           <section>
             <Typography variant="h5" component="h2" gutterBottom fontWeight={600}>
-              9. Children's Privacy
+              9. Children&apos;s Privacy
             </Typography>
             <Typography variant="body1" paragraph>
               <strong>9.1 Age Requirement:</strong> Our Services are intended
