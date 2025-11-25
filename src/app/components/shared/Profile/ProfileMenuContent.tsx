@@ -16,6 +16,7 @@ import PersonIcon from "@mui/icons-material/Person";
 import SettingsIcon from "@mui/icons-material/Settings";
 import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
 import LogoutIcon from "@mui/icons-material/Logout";
+import DescriptionIcon from "@mui/icons-material/Description";
 import useAvatarColor from "./useAvatarColor";
 import type { User } from "../types";
 
@@ -63,7 +64,7 @@ export default function ProfileMenuContent({
 
   React.useEffect(() => {
     // ensure refs array length matches static menu size
-    itemRefs.current = itemRefs.current.slice(0, 4);
+    itemRefs.current = itemRefs.current.slice(0, 5);
   }, []);
 
   const goProfile = React.useCallback(() => {
@@ -78,6 +79,11 @@ export default function ProfileMenuContent({
 
   const goSettings = React.useCallback(() => {
     onNavigate("/settings");
+    onClose?.();
+  }, [onNavigate, onClose]);
+
+  const goApplications = React.useCallback(() => {
+    onNavigate("/applications");
     onClose?.();
   }, [onNavigate, onClose]);
 
@@ -199,6 +205,18 @@ export default function ProfileMenuContent({
               itemRefs.current[2] = el as HTMLButtonElement | null;
             }}
             role="menuitem"
+            onClick={goApplications}
+          >
+            <ListItemIcon>
+              <DescriptionIcon aria-hidden="true" />
+            </ListItemIcon>
+            <ListItemText primary="Submitted Applications" />
+          </ListItemButton>
+          <ListItemButton
+            ref={(el) => {
+              itemRefs.current[3] = el as HTMLButtonElement | null;
+            }}
+            role="menuitem"
             onClick={goSettings}
           >
             <ListItemIcon>
@@ -209,7 +227,7 @@ export default function ProfileMenuContent({
           <Divider sx={{ my: 1 }} />
           <ListItemButton
             ref={(el) => {
-              itemRefs.current[3] = el as HTMLButtonElement | null;
+              itemRefs.current[4] = el as HTMLButtonElement | null;
             }}
             role="menuitem"
             onClick={handleLogout}
