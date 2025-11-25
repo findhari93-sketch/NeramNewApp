@@ -578,7 +578,11 @@ function LoginPageInner() {
   React.useEffect(() => {
     const n = searchParams?.get("notice");
     const email = searchParams?.get("email");
-    if (email) setEmailFromQuery(email);
+
+    // Always set email from query if present (even if already set)
+    if (email) {
+      setEmailFromQuery(email);
+    }
 
     // Clear signup status when notice is shown
     if (n) {
@@ -610,6 +614,8 @@ function LoginPageInner() {
       setNotice("Please log in to continue.");
     } else {
       setNotice(null);
+      // Clear email from query when no notice
+      if (!n) setEmailFromQuery(null);
     }
     const isVerify = n === "verify_email_sent" || n === "verify_email_required";
     if (isVerify && resendAttempts === 0) setCooldown(20);
