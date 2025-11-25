@@ -8,7 +8,30 @@ import { pt } from "zod/v4/locales";
 // Lightweight fallback Copyright block
 const CopyRight: React.FC = () => (
   <div style={{ textAlign: "center", paddingTop: 16, fontSize: 12 }}>
-    © {new Date().getFullYear()} Neram Classes. All rights reserved.
+    <div style={{ marginBottom: 8 }}>
+      © {new Date().getFullYear()} Neram Classes. All rights reserved.
+    </div>
+    <div style={{ fontSize: 10, opacity: 0.8 }}>
+      This site is protected by reCAPTCHA and the Google{" "}
+      <a
+        href="https://policies.google.com/privacy"
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{ color: "#fffb01", textDecoration: "underline" }}
+      >
+        Privacy Policy
+      </a>{" "}
+      and{" "}
+      <a
+        href="https://policies.google.com/terms"
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{ color: "#fffb01", textDecoration: "underline" }}
+      >
+        Terms of Service
+      </a>{" "}
+      apply.
+    </div>
   </div>
 );
 
@@ -188,6 +211,8 @@ const LinksColumns: React.FC = () => {
           { text: "results", url: "#" },
           { text: "NATA-app", url: "#" },
           { text: "team", url: "#" },
+          { text: "Privacy Policy", url: "/privacy" },
+          { text: "Terms & Conditions", url: "/terms" },
         ],
       },
       {

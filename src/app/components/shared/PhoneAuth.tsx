@@ -592,6 +592,20 @@ export default function PhoneAuth({
       }
       setStep("done");
 
+      // Dispatch global event to show welcome message (matches email auth flow)
+      try {
+        window.dispatchEvent(
+          new CustomEvent("neram:phoneVerified", {
+            detail: {
+              message:
+                "Welcome to the Neram Classes family! All our app resources you can access freely without any interruption.",
+            },
+          })
+        );
+      } catch {
+        // ignore
+      }
+
       // Persist user to database via secure server route (uses service role)
       try {
         const current = auth.currentUser;

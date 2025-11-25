@@ -30,25 +30,18 @@ export default function TawkMessenger() {
     script.onload = () => {
       const Tawk_API = (window as any).Tawk_API;
       if (Tawk_API) {
-        // Position widget on left bottom ONLY for /auth/login on desktop
-        const isLoginPage = pathname === "/auth/login";
-        if (isLoginPage) {
-          Tawk_API.customStyle = {
-            visibility: {
-              desktop: {
-                position: "bl", // bottom-left
-                xOffset: 20,
-                yOffset: 20,
-              },
-              mobile: {
-                position: "br", // bottom-right (default)
-                xOffset: 20,
-                yOffset: 20,
-              },
-            },
-          };
+        const isAuthPage = pathname?.startsWith("/auth");
+
+        // Hide widget on auth pages, show on other pages
+        if (isAuthPage) {
+          if (Tawk_API.hideWidget) {
+            Tawk_API.hideWidget();
+          }
         } else {
-          // Default position (bottom-right) for all other pages
+          // Default position (bottom-right) for all non-auth pages
+          if (Tawk_API.showWidget) {
+            Tawk_API.showWidget();
+          }
           Tawk_API.customStyle = {
             visibility: {
               desktop: {
@@ -83,28 +76,27 @@ export default function TawkMessenger() {
     };
   }, []);
 
-  // Update position when pathname changes
+  // Update visibility and position when pathname changes
   useEffect(() => {
     const Tawk_API = (window as any).Tawk_API;
-    if (Tawk_API && Tawk_API.customStyle) {
-      const isLoginPage = pathname === "/auth/login";
-      if (isLoginPage) {
-        Tawk_API.customStyle = {
-          visibility: {
-            desktop: {
-              position: "bl", // bottom-left
-              xOffset: 20,
-              yOffset: 20,
-            },
-            mobile: {
-              position: "br", // bottom-right (default)
-              xOffset: 20,
-              yOffset: 20,
-            },
-          },
-        };
-      } else {
-        // Default position (bottom-right) for all other pages
+    if (!Tawk_API) return;
+
+    const isLoginPage = pathname === "/auth/login";
+    const isAuthPage = pathname?.startsWith("/auth");
+
+    // Hide Tawk on all auth pages (login, signup, forgot password, etc.)
+    if (isAuthPage) {
+      if (Tawk_API.hideWidget) {
+        Tawk_API.hideWidget();
+      }
+    } else {
+      // Show widget on non-auth pages
+      if (Tawk_API.showWidget) {
+        Tawk_API.showWidget();
+      }
+
+      // Set position for non-auth pages
+      if (Tawk_API.customStyle) {
         Tawk_API.customStyle = {
           visibility: {
             desktop: {

@@ -40,3 +40,57 @@ a {
     color-scheme: dark;
   }
 }
+
+/* Hide reCAPTCHA badge */
+/* Note: Per Google's policy, if hiding the badge, you must include this text in your terms/privacy:
+   "This site is protected by reCAPTCHA and the Google Privacy Policy and Terms of Service apply." */
+.grecaptcha-badge,
+div.grecaptcha-badge {
+  visibility: hidden !important;
+  opacity: 0 !important;
+  display: none !important;
+  pointer-events: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  position: absolute !important;
+  overflow: hidden !important;
+  z-index: -9999 !important;
+}
+
+/* Additional selectors to ensure reCAPTCHA badge is hidden */
+iframe[src*="recaptcha"],
+iframe[src*="google.com/recaptcha"] {
+  visibility: hidden !important;
+  opacity: 0 !important;
+  display: none !important;
+  pointer-events: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  position: absolute !important;
+  z-index: -9999 !important;
+}
+
+/* Hide the reCAPTCHA container div with various selectors */
+div[class*="grecaptcha-badge"],
+div[class="grecaptcha-badge"],
+div[style*="bottom: 14px"],
+div[style*="right: 14px"],
+div[style*="position: fixed"] {
+  visibility: hidden !important;
+  opacity: 0 !important;
+  display: none !important;
+  pointer-events: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  position: absolute !important;
+  overflow: hidden !important;
+  z-index: -9999 !important;
+}
+
+/* Target by position (reCAPTCHA typically appears at bottom-right) */
+body > div[style*="position: fixed"][style*="bottom"][style*="right"] {
+  visibility: hidden !important;
+  opacity: 0 !important;
+  display: none !important;
+  pointer-events: none !important;
+}

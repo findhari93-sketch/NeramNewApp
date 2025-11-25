@@ -365,6 +365,12 @@ export default function ProfileGuard({
                   },
                 })
               );
+              // Also dispatch googleAuthComplete event to trigger profile refresh
+              window.dispatchEvent(
+                new CustomEvent("neram:googleAuthComplete", {
+                  detail: { uid: u?.uid },
+                })
+              );
             } catch {}
             return true;
           } catch (e) {

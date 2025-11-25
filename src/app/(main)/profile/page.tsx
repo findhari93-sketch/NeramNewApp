@@ -867,12 +867,23 @@ function ProfilePageInner() {
       profile: { photoURL: (user as any).photoURL },
       provider: "google.com",
     };
-    // Save to Supabase
+    // Save to Supabase and dispatch event to trigger profile refresh
     apiClient("/api/users/upsert", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
-    }).catch(() => console.warn("Google user upsert failed"));
+    })
+      .then(() => {
+        // Dispatch event to trigger profile data refresh
+        try {
+          window.dispatchEvent(
+            new CustomEvent("neram:googleAuthComplete", {
+              detail: { uid: (user as any).uid },
+            })
+          );
+        } catch {}
+      })
+      .catch(() => console.warn("Google user upsert failed"));
     // apiClient is a stable import, not needed in deps
   }, [user, authChecked]);
 
@@ -912,6 +923,37 @@ function ProfilePageInner() {
     },
     []
   );
+
+  // Listen for Google auth completion event to trigger profile refresh
+  React.useEffect(() => {
+    const handleGoogleAuthComplete = async () => {
+      const uid = auth.currentUser?.uid;
+      if (!uid) return;
+
+      // Reset fetch flag to allow refetch
+      fetchedMeForUid.current = null;
+
+      // Fetch fresh data from server
+      try {
+        const res = await apiClient(`/api/users/me`);
+        if (res && res.ok) {
+          const parsed = await res.json().catch(() => null);
+          const dbUser = parsed && parsed.user ? parsed.user : parsed;
+          if (dbUser) {
+            setUser(dbUser);
+            try {
+              writeUserCache(uid, dbUser);
+            } catch {}
+          }
+        }
+      } catch {
+        // ignore network errors
+      }
+    };
+
+    window.addEventListener("neram:googleAuthComplete", handleGoogleAuthComplete);
+    return () => window.removeEventListener("neram:googleAuthComplete", handleGoogleAuthComplete);
+  }, [writeUserCache, setUser]);
 
   React.useEffect(() => {
     // Always run this effect; prefer showing cached data immediately but also fetch from server to refresh UI
@@ -1039,6 +1081,46 @@ function ProfilePageInner() {
   return (
     <>
       <Container maxWidth="lg" sx={{ mb: 6, overflowX: "clip" }}>
+        {/* Page Header with Title and Join Class Button */}
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            mb: 3,
+            mt: 3,
+            flexWrap: "wrap",
+            gap: 2,
+          }}
+        >
+          <Typography
+            variant="h4"
+            component="h1"
+            fontWeight={700}
+            sx={{ color: "primary.main" }}
+          >
+            My Profile
+          </Typography>
+          <Button
+            variant="contained"
+            color="primary"
+            size="large"
+            onClick={() => router.push("/applicationform")}
+            sx={{
+              px: 3,
+              py: 1.5,
+              fontWeight: 600,
+              fontSize: "1rem",
+              boxShadow: 2,
+              "&:hover": {
+                boxShadow: 4,
+              },
+            }}
+          >
+            Join Class
+          </Button>
+        </Box>
+
         {/* Profile completeness card */}
         <Paper elevation={3} sx={{ p: 2, mb: 3, borderRadius: 2 }}>
           <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>

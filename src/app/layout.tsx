@@ -90,6 +90,64 @@ export default function RootLayout({
             defer
           />
         )}
+        {/* Inline script to hide reCAPTCHA badge immediately */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                // Function to hide reCAPTCHA badge
+                function hideRecaptchaBadge() {
+                  const badges = document.querySelectorAll('.grecaptcha-badge, [class*="grecaptcha-badge"]');
+                  badges.forEach(function(badge) {
+                    if (badge) {
+                      badge.style.visibility = 'hidden';
+                      badge.style.opacity = '0';
+                      badge.style.display = 'none';
+                      badge.style.width = '0';
+                      badge.style.height = '0';
+                      badge.style.position = 'absolute';
+                      badge.style.overflow = 'hidden';
+                      badge.style.zIndex = '-9999';
+                    }
+                  });
+                }
+
+                // Run immediately
+                hideRecaptchaBadge();
+
+                // Run after DOM is loaded
+                if (document.readyState === 'loading') {
+                  document.addEventListener('DOMContentLoaded', hideRecaptchaBadge);
+                } else {
+                  hideRecaptchaBadge();
+                }
+
+                // Run after window is fully loaded
+                window.addEventListener('load', hideRecaptchaBadge);
+
+                // Use MutationObserver to catch dynamically added badges
+                var observer = new MutationObserver(function(mutations) {
+                  hideRecaptchaBadge();
+                });
+
+                // Start observing when DOM is ready
+                if (document.body) {
+                  observer.observe(document.body, {
+                    childList: true,
+                    subtree: true
+                  });
+                } else {
+                  document.addEventListener('DOMContentLoaded', function() {
+                    observer.observe(document.body, {
+                      childList: true,
+                      subtree: true
+                    });
+                  });
+                }
+              })();
+            `,
+          }}
+        />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${handlee.variable} ${roboto.variable} ${bakbakOne.variable} ${poppins.variable} ${suezOne.variable}`}
