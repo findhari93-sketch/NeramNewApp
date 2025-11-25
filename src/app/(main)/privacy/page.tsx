@@ -31,11 +31,11 @@ export default function PrivacyPage() {
               1. Introduction
             </Typography>
             <Typography variant="body1" paragraph>
-              Welcome to Neram Classes ("we," "our," or "us"). We are committed
+              Welcome to Neram Classes (&quot;we,&quot; &quot;our,&quot; or &quot;us&quot;). We are committed
               to protecting your privacy and personal information. This Privacy
               Policy explains how we collect, use, disclose, and safeguard your
               information when you use our educational platform, website, mobile
-              applications, and related services (collectively, the "Services").
+              applications, and related services (collectively, the &quot;Services&quot;).
             </Typography>
             <Typography variant="body1" paragraph>
               Please read this Privacy Policy carefully. By using our Services,
@@ -68,7 +68,7 @@ export default function PrivacyPage() {
               </li>
               <li>
                 <Typography variant="body1">
-                  <strong>Profile Information:</strong> Father's name,
+                  <strong>Profile Information:</strong> Father&apos;s name,
                   educational details (school/college name, board, year,
                   standard), city, state, country, zip code, interests, course
                   preferences, and bio
@@ -262,9 +262,9 @@ export default function PrivacyPage() {
               spam, abuse, and automated attacks. reCAPTCHA collects hardware
               and software information, such as device and application data,
               and sends it to Google for analysis. This information is used to
-              protect our platform and improve reCAPTCHA's ability to
+              protect our platform and improve reCAPTCHA&apos;s ability to
               distinguish humans from bots. The information collected by
-              reCAPTCHA is subject to Google's Privacy Policy.
+              reCAPTCHA is subject to Google&apos;s Privacy Policy.
             </Typography>
             <Typography variant="body1" paragraph>
               <strong>4.3 Firebase Security:</strong> We use Firebase
@@ -640,7 +640,7 @@ export default function PrivacyPage() {
               </li>
               <li>
                 <Typography variant="body1">
-                  Updating the "Last Updated" date at the top of this policy
+                  Updating the &quot;Last Updated&quot; date at the top of this policy
                 </Typography>
               </li>
               <li>

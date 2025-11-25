@@ -31,10 +31,10 @@ export default function TermsPage() {
               1. Introduction
             </Typography>
             <Typography variant="body1" paragraph>
-              Welcome to Neram Classes ("we," "our," or "us"). These Terms and
-              Conditions ("Terms") govern your access to and use of our
+              Welcome to Neram Classes (&quot;we,&quot; &quot;our,&quot; or &quot;us&quot;). These Terms and
+              Conditions (&quot;Terms&quot;) govern your access to and use of our
               educational platform, website, mobile applications, and related
-              services (collectively, the "Services").
+              services (collectively, the &quot;Services&quot;).
             </Typography>
             <Typography variant="body1" paragraph>
               By accessing or using our Services, you agree to be bound by these
@@ -51,7 +51,7 @@ export default function TermsPage() {
             <Typography variant="body1" paragraph>
               <strong>2.1 Eligibility:</strong> You must be at least 13 years
               old to create an account. If you are under 18, you represent that
-              you have your parent or guardian's permission to use the Services.
+              you have your parent or guardian&apos;s permission to use the Services.
             </Typography>
             <Typography variant="body1" paragraph>
               <strong>2.2 Account Information:</strong> You agree to provide
@@ -300,8 +300,8 @@ export default function TermsPage() {
               10. Disclaimers and Limitations of Liability
             </Typography>
             <Typography variant="body1" paragraph>
-              <strong>10.1 "AS IS" Basis:</strong> THE SERVICES ARE PROVIDED ON
-              AN "AS IS" AND "AS AVAILABLE" BASIS WITHOUT WARRANTIES OF ANY KIND,
+              <strong>10.1 &quot;AS IS&quot; Basis:</strong> THE SERVICES ARE PROVIDED ON
+              AN &quot;AS IS&quot; AND &quot;AS AVAILABLE&quot; BASIS WITHOUT WARRANTIES OF ANY KIND,
               EITHER EXPRESS OR IMPLIED.
             </Typography>
             <Typography variant="body1" paragraph>
@@ -411,7 +411,7 @@ export default function TermsPage() {
             <Typography variant="body1" paragraph>
               We reserve the right to modify these Terms at any time. We will
               notify you of any material changes by posting the updated Terms on
-              our website and updating the "Last Updated" date. Your continued
+              our website and updating the &quot;Last Updated&quot; date. Your continued
               use of the Services after such changes constitutes your acceptance
               of the new Terms.
             </Typography>
