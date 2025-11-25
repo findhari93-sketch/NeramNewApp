@@ -523,6 +523,7 @@ export default function ApplicationForm() {
             diplomaYear: diplomaYear,
             diplomaCollege: diplomaCollege,
             otherDescription: otherDescription,
+            selectedCourse: selectedCourse,
             softwareCourse: softwareCourse || "Revit",
           };
 
@@ -556,6 +557,7 @@ export default function ApplicationForm() {
     diplomaYear,
     diplomaCollege,
     otherDescription,
+    selectedCourse,
     softwareCourse,
   ]);
 

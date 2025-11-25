@@ -770,7 +770,7 @@ export default function StepEdu(props) {
           role="status"
           aria-live="polite"
           color="error"
-          sx={{ mt: 1, textAlign: "center" }}
+          sx={{ mt: 1, textAlign: "center", fontWeight: 600, fontSize: "0.95rem" }}
         >
           {step2Errors.selectedCourse}
         </Typography>
@@ -787,7 +787,15 @@ export default function StepEdu(props) {
         <Button
           variant="contained"
           onClick={async () => {
-            if (!validateEdu()) return;
+            if (!validateEdu()) {
+              // Scroll to top of form to show validation errors
+              try {
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              } catch (e) {
+                console.warn("Failed to scroll to top:", e);
+              }
+              return;
+            }
             saveDraft();
             // Save to database
             if (props.saveToDatabase) {
