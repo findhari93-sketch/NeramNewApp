@@ -171,8 +171,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Update avatar_path in the users table by matching firebase_uid
+    // Update avatar_path in both users and users_duplicate tables by matching firebase_uid
     try {
+      // Update old users table (for backward compatibility)
       const { data: updateData, error: updateErr } = await supabaseServer
         .from("users")
         .update({ avatar_path: filename })
@@ -181,16 +182,44 @@ export async function POST(req: NextRequest) {
 
       if (updateErr) {
         console.error("users avatar_path update error", updateErr);
-        // return path with warning
-        // continue to return signed URL below even if DB update fails
       } else if (
         !updateData ||
         (Array.isArray(updateData) && updateData.length === 0)
       ) {
         console.warn("No users row matched firebase_uid", userId);
       }
+
+      // Update users_duplicate table (account.avatar_path in JSONB)
+      // First, fetch the existing row to merge with
+      const { data: existingUser, error: fetchErr } = await supabaseServer
+        .from("users_duplicate")
+        .select("account")
+        .filter("account->>firebase_uid", "eq", userId)
+        .limit(1)
+        .maybeSingle();
+
+      if (fetchErr) {
+        console.error("users_duplicate fetch error", fetchErr);
+      } else if (existingUser) {
+        // Merge avatar_path into existing account JSONB
+        const updatedAccount = {
+          ...(existingUser.account || {}),
+          avatar_path: filename,
+        };
+
+        const { error: updateDuplicateErr } = await supabaseServer
+          .from("users_duplicate")
+          .update({ account: updatedAccount })
+          .filter("account->>firebase_uid", "eq", userId);
+
+        if (updateDuplicateErr) {
+          console.error("users_duplicate avatar_path update error", updateDuplicateErr);
+        }
+      } else {
+        console.warn("No users_duplicate row matched firebase_uid", userId);
+      }
     } catch (e) {
-      console.error("users avatar_path update unexpected", e);
+      console.error("avatar_path update unexpected", e);
     }
 
     // Create a short-lived signed URL so the client can display the image immediately
