@@ -29,6 +29,7 @@ import {
   EmailAuthProvider,
   updatePassword,
   GoogleAuthProvider,
+  linkWithCredential,
 } from "firebase/auth";
 import { useRouter, useSearchParams } from "next/navigation";
 import apiClient from "../../../lib/apiClient";
@@ -184,6 +185,14 @@ function ProfilePageInner() {
   const [pwdError, setPwdError] = React.useState<string | null>(null);
   const [reauthenticated, setReauthenticated] = React.useState(false);
 
+  // Set Password dialog state (for Google users without password)
+  const [setPasswordDialogOpen, setSetPasswordDialogOpen] = React.useState(false);
+  const [setPasswordLoading, setSetPasswordLoading] = React.useState(false);
+  const [setPasswordUsername, setSetPasswordUsername] = React.useState("");
+  const [setPasswordNew, setSetPasswordNew] = React.useState("");
+  const [setPasswordConfirm, setSetPasswordConfirm] = React.useState("");
+  const [setPasswordError, setSetPasswordError] = React.useState<string | null>(null);
+
   const { control, handleSubmit, reset } = useForm<Record<string, any>>({
     defaultValues: {},
   });
@@ -227,6 +236,12 @@ function ProfilePageInner() {
     const total = checks.length;
     const done = checks.filter(Boolean).length;
     return Math.round((done / total) * 100);
+  }, [user]);
+
+  // Detect if user has password provider linked
+  const hasPasswordProvider = React.useMemo(() => {
+    const providerData = user?.providerData as Array<{ providerId: string }> | undefined;
+    return providerData?.some((p) => p.providerId === "password") ?? false;
   }, [user]);
 
   // Ensure the form is reset whenever the drawer opens or its values change.
@@ -1300,7 +1315,7 @@ function ProfilePageInner() {
                       </Typography>
                     </Stack>
 
-                    {/* Password row: masked with reveal and edit action */}
+                    {/* Password row: conditional based on whether user has password provider */}
                     <Stack
                       direction="row"
                       spacing={1}
@@ -1320,17 +1335,34 @@ function ProfilePageInner() {
                           flexWrap: "wrap",
                         }}
                       >
-                        <Typography variant="body2" sx={{ mr: 1 }}>
-                          {"••••••••"}
-                        </Typography>
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          onClick={() => setPwdDialogOpen(true)}
-                          aria-label="change-password"
-                        >
-                          Change password
-                        </Button>
+                        {hasPasswordProvider ? (
+                          <>
+                            <Typography variant="body2" sx={{ mr: 1 }}>
+                              {"••••••••"}
+                            </Typography>
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              onClick={() => setPwdDialogOpen(true)}
+                              aria-label="change-password"
+                            >
+                              Change password
+                            </Button>
+                          </>
+                        ) : (
+                          <Button
+                            variant="contained"
+                            size="small"
+                            onClick={() => {
+                              setSetPasswordUsername((user as any)?.username || "");
+                              setSetPasswordDialogOpen(true);
+                            }}
+                            aria-label="set-password"
+                            sx={{ fontWeight: 500 }}
+                          >
+                            Create username & password for easier login
+                          </Button>
+                        )}
                       </Box>
                     </Stack>
 
@@ -2332,6 +2364,167 @@ function ProfilePageInner() {
             }}
           >
             Change
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Set Password Dialog (for Google users without password) */}
+      <Dialog
+        open={setPasswordDialogOpen}
+        onClose={() => setSetPasswordDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Create Username & Password</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Set up a username and password to easily sign in without needing Google authentication every time.
+          </Typography>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}>
+            <TextField
+              label="Username"
+              type="text"
+              id="set-username"
+              name="username"
+              value={setPasswordUsername}
+              onChange={(e) => setSetPasswordUsername(e.target.value)}
+              fullWidth
+              helperText="Choose a unique username for login"
+            />
+            <TextField
+              label="New password"
+              type="password"
+              id="set-password-new"
+              name="new_password"
+              value={setPasswordNew}
+              onChange={(e) => setSetPasswordNew(e.target.value)}
+              fullWidth
+              helperText="Must be at least 6 characters"
+            />
+            <TextField
+              label="Confirm password"
+              type="password"
+              id="set-password-confirm"
+              name="confirm_password"
+              value={setPasswordConfirm}
+              onChange={(e) => setSetPasswordConfirm(e.target.value)}
+              fullWidth
+            />
+            {setPasswordError ? (
+              <Typography color="error" variant="body2">
+                {setPasswordError}
+              </Typography>
+            ) : null}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => {
+            setSetPasswordDialogOpen(false);
+            setSetPasswordError(null);
+            setSetPasswordNew("");
+            setSetPasswordConfirm("");
+          }}>Cancel</Button>
+          <Button
+            variant="contained"
+            disabled={setPasswordLoading}
+            onClick={async () => {
+              setSetPasswordError(null);
+
+              // Validation
+              if (!setPasswordUsername || setPasswordUsername.trim().length < 3) {
+                setSetPasswordError("Username must be at least 3 characters");
+                return;
+              }
+              if (!setPasswordNew) {
+                setSetPasswordError("Please enter a password");
+                return;
+              }
+              if (setPasswordNew.length < 6) {
+                setSetPasswordError("Password must be at least 6 characters");
+                return;
+              }
+              if (setPasswordNew !== setPasswordConfirm) {
+                setSetPasswordError("Passwords do not match");
+                return;
+              }
+
+              setSetPasswordLoading(true);
+              try {
+                const current = auth.currentUser;
+                if (!current) {
+                  setSetPasswordError("No authenticated user");
+                  setSetPasswordLoading(false);
+                  return;
+                }
+
+                if (!current.email) {
+                  setSetPasswordError("Your account doesn't have an email address. Cannot create password login.");
+                  setSetPasswordLoading(false);
+                  return;
+                }
+
+                // First, update username in database if changed
+                const trimmedUsername = setPasswordUsername.trim();
+                if (trimmedUsername !== (user as any)?.username) {
+                  const usernameResult = await updateUserFields(current.uid, {
+                    username: trimmedUsername,
+                  });
+                  if (!usernameResult.ok) {
+                    setSetPasswordError(`Failed to set username: ${usernameResult.error}`);
+                    setSetPasswordLoading(false);
+                    return;
+                  }
+                }
+
+                // Link email/password credential to the existing account
+                try {
+                  const credential = EmailAuthProvider.credential(
+                    current.email,
+                    setPasswordNew
+                  );
+                  await linkWithCredential(current, credential);
+
+                  setToast({
+                    open: true,
+                    message: "Username and password created successfully! You can now log in with your credentials.",
+                    severity: "success",
+                  });
+
+                  // Close dialog and reset form
+                  setSetPasswordDialogOpen(false);
+                  setSetPasswordUsername("");
+                  setSetPasswordNew("");
+                  setSetPasswordConfirm("");
+                  setSetPasswordError(null);
+
+                  // Refresh user data to reflect new provider
+                  try {
+                    const res = await apiClient(`/api/users/me`);
+                    if (res && res.ok) {
+                      const parsed = await res.json().catch(() => null);
+                      const dbUser = parsed && parsed.user ? parsed.user : parsed;
+                      if (dbUser) setUser(dbUser);
+                    }
+                  } catch {}
+                } catch (linkErr: any) {
+                  let errorMsg = "Failed to create password login";
+                  if (linkErr?.code === "auth/email-already-in-use") {
+                    errorMsg = "This email is already associated with password login";
+                  } else if (linkErr?.code === "auth/provider-already-linked") {
+                    errorMsg = "Password login is already set up for this account";
+                  } else if (linkErr?.message) {
+                    errorMsg = linkErr.message;
+                  }
+                  setSetPasswordError(errorMsg);
+                }
+              } catch (err) {
+                setSetPasswordError("Unexpected error: " + String(err));
+              } finally {
+                setSetPasswordLoading(false);
+              }
+            }}
+          >
+            {setPasswordLoading ? <CircularProgress size={20} /> : "Create"}
           </Button>
         </DialogActions>
       </Dialog>
