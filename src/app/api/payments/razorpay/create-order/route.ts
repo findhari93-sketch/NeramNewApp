@@ -64,22 +64,33 @@ export async function POST(req: Request) {
         dev("JWT token flow", { token: token.substring(0, 30) + "..." });
         const payload = validation.payload! as any;
         applicationId = payload.userId;
-        rupees = Number(payload.amount);
 
-        // Optional: Check already-paid state
+        // Fetch admin_filled amount from database
         const { data: application } = await supabase
           .from("users_duplicate")
-          .select("final_fee_payment")
+          .select("final_fee_payment, admin_filled")
           .eq("id", applicationId)
           .single();
+
         if (application) {
           const finalFee = application.final_fee_payment as any || {};
+
+          // Check already-paid state
           if (finalFee.payment_status === "paid") {
             return NextResponse.json(
               { error: "already_paid", hint: "Payment already completed" },
               { status: 400 }
             );
           }
+
+          // Get amount from admin_filled (priority) or JWT token (fallback)
+          const adminFilled = application.admin_filled as any || {};
+          rupees = Number(adminFilled.amount || adminFilled.final_amount || adminFilled.payable_amount || payload.amount);
+
+          dev("Using amount from admin_filled", { amount: rupees, adminFilled });
+        } else {
+          // Fallback to JWT amount if application not found
+          rupees = Number(payload.amount);
         }
 
         if (!Number.isFinite(rupees) || rupees <= 0) {
@@ -94,7 +105,7 @@ export async function POST(req: Request) {
 
         const { data: applications, error: lookupErr } = await supabase
           .from("users_duplicate")
-          .select("id, final_fee_payment")
+          .select("id, final_fee_payment, admin_filled")
           .not("final_fee_payment", "is", null);
 
         if (lookupErr) {
@@ -125,6 +136,7 @@ export async function POST(req: Request) {
 
         applicationId = matchedApp.id;
         const finalFee = matchedApp.final_fee_payment as any || {};
+        const adminFilled = matchedApp.admin_filled as any || {};
 
         // Check 1: token_expires > now
         if (finalFee.token_expires) {
@@ -165,16 +177,23 @@ export async function POST(req: Request) {
           );
         }
 
-        // Use payable_amount from DB
-        rupees = Number(finalFee.payable_amount || 0);
+        // Use amount from admin_filled (priority) or final_fee_payment (fallback)
+        rupees = Number(adminFilled.amount || adminFilled.final_amount || adminFilled.payable_amount || finalFee.payable_amount || 0);
+        dev("Using amount from admin_filled or final_fee_payment", {
+          adminFilled,
+          finalFeeAmount: finalFee.payable_amount,
+          selectedAmount: rupees
+        });
+
         if (!Number.isFinite(rupees) || rupees <= 0) {
-          dev("Invalid payable_amount", {
+          dev("Invalid amount", {
+            admin_filled: adminFilled,
             payable_amount: finalFee.payable_amount,
           });
           return NextResponse.json(
             {
               error: "invalid_amount",
-              hint: "Application has no valid payable amount",
+              hint: "Application has no valid payable amount in admin_filled or final_fee_payment",
             },
             { status: 400 }
           );
