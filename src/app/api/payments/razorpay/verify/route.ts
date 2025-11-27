@@ -137,6 +137,16 @@ export async function POST(req: Request) {
       });
     }
 
+    // Extract payment amount from admin_filled data
+    const appDetails = application.application_details || {};
+    const adminFilled = appDetails.admin_filled || {};
+    const totalCourseFees = Number(adminFilled.total_course_fees || 0);
+    const discount = Number(adminFilled.discount || 0);
+    const calculatedPayableAmount = totalCourseFees - discount;
+
+    // Use stored payable_amount if exists, otherwise use calculated amount
+    const payableAmount = finalFee.payable_amount || calculatedPayableAmount || 0;
+
     const now = new Date().toISOString();
     const newPaymentHistory = [
       ...paymentHistory,
@@ -144,7 +154,7 @@ export async function POST(req: Request) {
         event: "payment.verified",
         paymentId,
         orderId,
-        amount: finalFee.payable_amount || 0,
+        amount: payableAmount,
         ts: now,
         source: "verify",
       },
@@ -154,6 +164,8 @@ export async function POST(req: Request) {
       ...finalFee,
       token_used: true,
       payment_status: "paid",
+      payment_method: "Razorpay",
+      payable_amount: payableAmount,
       payment_at: now,
       razorpay_payment_id: paymentId,
       payment_history: newPaymentHistory,
@@ -187,15 +199,15 @@ export async function POST(req: Request) {
       const studentEmail = application.email || application.contact?.email;
       const studentPhone = application.contact?.phone || application.phone;
 
-      const appDetails = application.application_details || {};
-      const adminFilled = appDetails.admin_filled || {};
+      console.log("[verify] Student details:", { studentName, studentEmail, studentPhone });
 
       const courseName = adminFilled.final_course_Name || application.selected_course || "N/A";
       const courseDuration = adminFilled.course_duration || "N/A";
 
-      const totalCourseFees = Number(adminFilled.total_course_fees || 0);
-      const discount = Number(adminFilled.discount || 0);
-      const amountPaid = Number(finalFee.payable_amount || 0);
+      // Use the payableAmount we calculated earlier
+      const amountPaid = payableAmount;
+
+      console.log("[verify] Payment details:", { totalCourseFees, discount, amountPaid });
 
       const paymentOptions = adminFilled.payment_options;
       const paymentTypeRaw = Array.isArray(paymentOptions) ? String(paymentOptions[0] || "partial").toLowerCase() : String(paymentOptions || "partial").toLowerCase();
@@ -243,33 +255,44 @@ export async function POST(req: Request) {
       }
 
       if (studentEmail) {
-        const graphToken = await getGraphToken();
-        if (graphToken) {
-          const emailHTML = generateInvoiceEmailHTML({
-            studentName,
-            courseName,
-            amountPaid,
-            paymentId,
-            invoiceNumber,
-            paymentDate,
-          });
+        console.log(`[verify] Attempting to send invoice email to ${studentEmail}`);
+        try {
+          const graphToken = await getGraphToken();
+          if (graphToken) {
+            console.log("[verify] Graph token obtained successfully");
+            const emailHTML = generateInvoiceEmailHTML({
+              studentName,
+              courseName,
+              amountPaid,
+              paymentId,
+              invoiceNumber,
+              paymentDate,
+            });
 
-          const attachmentName = `Invoice_${invoiceNumber}.pdf`;
+            const attachmentName = `Invoice_${invoiceNumber}.pdf`;
 
-          await sendEmailWithAttachment(
-            graphToken,
-            studentEmail,
-            `Payment Invoice - ${invoiceNumber}`,
-            emailHTML,
-            pdfBuffer,
-            attachmentName
-          );
-          console.log(`[verify] Invoice email sent to ${studentEmail}`);
-        } else {
-          console.warn("[verify] Email credentials not configured - invoice not sent");
+            await sendEmailWithAttachment(
+              graphToken,
+              studentEmail,
+              `Payment Invoice - ${invoiceNumber}`,
+              emailHTML,
+              pdfBuffer,
+              attachmentName
+            );
+            console.log(`[verify] ✅ Invoice email sent successfully to ${studentEmail}`);
+          } else {
+            console.error("[verify] ❌ Failed to get Graph token - Email credentials not configured");
+            console.error("[verify] Required env vars: AZ_TENANT_ID, AZ_CLIENT_ID, AZ_CLIENT_SECRET, AZ_SENDER_USER");
+          }
+        } catch (emailError) {
+          console.error("[verify] ❌ Failed to send invoice email:", emailError);
+          if (emailError instanceof Error) {
+            console.error("[verify] Email error details:", emailError.message);
+          }
         }
       } else {
-        console.warn("[verify] No email on record - invoice not sent");
+        console.error("[verify] ❌ No email address found for student - invoice not sent");
+        console.error("[verify] Checked fields: application.email, application.contact?.email");
       }
 
       // Persist invoice details under payment details as an array
