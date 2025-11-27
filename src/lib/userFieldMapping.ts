@@ -57,32 +57,41 @@ export interface UsersDuplicateRow {
     other_description?: string;
   };
   application_details?: {
-    final_fee_payment?: {
-      token?: string | null;
-      payment_at?: string | null;
-      discount_full?: number | null;
-      token_expires?: string | null;
-      payable_amount?: number | null;
-      payment_method?: string | null;
-      payment_status?: "pending" | "paid" | "failed" | "refunded";
-      payment_history?: Array<{
-        event?: string;
-        paymentId?: string;
-        orderId?: string;
-        amount?: number;
-        ts?: string;
-        source?: string;
-      }>;
-      installment1_amount?: number | null;
-      installment2_amount?: number | null;
-      token_used?: boolean;
-      razorpay_order_id?: string;
-      razorpay_payment_id?: string;
-      order_created_at?: string;
-      last_verify_at?: string;
-    };
+    approved_at?: string | null;
+    approved_by?: string | null;
+    email_status?: string;
+    email_sent_at?: string | null;
+    application_submitted?: boolean;
+    app_submitted_date_time?: string | null;
+    application_admin_approval?: string;
     [key: string]: any;
   };
+  admin_filled?: Record<string, any>;
+  final_fee_payment?: {
+    token?: string | null;
+    payment_at?: string | null;
+    discount_full?: number | null;
+    token_expires?: string | null;
+    payable_amount?: number | null;
+    payment_method?: string | null;
+    payment_status?: "pending" | "paid" | "failed" | "refunded";
+    payment_history?: Array<{
+      event?: string;
+      paymentId?: string;
+      orderId?: string;
+      amount?: number;
+      ts?: string;
+      source?: string;
+    }>;
+    installment1_amount?: number | null;
+    installment2_amount?: number | null;
+    token_used?: boolean;
+    razorpay_order_id?: string;
+    razorpay_payment_id?: string;
+    order_created_at?: string;
+    last_verify_at?: string;
+  };
+  updated_at?: string;
 }
 
 /**

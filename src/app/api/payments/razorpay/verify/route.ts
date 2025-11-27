@@ -55,13 +55,12 @@ export async function POST(req: Request) {
 
     const { data: appsByOrder, error: orderErr } = await supabase
       .from("users_duplicate")
-      .select("id, application_details");
+      .select("id, final_fee_payment");
 
     if (!orderErr && appsByOrder) {
       for (const app of appsByOrder) {
-        const appDetails = app.application_details as any;
-        const finalFee = appDetails?.final_fee_payment || {};
-        if (finalFee.razorpay_order_id === orderId) {
+        const finalFee = app.final_fee_payment as any;
+        if (finalFee?.razorpay_order_id === orderId) {
           applicationId = app.id;
           application = app;
           console.log("[verify] Found application by order_id", {
@@ -101,7 +100,7 @@ export async function POST(req: Request) {
     if (!application) {
       const { data: app, error: fetchErr } = await supabase
         .from("users_duplicate")
-        .select("application_details")
+        .select("final_fee_payment")
         .eq("id", applicationId)
         .single();
 
@@ -115,8 +114,7 @@ export async function POST(req: Request) {
       application = app;
     }
 
-    const appDetails = application.application_details as any;
-    const finalFee = appDetails?.final_fee_payment || {};
+    const finalFee = application.final_fee_payment as any || {};
     const paymentHistory = Array.isArray(finalFee.payment_history)
       ? finalFee.payment_history
       : [];
@@ -160,15 +158,10 @@ export async function POST(req: Request) {
       last_verify_at: now,
     };
 
-    const updatedAppDetails = {
-      ...appDetails,
-      final_fee_payment: updatedFinalFee,
-    };
-
     const { error: updateErr } = await supabase
       .from("users_duplicate")
       .update({
-        application_details: updatedAppDetails,
+        final_fee_payment: updatedFinalFee,
         updated_at: now,
       })
       .eq("id", applicationId);

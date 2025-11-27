@@ -69,12 +69,11 @@ export async function POST(req: Request) {
         // Optional: Check already-paid state
         const { data: application } = await supabase
           .from("users_duplicate")
-          .select("application_details")
+          .select("final_fee_payment")
           .eq("id", applicationId)
           .single();
         if (application) {
-          const appDetails = application.application_details as any;
-          const finalFee = appDetails?.final_fee_payment || {};
+          const finalFee = application.final_fee_payment as any || {};
           if (finalFee.payment_status === "paid") {
             return NextResponse.json(
               { error: "already_paid", hint: "Payment already completed" },
@@ -95,8 +94,8 @@ export async function POST(req: Request) {
 
         const { data: applications, error: lookupErr } = await supabase
           .from("users_duplicate")
-          .select("id, application_details")
-          .not("application_details", "is", null);
+          .select("id, final_fee_payment")
+          .not("final_fee_payment", "is", null);
 
         if (lookupErr) {
           console.error("DB lookup error:", lookupErr);
@@ -109,8 +108,7 @@ export async function POST(req: Request) {
         // Find application with matching token
         let matchedApp: any = null;
         for (const app of applications || []) {
-          const appDetails = app.application_details as any;
-          const finalFee = appDetails?.final_fee_payment || {};
+          const finalFee = app.final_fee_payment as any || {};
           if (finalFee.token === token) {
             matchedApp = app;
             break;
@@ -126,8 +124,7 @@ export async function POST(req: Request) {
         }
 
         applicationId = matchedApp.id;
-        const appDetails = matchedApp.application_details as any;
-        const finalFee = appDetails?.final_fee_payment || {};
+        const finalFee = matchedApp.final_fee_payment as any || {};
 
         // Check 1: token_expires > now
         if (finalFee.token_expires) {
@@ -268,26 +265,22 @@ export async function POST(req: Request) {
     if (applicationId && token) {
       const { data: existingApp } = await supabase
         .from("users_duplicate")
-        .select("application_details")
+        .select("final_fee_payment")
         .eq("id", applicationId)
         .single();
 
       if (existingApp) {
-        const appDetails = (existingApp.application_details as any) || {};
-        const finalFee = appDetails.final_fee_payment || {};
+        const finalFee = (existingApp.final_fee_payment as any) || {};
 
-        const updatedAppDetails = {
-          ...appDetails,
-          final_fee_payment: {
-            ...finalFee,
-            razorpay_order_id: order.id,
-            order_created_at: new Date().toISOString(),
-          },
+        const updatedFinalFee = {
+          ...finalFee,
+          razorpay_order_id: order.id,
+          order_created_at: new Date().toISOString(),
         };
 
         await supabase
           .from("users_duplicate")
-          .update({ application_details: updatedAppDetails })
+          .update({ final_fee_payment: updatedFinalFee })
           .eq("id", applicationId);
 
         dev("Saved razorpay_order_id to application", { order_id: order.id });
