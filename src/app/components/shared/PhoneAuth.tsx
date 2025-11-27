@@ -139,6 +139,10 @@ function getActionableError(err: unknown): string {
       return "This code has expired. Please request a new one.";
     case "auth/phone-number-already-exists":
       return "This phone number is already registered to another account.";
+    case "auth/account-exists-with-different-credential":
+      return "This phone number is already registered. Please sign in with your existing account or use a different phone number.";
+    case "auth/credential-already-in-use":
+      return "This phone number is already linked to another account. Please use a different phone number.";
     case "auth/captcha-check-failed":
       return "Security verification failed. Please try again.";
     default:
