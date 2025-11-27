@@ -10,7 +10,11 @@
       "Bash(git commit:*)",
       "Bash(git branch:*)",
       "Bash(npm run dev:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(npm install:*)",
+      "Bash(if [ -f .env.local ])",
+      "Bash(then grep -q \"PAYMENT_TOKEN_SECRET\" .env.local)",
+      "Bash(else echo \"⚠️ .env.local file not found\")"
     ],
     "deny": [],
     "ask": []

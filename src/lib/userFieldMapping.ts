@@ -56,6 +56,33 @@ export interface UsersDuplicateRow {
     diploma_college?: string;
     other_description?: string;
   };
+  application_details?: {
+    final_fee_payment?: {
+      token?: string | null;
+      payment_at?: string | null;
+      discount_full?: number | null;
+      token_expires?: string | null;
+      payable_amount?: number | null;
+      payment_method?: string | null;
+      payment_status?: "pending" | "paid" | "failed" | "refunded";
+      payment_history?: Array<{
+        event?: string;
+        paymentId?: string;
+        orderId?: string;
+        amount?: number;
+        ts?: string;
+        source?: string;
+      }>;
+      installment1_amount?: number | null;
+      installment2_amount?: number | null;
+      token_used?: boolean;
+      razorpay_order_id?: string;
+      razorpay_payment_id?: string;
+      order_created_at?: string;
+      last_verify_at?: string;
+    };
+    [key: string]: any;
+  };
 }
 
 /**
