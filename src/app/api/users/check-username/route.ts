@@ -35,22 +35,55 @@ export async function GET(req: Request) {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Check if username exists in account JSONB column
-    const { data, error } = await supabase
+    // Check if username exists in both account JSONB column and top-level username column
+    // Query both the JSONB path and the top-level username column
+
+    console.log("[check-username] Checking username:", trimmedUsername);
+
+    // First check account.username (JSONB)
+    const accountCheck = await supabase
       .from("users_duplicate")
       .select("uid")
-      .or(`account->>username.eq.${trimmedUsername},username.eq.${trimmedUsername}`)
+      .not("account", "is", null)
+      .filter("account->>username", "eq", trimmedUsername)
       .limit(1);
 
-    if (error) {
-      console.error("[check-username] Database error:", error);
+    if (accountCheck.error) {
+      console.error("[check-username] Account JSONB check error:", accountCheck.error);
+    }
+
+    // Also check top-level username column
+    const usernameCheck = await supabase
+      .from("users_duplicate")
+      .select("uid")
+      .eq("username", trimmedUsername)
+      .limit(1);
+
+    if (usernameCheck.error) {
+      console.error("[check-username] Username column check error:", usernameCheck.error);
+    }
+
+    // If either check has an error that's not "column doesn't exist", return error
+    if (accountCheck.error && !accountCheck.error.message?.includes("does not exist")) {
       return NextResponse.json(
         { available: false, error: "Failed to check username availability" },
         { status: 500 }
       );
     }
 
-    const available = !data || data.length === 0;
+    if (usernameCheck.error && !usernameCheck.error.message?.includes("does not exist")) {
+      return NextResponse.json(
+        { available: false, error: "Failed to check username availability" },
+        { status: 500 }
+      );
+    }
+
+    // Username is taken if found in either location
+    const foundInAccount = accountCheck.data && accountCheck.data.length > 0;
+    const foundInUsername = usernameCheck.data && usernameCheck.data.length > 0;
+    const available = !foundInAccount && !foundInUsername;
+
+    console.log("[check-username] Result:", { available, foundInAccount, foundInUsername });
 
     return NextResponse.json({ available });
   } catch (error) {

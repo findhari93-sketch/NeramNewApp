@@ -2681,21 +2681,38 @@ function ProfilePageInner() {
                   return;
                 }
 
-                // Update username in database under account JSONB column
+                // Update username in database
+                // Try account JSONB first, fall back to top-level username
                 const trimmedUsername = setPasswordUsername.trim();
                 try {
-                  const payload = {
+                  // Try with account JSONB column
+                  let payload: any = {
                     uid: current.uid,
                     account: {
                       username: trimmedUsername,
                     },
                   };
 
-                  const usernameRes = await apiClient(`/api/users/upsert`, {
+                  let usernameRes = await apiClient(`/api/users/upsert`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(payload),
                   });
+
+                  // If account column doesn't exist, fall back to top-level username
+                  if (usernameRes && usernameRes.status >= 400) {
+                    console.log("[set-password] account column might not exist, falling back to username");
+                    payload = {
+                      uid: current.uid,
+                      username: trimmedUsername,
+                    };
+
+                    usernameRes = await apiClient(`/api/users/upsert`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify(payload),
+                    });
+                  }
 
                   if (!usernameRes || usernameRes.status >= 400) {
                     const errorBody = await usernameRes?.json().catch(() => null);
