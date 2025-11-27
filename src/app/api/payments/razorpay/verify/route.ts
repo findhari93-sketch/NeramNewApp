@@ -4,6 +4,8 @@ import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { createClient } from "@supabase/supabase-js";
 import { verifyPaymentTokenServer } from "@/lib/validatePaymentToken";
+import { generateInvoicePDF, generateInvoiceNumber, InvoiceData } from "@/lib/generateInvoicePDF";
+import { getGraphToken, sendEmailWithAttachment, generateInvoiceEmailHTML } from "@/lib/emailService";
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -114,7 +116,7 @@ export async function POST(req: Request) {
       application = app;
     }
 
-    const finalFee = application.final_fee_payment as any || {};
+    const finalFee = (application.final_fee_payment as any) || {};
     const paymentHistory = Array.isArray(finalFee.payment_history)
       ? finalFee.payment_history
       : [];
@@ -175,6 +177,143 @@ export async function POST(req: Request) {
     }
 
     console.log("[verify] Payment verified and saved successfully");
+
+    // ===== Generate and send invoice (non-blocking for payment success) =====
+    try {
+      console.log("[verify] Generating invoice PDF...");
+
+      // Extract student and course details
+      const studentName = application.student_name || application.basic?.student_name || application.name || "Student";
+      const studentEmail = application.email || application.contact?.email;
+      const studentPhone = application.contact?.phone || application.phone;
+
+      const appDetails = application.application_details || {};
+      const adminFilled = appDetails.admin_filled || {};
+
+      const courseName = adminFilled.final_course_Name || application.selected_course || "N/A";
+      const courseDuration = adminFilled.course_duration || "N/A";
+
+      const totalCourseFees = Number(adminFilled.total_course_fees || 0);
+      const discount = Number(adminFilled.discount || 0);
+      const amountPaid = Number(finalFee.payable_amount || 0);
+
+      const paymentOptions = adminFilled.payment_options;
+      const paymentTypeRaw = Array.isArray(paymentOptions) ? String(paymentOptions[0] || "partial").toLowerCase() : String(paymentOptions || "partial").toLowerCase();
+
+      const invoiceNumber = generateInvoiceNumber(applicationId);
+      const paymentDate = now;
+
+      const invoiceData: InvoiceData = {
+        invoiceNumber,
+        invoiceDate: paymentDate,
+        applicationId: applicationId,
+        studentName,
+        studentEmail: studentEmail || "",
+        studentPhone,
+        courseName,
+        courseDuration,
+        paymentId: paymentId,
+        orderId: orderId,
+        paymentMethod: "Razorpay",
+        paymentDate,
+        totalCourseFees,
+        discount,
+        amountPaid,
+        paymentType: paymentTypeRaw === "full" ? "Full Payment" : "Partial Payment",
+      };
+
+      const pdfBuffer = await generateInvoicePDF(invoiceData);
+      console.log("[verify] Invoice PDF generated successfully");
+
+      // Upload PDF to Supabase Storage for permanent records
+      const storagePath = `invoices/${applicationId}/${invoiceNumber}.pdf`;
+      const uploadRes = await supabase.storage
+        .from("payment-proofs")
+        .upload(storagePath, pdfBuffer, { contentType: "application/pdf", upsert: true });
+
+      let invoiceUrl: string | null = null;
+      if (uploadRes?.data?.path) {
+        const { data: publicUrlData } = await supabase.storage
+          .from("payment-proofs")
+          .getPublicUrl(uploadRes.data.path);
+        invoiceUrl = publicUrlData?.publicUrl || null;
+        console.log("[verify] Invoice PDF uploaded:", invoiceUrl || uploadRes.data.path);
+      } else if (uploadRes?.error) {
+        console.warn("[verify] Failed to upload invoice PDF:", uploadRes.error);
+      }
+
+      if (studentEmail) {
+        const graphToken = await getGraphToken();
+        if (graphToken) {
+          const emailHTML = generateInvoiceEmailHTML({
+            studentName,
+            courseName,
+            amountPaid,
+            paymentId,
+            invoiceNumber,
+            paymentDate,
+          });
+
+          const attachmentName = `Invoice_${invoiceNumber}.pdf`;
+
+          await sendEmailWithAttachment(
+            graphToken,
+            studentEmail,
+            `Payment Invoice - ${invoiceNumber}`,
+            emailHTML,
+            pdfBuffer,
+            attachmentName
+          );
+          console.log(`[verify] Invoice email sent to ${studentEmail}`);
+        } else {
+          console.warn("[verify] Email credentials not configured - invoice not sent");
+        }
+      } else {
+        console.warn("[verify] No email on record - invoice not sent");
+      }
+
+      // Persist invoice details under payment details as an array
+      const existingInvoices: any[] = Array.isArray(updatedFinalFee.invoice) ? updatedFinalFee.invoice : [];
+      const newInvoiceEntry = {
+        number: invoiceNumber,
+        date: paymentDate,
+        amount_paid: amountPaid,
+        total_course_fees: totalCourseFees,
+        discount,
+        payment_id: paymentId,
+        order_id: orderId,
+        method: "Razorpay",
+        url: invoiceUrl,
+        emailed_to: studentEmail || null,
+        emailed_at: studentEmail ? paymentDate : null,
+      };
+      const updatedFinalFeeWithInvoice = { ...updatedFinalFee, invoice: [...existingInvoices, newInvoiceEntry] };
+
+      await supabase
+        .from("users_duplicate")
+        .update({ final_fee_payment: updatedFinalFeeWithInvoice, updated_at: now })
+        .eq("id", applicationId);
+
+      console.log("[verify] Invoice details stored under final_fee_payment.invoice[]");
+
+      // Notify admin via notifications table (optional; does not block)
+      try {
+        await supabase
+          .from("notifications")
+          .insert({
+            user_id: applicationId,
+            notification_type: "payment_verified",
+            title: "Payment Verified",
+            message: `Invoice ${invoiceNumber} generated. Amount: ₹${amountPaid.toLocaleString("en-IN")}`,
+          });
+        console.log("[verify] Admin notification inserted");
+      } catch (nErr) {
+        console.warn("[verify] Failed to insert admin notification:", nErr);
+      }
+    } catch (invoiceErr) {
+      console.error("[verify] Failed to generate/send invoice:", invoiceErr);
+      console.error("[verify] Payment was successful, but invoice could not be sent");
+    }
 
     const redirectToken = crypto.randomBytes(32).toString("hex");
 
