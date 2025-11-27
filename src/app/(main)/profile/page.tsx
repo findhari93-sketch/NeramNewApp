@@ -192,6 +192,10 @@ function ProfilePageInner() {
   const [setPasswordNew, setSetPasswordNew] = React.useState("");
   const [setPasswordConfirm, setSetPasswordConfirm] = React.useState("");
   const [setPasswordError, setSetPasswordError] = React.useState<string | null>(null);
+  const [showPassword, setShowPassword] = React.useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
+  const [usernameAvailable, setUsernameAvailable] = React.useState<boolean | null>(null);
+  const [checkingUsername, setCheckingUsername] = React.useState(false);
 
   const { control, handleSubmit, reset } = useForm<Record<string, any>>({
     defaultValues: {},
@@ -517,6 +521,52 @@ function ProfilePageInner() {
     },
     [user, setUser]
   );
+
+  // Check if username is available
+  const checkUsernameAvailability = React.useCallback(
+    async (username: string) => {
+      if (!username || username.trim().length < 3) {
+        setUsernameAvailable(null);
+        return;
+      }
+
+      const trimmed = username.trim();
+      // If username hasn't changed from current user's username, it's available
+      if (trimmed === (user as any)?.username) {
+        setUsernameAvailable(true);
+        return;
+      }
+
+      setCheckingUsername(true);
+      try {
+        const res = await apiClient(
+          `/api/users/check-username?username=${encodeURIComponent(trimmed)}`
+        );
+        if (res && res.ok) {
+          const data = await res.json();
+          setUsernameAvailable(data.available === true);
+        } else {
+          setUsernameAvailable(null);
+        }
+      } catch {
+        setUsernameAvailable(null);
+      } finally {
+        setCheckingUsername(false);
+      }
+    },
+    [user]
+  );
+
+  // Debounced username check
+  React.useEffect(() => {
+    if (!setPasswordDialogOpen) return;
+    const timer = setTimeout(() => {
+      if (setPasswordUsername) {
+        checkUsernameAvailability(setPasswordUsername);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [setPasswordUsername, setPasswordDialogOpen, checkUsernameAvailability]);
 
   const onUpload = async (file: File) => {
     // Replace with your upload handler (Supabase / S3) that returns { photoURL }
@@ -2371,68 +2421,236 @@ function ProfilePageInner() {
       {/* Set Password Dialog (for Google users without password) */}
       <Dialog
         open={setPasswordDialogOpen}
-        onClose={() => setSetPasswordDialogOpen(false)}
+        onClose={() => {
+          if (!setPasswordLoading) {
+            setSetPasswordDialogOpen(false);
+            setSetPasswordError(null);
+            setSetPasswordUsername("");
+            setSetPasswordNew("");
+            setSetPasswordConfirm("");
+            setShowPassword(false);
+            setShowConfirmPassword(false);
+            setUsernameAvailable(null);
+          }
+        }}
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle>Create Username & Password</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Set up a username and password to easily sign in without needing Google authentication every time.
+        <DialogTitle sx={{ pb: 1 }}>
+          <Typography variant="h6" fontWeight={600}>
+            Create Username & Password
           </Typography>
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}>
-            <TextField
-              label="Username"
-              type="text"
-              id="set-username"
-              name="username"
-              value={setPasswordUsername}
-              onChange={(e) => setSetPasswordUsername(e.target.value)}
-              fullWidth
-              helperText="Choose a unique username for login"
-            />
-            <TextField
-              label="New password"
-              type="password"
-              id="set-password-new"
-              name="new_password"
-              value={setPasswordNew}
-              onChange={(e) => setSetPasswordNew(e.target.value)}
-              fullWidth
-              helperText="Must be at least 6 characters"
-            />
-            <TextField
-              label="Confirm password"
-              type="password"
-              id="set-password-confirm"
-              name="confirm_password"
-              value={setPasswordConfirm}
-              onChange={(e) => setSetPasswordConfirm(e.target.value)}
-              fullWidth
-            />
-            {setPasswordError ? (
-              <Typography color="error" variant="body2">
-                {setPasswordError}
-              </Typography>
-            ) : null}
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            Set up login credentials for easier access without Google authentication
+          </Typography>
+        </DialogTitle>
+        <DialogContent sx={{ pt: 2 }}>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
+            {/* Username Field with Availability Indicator */}
+            <Box>
+              <TextField
+                label="Username"
+                type="text"
+                id="set-username"
+                name="username"
+                value={setPasswordUsername}
+                onChange={(e) => {
+                  const value = e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "");
+                  setSetPasswordUsername(value);
+                  setUsernameAvailable(null);
+                }}
+                fullWidth
+                disabled={setPasswordLoading}
+                error={usernameAvailable === false}
+                helperText={
+                  checkingUsername
+                    ? "Checking availability..."
+                    : usernameAvailable === true
+                    ? "✓ Username is available"
+                    : usernameAvailable === false
+                    ? "✗ Username is already taken"
+                    : "Choose a unique username (letters, numbers, underscore only)"
+                }
+                InputProps={{
+                  endAdornment: checkingUsername ? (
+                    <CircularProgress size={20} sx={{ mr: 1 }} />
+                  ) : usernameAvailable === true ? (
+                    <Typography sx={{ mr: 1, color: "success.main", fontSize: 20 }}>
+                      ✓
+                    </Typography>
+                  ) : usernameAvailable === false ? (
+                    <Typography sx={{ mr: 1, color: "error.main", fontSize: 20 }}>
+                      ✗
+                    </Typography>
+                  ) : null,
+                }}
+                sx={{
+                  "& .MuiFormHelperText-root": {
+                    color:
+                      usernameAvailable === true
+                        ? "success.main"
+                        : usernameAvailable === false
+                        ? "error.main"
+                        : "text.secondary",
+                  },
+                }}
+              />
+            </Box>
+
+            {/* Password Field with Visibility Toggle */}
+            <Box>
+              <TextField
+                label="Password"
+                type={showPassword ? "text" : "password"}
+                id="set-password-new"
+                name="new_password"
+                value={setPasswordNew}
+                onChange={(e) => setSetPasswordNew(e.target.value)}
+                fullWidth
+                disabled={setPasswordLoading}
+                helperText="Must be at least 6 characters"
+                InputProps={{
+                  endAdornment: (
+                    <IconButton
+                      aria-label="toggle password visibility"
+                      onClick={() => setShowPassword(!showPassword)}
+                      edge="end"
+                      size="small"
+                      sx={{ mr: 0.5 }}
+                    >
+                      {showPassword ? (
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                          <path
+                            d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"
+                            fill="currentColor"
+                          />
+                        </svg>
+                      ) : (
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                          <path
+                            d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"
+                            fill="currentColor"
+                          />
+                        </svg>
+                      )}
+                    </IconButton>
+                  ),
+                }}
+              />
+              {setPasswordNew && setPasswordNew.length < 6 && (
+                <Typography variant="caption" color="warning.main" sx={{ mt: 0.5, display: "block" }}>
+                  Password is too short (minimum 6 characters)
+                </Typography>
+              )}
+            </Box>
+
+            {/* Confirm Password Field with Visibility Toggle */}
+            <Box>
+              <TextField
+                label="Confirm Password"
+                type={showConfirmPassword ? "text" : "password"}
+                id="set-password-confirm"
+                name="confirm_password"
+                value={setPasswordConfirm}
+                onChange={(e) => setSetPasswordConfirm(e.target.value)}
+                fullWidth
+                disabled={setPasswordLoading}
+                error={
+                  setPasswordConfirm.length > 0 &&
+                  setPasswordNew !== setPasswordConfirm
+                }
+                helperText={
+                  setPasswordConfirm.length > 0 && setPasswordNew !== setPasswordConfirm
+                    ? "Passwords do not match"
+                    : "Re-enter your password to confirm"
+                }
+                InputProps={{
+                  endAdornment: (
+                    <IconButton
+                      aria-label="toggle confirm password visibility"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      edge="end"
+                      size="small"
+                      sx={{ mr: 0.5 }}
+                    >
+                      {showConfirmPassword ? (
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                          <path
+                            d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"
+                            fill="currentColor"
+                          />
+                        </svg>
+                      ) : (
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                          <path
+                            d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"
+                            fill="currentColor"
+                          />
+                        </svg>
+                      )}
+                    </IconButton>
+                  ),
+                }}
+              />
+            </Box>
+
+            {/* Error Message */}
+            {setPasswordError && (
+              <Box
+                sx={{
+                  p: 1.5,
+                  borderRadius: 1,
+                  bgcolor: "error.lighter",
+                  border: "1px solid",
+                  borderColor: "error.main",
+                }}
+              >
+                <Typography color="error" variant="body2">
+                  {setPasswordError}
+                </Typography>
+              </Box>
+            )}
           </Box>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => {
-            setSetPasswordDialogOpen(false);
-            setSetPasswordError(null);
-            setSetPasswordNew("");
-            setSetPasswordConfirm("");
-          }}>Cancel</Button>
+        <DialogActions sx={{ px: 3, pb: 2.5 }}>
+          <Button
+            onClick={() => {
+              if (!setPasswordLoading) {
+                setSetPasswordDialogOpen(false);
+                setSetPasswordError(null);
+                setSetPasswordUsername("");
+                setSetPasswordNew("");
+                setSetPasswordConfirm("");
+                setShowPassword(false);
+                setShowConfirmPassword(false);
+                setUsernameAvailable(null);
+              }
+            }}
+            disabled={setPasswordLoading}
+          >
+            Cancel
+          </Button>
           <Button
             variant="contained"
-            disabled={setPasswordLoading}
+            disabled={
+              setPasswordLoading ||
+              !setPasswordUsername ||
+              setPasswordUsername.trim().length < 3 ||
+              usernameAvailable !== true ||
+              !setPasswordNew ||
+              setPasswordNew.length < 6 ||
+              setPasswordNew !== setPasswordConfirm
+            }
             onClick={async () => {
               setSetPasswordError(null);
 
               // Validation
               if (!setPasswordUsername || setPasswordUsername.trim().length < 3) {
                 setSetPasswordError("Username must be at least 3 characters");
+                return;
+              }
+              if (usernameAvailable !== true) {
+                setSetPasswordError("Please choose an available username");
                 return;
               }
               if (!setPasswordNew) {
@@ -2463,17 +2681,30 @@ function ProfilePageInner() {
                   return;
                 }
 
-                // First, update username in database if changed
+                // Update username in database under account JSONB column
                 const trimmedUsername = setPasswordUsername.trim();
-                if (trimmedUsername !== (user as any)?.username) {
-                  const usernameResult = await updateUserFields(current.uid, {
-                    username: trimmedUsername,
+                try {
+                  const payload = {
+                    uid: current.uid,
+                    account: {
+                      username: trimmedUsername,
+                    },
+                  };
+
+                  const usernameRes = await apiClient(`/api/users/upsert`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
                   });
-                  if (!usernameResult.ok) {
-                    setSetPasswordError(`Failed to set username: ${usernameResult.error}`);
-                    setSetPasswordLoading(false);
-                    return;
+
+                  if (!usernameRes || usernameRes.status >= 400) {
+                    const errorBody = await usernameRes?.json().catch(() => null);
+                    throw new Error(errorBody?.error || "Failed to set username");
                   }
+                } catch (usernameErr: any) {
+                  setSetPasswordError(`Failed to set username: ${usernameErr.message}`);
+                  setSetPasswordLoading(false);
+                  return;
                 }
 
                 // Link email/password credential to the existing account
@@ -2496,6 +2727,9 @@ function ProfilePageInner() {
                   setSetPasswordNew("");
                   setSetPasswordConfirm("");
                   setSetPasswordError(null);
+                  setShowPassword(false);
+                  setShowConfirmPassword(false);
+                  setUsernameAvailable(null);
 
                   // Refresh user data to reflect new provider
                   try {
@@ -2523,8 +2757,13 @@ function ProfilePageInner() {
                 setSetPasswordLoading(false);
               }
             }}
+            sx={{ minWidth: 100 }}
           >
-            {setPasswordLoading ? <CircularProgress size={20} /> : "Create"}
+            {setPasswordLoading ? (
+              <CircularProgress size={20} color="inherit" />
+            ) : (
+              "Create Account"
+            )}
           </Button>
         </DialogActions>
       </Dialog>
