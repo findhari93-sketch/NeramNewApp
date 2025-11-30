@@ -13,6 +13,11 @@ import InputAdornment from "@mui/material/InputAdornment";
 import IconButton from "@mui/material/IconButton";
 import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
+import EmailOutlined from "@mui/icons-material/EmailOutlined";
+import LockOutlined from "@mui/icons-material/LockOutlined";
+import LinearProgress from "@mui/material/LinearProgress";
+import Checkbox from "@mui/material/Checkbox";
+import FormControlLabel from "@mui/material/FormControlLabel";
 import TopNavBar from "../../components/shared/TopNavBar";
 import { useRouter, useSearchParams } from "next/navigation";
 import { auth } from "../../../lib/firebase";
@@ -71,6 +76,8 @@ function LoginPageInner() {
   const [isSigningUp, setIsSigningUp] = useState(false);
   const [isAttemptingLogin, setIsAttemptingLogin] = useState(false);
   const [signupStatus, setSignupStatus] = useState<string | null>(null);
+  const [rememberMe, setRememberMe] = useState<boolean>(true);
+  const [mounted, setMounted] = useState(false);
 
   const emailParam = React.useMemo(
     () => searchParams?.get("email") || emailFromQuery,
@@ -93,6 +100,20 @@ function LoginPageInner() {
     const email = typeof obj.email === "string" ? obj.email : null;
     const phone = typeof obj.phoneNumber === "string" ? obj.phoneNumber : null;
     return email || phone || null;
+  };
+
+  // Helper to check if user has email/Google auth (not just phone)
+  const hasEmailOrGoogleAuth = (u: unknown) => {
+    if (!u || typeof u !== "object") return false;
+    const obj = u as Record<string, unknown>;
+    const providerData = Array.isArray(obj.providerData)
+      ? obj.providerData
+      : [];
+    // Check if user has email or google.com provider (not just phone)
+    return providerData.some((provider: any) => {
+      const providerId = provider?.providerId;
+      return providerId === "password" || providerId === "google.com";
+    });
   };
 
   // Helper to check profile completeness and redirect accordingly
@@ -138,6 +159,20 @@ function LoginPageInner() {
     setLoading(true);
     try {
       const provider = new GoogleAuthProvider();
+      // Set persistence based on Remember Me preference
+      try {
+        const {
+          setPersistence,
+          browserLocalPersistence,
+          browserSessionPersistence,
+        } = await import("firebase/auth");
+        await setPersistence(
+          auth,
+          rememberMe ? browserLocalPersistence : browserSessionPersistence
+        );
+      } catch (persistErr) {
+        console.warn("googleSignIn persistence failed", persistErr);
+      }
       const res = await signInWithPopup(auth, provider);
       const user = res.user;
       // Immediately upsert Google user data to Supabase
@@ -260,6 +295,9 @@ function LoginPageInner() {
   };
 
   React.useEffect(() => {
+    // Trigger fade-in animation on mount
+    setMounted(true);
+
     const handler = (ev: Event) => {
       try {
         const ce = ev as CustomEvent<any>;
@@ -893,6 +931,20 @@ function LoginPageInner() {
       const password = form.password;
       const isEmail = identifier.includes("@");
       try {
+        // Set persistence based on Remember Me preference
+        try {
+          const {
+            setPersistence,
+            browserLocalPersistence,
+            browserSessionPersistence,
+          } = await import("firebase/auth");
+          await setPersistence(
+            auth,
+            rememberMe ? browserLocalPersistence : browserSessionPersistence
+          );
+        } catch (persistErr) {
+          console.warn("handleSubmit persistence failed", persistErr);
+        }
         // Always validate inputs (require password for sign-up path). This ensures
         // a password is provided for new accounts and prevents auth/missing-password.
         const validation = signInSchema.safeParse({ identifier, password });
@@ -1269,6 +1321,39 @@ function LoginPageInner() {
       ? "Create Account"
       : "Sign In";
 
+    // Password strength helper
+    const computePasswordStrength = (pw: string) => {
+      let score = 0;
+      if (!pw) return { score: 0, label: "", color: "error" };
+      const length = pw.length;
+      if (length >= 8) score += 25;
+      else if (length >= 6) score += 15;
+      else score += 5;
+      if (/[A-Z]/.test(pw)) score += 15;
+      if (/[a-z]/.test(pw)) score += 15;
+      if (/[0-9]/.test(pw)) score += 15;
+      if (/[^A-Za-z0-9]/.test(pw)) score += 15;
+      if (length >= 12) score += 15;
+      if (score > 100) score = 100;
+      let label: string;
+      let color: string;
+      if (score < 30) {
+        label = "Weak";
+        color = "error";
+      } else if (score < 60) {
+        label = "Fair";
+        color = "warning";
+      } else if (score < 85) {
+        label = "Good";
+        color = "info";
+      } else {
+        label = "Strong";
+        color = "success";
+      }
+      return { score, label, color };
+    };
+    const strength = computePasswordStrength(form.password);
+
     return (
       <Box
         component="form"
@@ -1290,15 +1375,41 @@ function LoginPageInner() {
           required
           sx={{
             "& .MuiInputBase-root": {
-              fontSize: { xs: "0.875rem", sm: "0.875rem" },
-              height: { xs: "40px", sm: "40px" },
+              fontSize: { xs: "0.9rem", sm: "0.9rem" },
+              height: { xs: "50px", sm: "52px" },
+              backgroundColor: (theme) => theme.palette.grey[50],
+              transition: "box-shadow 0.25s, border-color 0.25s",
             },
+            "& .MuiOutlinedInput-root": {
+              borderRadius: 2.5,
+            },
+            "& .MuiOutlinedInput-root.Mui-focused": {
+              boxShadow: (theme) =>
+                `0 0 0 3px rgba(${theme.palette.primary.main.replace(
+                  "#",
+                  ""
+                )},0.25)`,
+            },
+            "& .MuiOutlinedInput-notchedOutline": {
+              transition: "border-color 0.25s",
+            },
+            "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline":
+              {
+                borderColor: "primary.main",
+              },
           }}
           helperText={
             form.identifier && /^\+?\d{10,15}$/.test(form.identifier)
               ? "Phone number detected - use phone OTP option below"
               : ""
           }
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <EmailOutlined fontSize="small" color="action" />
+              </InputAdornment>
+            ),
+          }}
         />
 
         {/* Always show password field for any existing email (any provider, including Google). Only hide for truly new emails. */}
@@ -1318,11 +1429,27 @@ function LoginPageInner() {
               required
               sx={{
                 "& .MuiInputBase-root": {
-                  fontSize: { xs: "0.875rem", sm: "0.875rem" },
-                  height: { xs: "40px", sm: "40px" },
+                  fontSize: { xs: "0.9rem", sm: "0.9rem" },
+                  height: { xs: "50px", sm: "52px" },
+                  backgroundColor: (theme) => theme.palette.grey[50],
+                  transition: "box-shadow 0.25s, border-color 0.25s",
                 },
+                "& .MuiOutlinedInput-root": { borderRadius: 2.5 },
+                "& .MuiOutlinedInput-root.Mui-focused": {
+                  boxShadow: (theme) =>
+                    `0 0 0 3px ${theme.palette.primary.main}40`,
+                },
+                "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline":
+                  {
+                    borderColor: "primary.main",
+                  },
               }}
               InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <LockOutlined fontSize="small" color="action" />
+                  </InputAdornment>
+                ),
                 endAdornment: (
                   <InputAdornment position="end">
                     <IconButton
@@ -1335,6 +1462,31 @@ function LoginPageInner() {
                 ),
               }}
             />
+            {form.password && (
+              <Box sx={{ mt: 1 }}>
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    mb: 0.5,
+                    gap: 1,
+                  }}
+                >
+                  <Typography variant="caption" color="text.secondary">
+                    Password strength: {strength.label}
+                  </Typography>
+                  <Typography variant="caption" sx={{ fontWeight: 600 }}>
+                    {strength.score}%
+                  </Typography>
+                </Box>
+                <LinearProgress
+                  variant="determinate"
+                  value={strength.score}
+                  color={strength.color as any}
+                  sx={{ height: 6, borderRadius: 3 }}
+                />
+              </Box>
+            )}
             {/* Confirm password only for staged sign-up (new email) */}
             {stagedNewEmail && (
               <TextField
@@ -1352,9 +1504,27 @@ function LoginPageInner() {
                 required
                 sx={{
                   "& .MuiInputBase-root": {
-                    fontSize: { xs: "0.875rem", sm: "0.875rem" },
-                    height: { xs: "40px", sm: "40px" },
+                    fontSize: { xs: "0.9rem", sm: "0.9rem" },
+                    height: { xs: "50px", sm: "52px" },
+                    backgroundColor: (theme) => theme.palette.grey[50],
+                    transition: "box-shadow 0.25s, border-color 0.25s",
                   },
+                  "& .MuiOutlinedInput-root": { borderRadius: 2.5 },
+                  "& .MuiOutlinedInput-root.Mui-focused": {
+                    boxShadow: (theme) =>
+                      `0 0 0 3px ${theme.palette.primary.main}40`,
+                  },
+                  "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline":
+                    {
+                      borderColor: "primary.main",
+                    },
+                }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <LockOutlined fontSize="small" color="action" />
+                    </InputAdornment>
+                  ),
                 }}
               />
             )}
@@ -1374,6 +1544,16 @@ function LoginPageInner() {
                 Forgot password?
               </Button>
             )}
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                />
+              }
+              label="Remember me"
+              sx={{ mt: 0.5, userSelect: "none" }}
+            />
           </>
         )}
         <Button
@@ -1382,9 +1562,28 @@ function LoginPageInner() {
           disabled={emailPasswordLoading || checkingEmail}
           fullWidth
           sx={{
-            py: { xs: 1.5, sm: 1 },
-            fontSize: { xs: "1rem", sm: "0.875rem" },
+            py: { xs: 1.4, sm: 1.1 },
+            fontSize: { xs: "1rem", sm: "0.95rem" },
             gap: 1,
+            borderRadius: 999,
+            backgroundImage: (theme) => theme.gradients.brand(),
+            boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+            transition: "box-shadow 0.25s, transform 0.25s, filter 0.25s",
+            fontWeight: 600,
+            letterSpacing: 0.3,
+            "&:hover": {
+              boxShadow: "0 6px 18px rgba(0,0,0,0.25)",
+              filter: "brightness(1.05)",
+            },
+            "&:active": {
+              transform: "translateY(1px)",
+              boxShadow: "0 3px 8px rgba(0,0,0,0.20)",
+            },
+            "&.Mui-disabled": {
+              backgroundImage: (theme) => theme.gradients.brand(),
+              opacity: 0.55,
+              color: "#fff",
+            },
           }}
         >
           {emailPasswordLoading && (
@@ -1414,15 +1613,17 @@ function LoginPageInner() {
       <Box
         sx={(theme) => ({
           backgroundImage: theme.gradients.brand(),
-          // Prefer dynamic viewport height on mobile with fallback on larger screens
           minHeight: { xs: "100dvh", sm: "100vh" },
           display: "flex",
           flexDirection: "column",
-          justifyContent: { xs: "flex-start", sm: "flex-end" },
+          justifyContent: { xs: "center", sm: "flex-end" },
           alignItems: { xs: "center", sm: "flex-end" },
-          p: { xs: 1, sm: 0 },
-          pt: { xs: 8, sm: 0 }, // Add top padding on mobile for status bar
-          overflow: "hidden", // Prevent scroll on main container
+          p: { xs: 2, sm: 0 },
+          pt: { xs: 0, sm: 0 },
+          overflow: { xs: "auto", sm: "hidden" },
+          opacity: mounted ? 1 : 0,
+          transform: mounted ? "translateY(0)" : "translateY(8px)",
+          transition: "opacity 0.6s ease, transform 0.6s ease",
         })}
       >
         {/* Container positioned responsively */}
@@ -1435,7 +1636,10 @@ function LoginPageInner() {
             maxWidth: { xs: "100%", sm: "460px" },
             m: 0,
             p: { xs: 0, sm: 0 },
-            flex: { xs: "1 1 auto", sm: "none" }, // Allow flex growth on mobile
+            my: { xs: "auto", sm: 0 },
+            display: { xs: "flex", sm: "block" },
+            flexDirection: { xs: "column", sm: "row" },
+            justifyContent: { xs: "center", sm: "flex-start" },
           }}
         >
           {/* White card with responsive design */}
@@ -1465,19 +1669,29 @@ function LoginPageInner() {
               sx={{
                 display: "flex",
                 flexDirection: "column",
-                mb: { xs: 2.5, sm: 6 },
+                mb: { xs: 2, sm: 4 },
+                gap: 0.5,
                 flexShrink: 0, // Prevent header from shrinking
               }}
             >
-              <Typography variant="caption">WELCOME BACK</Typography>
               <Typography
-                variant="caption"
+                variant="h5"
                 sx={{
-                  fontWeight: 700,
-                  fontSize: { xs: "0.875rem", sm: "0.75rem" },
+                  fontWeight: 600,
+                  fontSize: { xs: "1.5rem", sm: "1.75rem" },
+                  color: "text.primary",
                 }}
               >
-                Sign up / Log in into your Account
+                Welcome Back 👋
+              </Typography>
+              <Typography
+                variant="body2"
+                sx={{
+                  color: "text.secondary",
+                  fontSize: { xs: "0.875rem", sm: "0.9375rem" },
+                }}
+              >
+                Sign up / Sign in to continue your learning
               </Typography>
             </Box>
 
@@ -1487,12 +1701,13 @@ function LoginPageInner() {
                 <Typography>Redirecting...</Typography>
               </Box>
             ) : (
-              (authState.user || phoneVerified) && (
+              authState.user &&
+              hasEmailOrGoogleAuth(authState.user) && (
                 <Box
                   sx={{ mb: 2, display: "flex", gap: 2, alignItems: "center" }}
                 >
                   <Typography>
-                    Signed in as {getUserLabel(authState.user) || "phone user"}
+                    Signed in as {getUserLabel(authState.user) || "user"}
                   </Typography>
                   <Button
                     variant="outlined"
@@ -1665,7 +1880,22 @@ function LoginPageInner() {
                 sx={{ mb: { xs: 1, sm: 2 }, flex: "1 1 auto" }}
               >
                 {notice && <Alert severity="success">{notice}</Alert>}
-                {error && <Alert severity="error">{error}</Alert>}
+                {error && (
+                  <Alert
+                    severity="error"
+                    variant="filled"
+                    sx={{
+                      animation: "fadeIn .4s",
+                      "@keyframes fadeIn": {
+                        from: { opacity: 0, transform: "translateY(-4px)" },
+                        to: { opacity: 1, transform: "translateY(0)" },
+                      },
+                      boxShadow: 3,
+                    }}
+                  >
+                    {error}
+                  </Alert>
+                )}
 
                 <EmailPasswordAuth />
 
@@ -1716,17 +1946,27 @@ function LoginPageInner() {
                     color: "#3c4043",
                     borderColor: "#dadce0",
                     borderRadius: 999,
-                    py: { xs: 1.5, sm: 1 },
-                    fontSize: { xs: "1rem", sm: "0.875rem" },
+                    py: { xs: 1.4, sm: 1.1 },
+                    fontSize: { xs: "1rem", sm: "0.95rem" },
+                    fontWeight: 600,
+                    letterSpacing: 0.2,
+                    boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
+                    transition: "box-shadow 0.25s, transform 0.25s",
                     "&:hover": {
                       bgcolor: "#fff",
                       borderColor: "#dadce0",
-                      boxShadow: 1,
+                      boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                      transform: "translateY(-1px)",
+                    },
+                    "&:active": {
+                      transform: "translateY(0)",
+                      boxShadow: "0 2px 6px rgba(0,0,0,0.12)",
                     },
                     "&:disabled": {
                       bgcolor: "#fff",
                       color: "text.disabled",
                       borderColor: "#e0e0e0",
+                      boxShadow: "none",
                     },
                   }}
                 >

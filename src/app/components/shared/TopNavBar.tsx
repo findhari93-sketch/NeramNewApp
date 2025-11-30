@@ -9,6 +9,7 @@ import Button from "@mui/material/Button";
 import MenuIcon from "@mui/icons-material/Menu";
 import CloseIcon from "@mui/icons-material/Close";
 import LoginRounded from "@mui/icons-material/LoginRounded";
+import HomeRounded from "@mui/icons-material/HomeRounded";
 import Box from "@mui/material/Box";
 import Drawer from "@mui/material/Drawer";
 import List from "@mui/material/List";
@@ -587,11 +588,20 @@ export default function TopNavBar({
                 }}
               />
             ) : (
-              <Link href="/auth/login" style={{ textDecoration: "none" }}>
+              <Link
+                href={pathname === "/auth/login" ? "/" : "/auth/login"}
+                style={{ textDecoration: "none" }}
+              >
                 <Button
                   variant="outlined"
                   color="inherit"
-                  startIcon={<LoginRounded />}
+                  startIcon={
+                    pathname === "/auth/login" ? (
+                      <HomeRounded />
+                    ) : (
+                      <LoginRounded />
+                    )
+                  }
                   sx={(theme) => ({
                     textTransform: "none",
                     borderColor: theme.palette.white.main,
@@ -606,7 +616,7 @@ export default function TopNavBar({
                     },
                   })}
                 >
-                  Sign In
+                  {pathname === "/auth/login" ? "Home" : "Sign In"}
                 </Button>
               </Link>
             )}
@@ -710,11 +720,20 @@ export default function TopNavBar({
                 </Button>
               </Link>
             ) : (
-              <Link href="/auth/login" style={{ textDecoration: "none" }}>
+              <Link
+                href={pathname === "/auth/login" ? "/" : "/auth/login"}
+                style={{ textDecoration: "none" }}
+              >
                 <Button
                   variant="outlined"
                   fullWidth
-                  startIcon={<LoginRounded />}
+                  startIcon={
+                    pathname === "/auth/login" ? (
+                      <HomeRounded />
+                    ) : (
+                      <LoginRounded />
+                    )
+                  }
                   sx={{
                     textTransform: "none",
                     borderRadius: 999,
@@ -729,7 +748,7 @@ export default function TopNavBar({
                     },
                   }}
                 >
-                  Sign In
+                  {pathname === "/auth/login" ? "Home" : "Sign In"}
                 </Button>
               </Link>
             )}

@@ -242,11 +242,31 @@ function ProfilePageInner() {
     return Math.round((done / total) * 100);
   }, [user]);
 
-  // Detect if user has password provider linked
-  const hasPasswordProvider = React.useMemo(() => {
-    const providerData = user?.providerData as Array<{ providerId: string }> | undefined;
-    return providerData?.some((p) => p.providerId === "password") ?? false;
-  }, [user]);
+  // Detect if user has password provider linked (check Firebase auth directly)
+  const [hasPasswordProvider, setHasPasswordProvider] = React.useState(false);
+
+  // Update hasPasswordProvider whenever Firebase auth state changes
+  React.useEffect(() => {
+    const checkProviders = () => {
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        const providers = currentUser.providerData.map((p) => p.providerId);
+        const hasPassword = providers.includes("password");
+        console.log("[profile] Provider check:", { providers, hasPassword });
+        setHasPasswordProvider(hasPassword);
+      } else {
+        setHasPasswordProvider(false);
+      }
+    };
+
+    // Check immediately
+    checkProviders();
+
+    // Also check when auth state changes
+    const unsubscribe = auth.onAuthStateChanged(checkProviders);
+
+    return () => unsubscribe();
+  }, []);
 
   // Ensure the form is reset whenever the drawer opens or its values change.
   // This fixes a bug where controlled inputs (notably the `chips` text field)
@@ -2681,43 +2701,29 @@ function ProfilePageInner() {
                   return;
                 }
 
-                // Update username in database
-                // Try account JSONB first, fall back to top-level username
+                // Update username in database (send at top level - mapping handles account.username)
                 const trimmedUsername = setPasswordUsername.trim();
                 try {
-                  // Try with account JSONB column
-                  let payload: any = {
+                  const payload = {
                     uid: current.uid,
-                    account: {
-                      username: trimmedUsername,
-                    },
+                    username: trimmedUsername, // Send at top level - mapping function maps to account.username
                   };
 
-                  let usernameRes = await apiClient(`/api/users/upsert`, {
+                  console.log("[set-password] Updating username:", trimmedUsername);
+
+                  const usernameRes = await apiClient(`/api/users/upsert`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(payload),
                   });
 
-                  // If account column doesn't exist, fall back to top-level username
-                  if (usernameRes && usernameRes.status >= 400) {
-                    console.log("[set-password] account column might not exist, falling back to username");
-                    payload = {
-                      uid: current.uid,
-                      username: trimmedUsername,
-                    };
-
-                    usernameRes = await apiClient(`/api/users/upsert`, {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify(payload),
-                    });
-                  }
-
                   if (!usernameRes || usernameRes.status >= 400) {
                     const errorBody = await usernameRes?.json().catch(() => null);
+                    console.error("[set-password] Failed to save username:", errorBody);
                     throw new Error(errorBody?.error || "Failed to set username");
                   }
+
+                  console.log("[set-password] Username saved successfully");
                 } catch (usernameErr: any) {
                   setSetPasswordError(`Failed to set username: ${usernameErr.message}`);
                   setSetPasswordLoading(false);
@@ -2730,7 +2736,15 @@ function ProfilePageInner() {
                     current.email,
                     setPasswordNew
                   );
+                  console.log("[set-password] Linking password credential to account");
                   await linkWithCredential(current, credential);
+                  console.log("[set-password] Password credential linked successfully");
+
+                  // Force refresh Firebase auth state to get updated providerData
+                  console.log("[set-password] Refreshing Firebase auth state");
+                  await current.reload();
+                  const refreshedUser = auth.currentUser;
+                  console.log("[set-password] Firebase user providers:", refreshedUser?.providerData);
 
                   setToast({
                     open: true,
@@ -2748,15 +2762,21 @@ function ProfilePageInner() {
                   setShowConfirmPassword(false);
                   setUsernameAvailable(null);
 
-                  // Refresh user data to reflect new provider
+                  // Refresh user data from database to get updated username
                   try {
+                    console.log("[set-password] Fetching updated user data from database");
                     const res = await apiClient(`/api/users/me`);
                     if (res && res.ok) {
                       const parsed = await res.json().catch(() => null);
                       const dbUser = parsed && parsed.user ? parsed.user : parsed;
-                      if (dbUser) setUser(dbUser);
+                      if (dbUser) {
+                        console.log("[set-password] Updated user data:", { username: dbUser.username, providers: refreshedUser?.providerData });
+                        setUser(dbUser);
+                      }
                     }
-                  } catch {}
+                  } catch (fetchErr) {
+                    console.error("[set-password] Failed to fetch updated user:", fetchErr);
+                  }
                 } catch (linkErr: any) {
                   let errorMsg = "Failed to create password login";
                   if (linkErr?.code === "auth/email-already-in-use") {
