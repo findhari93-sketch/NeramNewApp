@@ -33,8 +33,8 @@ const AboutUs: React.FC = () => {
           Best NATA & JEE B.Arch Online Coaching in India
         </Typography>
         <Typography variant="caption" component="p">
-          Neram Academy is India's leading online coaching institute for NATA (National Aptitude Test in Architecture) and JEE Paper 2 (B.Arch). 
-          Established in 2017 by alumni from IITs, NITs, SPA Delhi, and Anna University, we've achieved a 100% success rate with students 
+          Neram Academy is India&apos;s leading online coaching institute for NATA (National Aptitude Test in Architecture) and JEE Paper 2 (B.Arch).
+          Established in 2017 by alumni from IITs, NITs, SPA Delhi, and Anna University, we&apos;ve achieved a 100% success rate with students
           securing top ranks including <strong>All India Rank 1 in JEE B.Arch 2024</strong> and <strong>NATA Rank 1 (187/200) in 2020</strong>.
           Our architecture entrance coaching serves students across Tamil Nadu, Karnataka, Kerala, and UAE through live online classes and recorded sessions.
         </Typography>

@@ -254,7 +254,7 @@ export default function CoachingPage() {
             </Box>
             <Grid container spacing={2}>
               {cities.tamilNadu.map((city) => (
-                <Grid item xs={12} sm={6} md={4} key={city.slug}>
+                <Grid size={{ xs: 12, sm: 6, md: 4 }} key={city.slug}>
                   <Link
                     href={`/coaching/${city.slug}`}
                     style={{ textDecoration: "none" }}
@@ -302,7 +302,7 @@ export default function CoachingPage() {
             </Box>
             <Grid container spacing={2}>
               {cities.karnataka.map((city) => (
-                <Grid item xs={12} sm={6} md={4} key={city.slug}>
+                <Grid size={{ xs: 12, sm: 6, md: 4 }} key={city.slug}>
                   <Link
                     href={`/coaching/${city.slug}`}
                     style={{ textDecoration: "none" }}
@@ -362,7 +362,7 @@ export default function CoachingPage() {
             </Typography>
             <Grid container spacing={2}>
               {cities.gulf.map((city) => (
-                <Grid item xs={12} sm={6} md={4} key={city.slug}>
+                <Grid size={{ xs: 12, sm: 6, md: 4 }} key={city.slug}>
                   <Link
                     href={`/coaching/${city.slug}`}
                     style={{ textDecoration: "none" }}
@@ -410,7 +410,7 @@ export default function CoachingPage() {
             }}
           >
             <Typography variant="h4" sx={{ fontWeight: 600, mb: 2 }}>
-              Can't Find Your City?
+              Can&apos;t Find Your City?
             </Typography>
             <Typography variant="h6" sx={{ mb: 3, opacity: 0.9 }}>
               We offer online coaching for students across India and

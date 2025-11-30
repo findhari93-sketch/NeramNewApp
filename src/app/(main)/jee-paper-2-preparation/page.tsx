@@ -185,7 +185,7 @@ export default function JEEPaper2PreparationPage() {
                 🎯 Key Exam Details:
               </Typography>
               <Grid container spacing={2}>
-                <Grid item xs={12} md={6}>
+                <Grid size={{ xs: 12, md: 6 }}>
                   <List dense>
                     <ListItem>
                       • <strong>Exam Mode:</strong> Computer-Based Test (CBT)
@@ -202,7 +202,7 @@ export default function JEEPaper2PreparationPage() {
                     </ListItem>
                   </List>
                 </Grid>
-                <Grid item xs={12} md={6}>
+                <Grid size={{ xs: 12, md: 6 }}>
                   <List dense>
                     <ListItem>
                       • <strong>Negative Marking:</strong> -1 for wrong answer
@@ -239,7 +239,7 @@ export default function JEEPaper2PreparationPage() {
               📋 JEE Paper 2 Exam Pattern {currentYear}
             </Typography>{" "}
             <Grid container spacing={3}>
-              <Grid item xs={12} md={4}>
+              <Grid size={{ xs: 12, md: 4 }}>
                 <Paper
                   elevation={2}
                   sx={{ p: 3, height: "100%", bgcolor: "success.light" }}
@@ -263,7 +263,7 @@ export default function JEEPaper2PreparationPage() {
                   </List>
                 </Paper>
               </Grid>
-              <Grid item xs={12} md={4}>
+              <Grid size={{ xs: 12, md: 4 }}>
                 <Paper
                   elevation={2}
                   sx={{ p: 3, height: "100%", bgcolor: "info.light" }}
@@ -287,7 +287,7 @@ export default function JEEPaper2PreparationPage() {
                   </List>
                 </Paper>
               </Grid>
-              <Grid item xs={12} md={4}>
+              <Grid size={{ xs: 12, md: 4 }}>
                 <Paper
                   elevation={2}
                   sx={{ p: 3, height: "100%", bgcolor: "warning.light" }}
@@ -347,7 +347,7 @@ export default function JEEPaper2PreparationPage() {
                   High-Weightage Topics (Focus 80% here):
                 </Typography>
                 <Grid container spacing={2}>
-                  <Grid item xs={12} md={6}>
+                  <Grid size={{ xs: 12, md: 6 }}>
                     <List dense>
                       <ListItem>
                         <ListItemIcon>
@@ -387,7 +387,7 @@ export default function JEEPaper2PreparationPage() {
                       </ListItem>
                     </List>
                   </Grid>
-                  <Grid item xs={12} md={6}>
+                  <Grid size={{ xs: 12, md: 6 }}>
                     <List dense>
                       <ListItem>
                         <ListItemIcon>
@@ -574,7 +574,7 @@ export default function JEEPaper2PreparationPage() {
                   <Typography fontWeight={600}>💡 Pro Tip:</Typography>
                   <Typography>
                     Practice digital drawing extensively! Most students lose
-                    marks because they're not comfortable with tablets. Use free
+                    marks because they&apos;re not comfortable with tablets. Use free
                     software like Krita or Sketchbook to practice daily.
                   </Typography>
                 </Box>
@@ -761,7 +761,7 @@ export default function JEEPaper2PreparationPage() {
                       15min buffer)
                     </ListItem>
                     <ListItem>
-                      ⚡ Attempt only questions you're confident about (negative
+                      ⚡ Attempt only questions you&apos;re confident about (negative
                       marking!)
                     </ListItem>
                     <ListItem>
@@ -804,7 +804,7 @@ export default function JEEPaper2PreparationPage() {
               Target Score Breakdown for 99+ Percentile (varies by difficulty):
             </Typography>
             <Grid container spacing={3}>
-              <Grid item xs={12} md={4}>
+              <Grid size={{ xs: 12, md: 4 }}>
                 <Paper sx={{ p: 2, textAlign: "center", bgcolor: "white" }}>
                   <Typography
                     variant="h4"
@@ -819,7 +819,7 @@ export default function JEEPaper2PreparationPage() {
                   <Typography variant="caption">(out of 100 marks)</Typography>
                 </Paper>
               </Grid>
-              <Grid item xs={12} md={4}>
+              <Grid size={{ xs: 12, md: 4 }}>
                 <Paper sx={{ p: 2, textAlign: "center", bgcolor: "white" }}>
                   <Typography variant="h4" fontWeight={700} color="info.main">
                     160-170
@@ -830,7 +830,7 @@ export default function JEEPaper2PreparationPage() {
                   <Typography variant="caption">(out of 200 marks)</Typography>
                 </Paper>
               </Grid>
-              <Grid item xs={12} md={4}>
+              <Grid size={{ xs: 12, md: 4 }}>
                 <Paper sx={{ p: 2, textAlign: "center", bgcolor: "white" }}>
                   <Typography
                     variant="h4"
@@ -896,7 +896,7 @@ export default function JEEPaper2PreparationPage() {
               📚 Best Books for JEE Paper 2 (B.Arch)
             </Typography>
             <Grid container spacing={3}>
-              <Grid item xs={12} md={6}>
+              <Grid size={{ xs: 12, md: 6 }}>
                 <Typography variant="h6" fontWeight={600} mb={2}>
                   Mathematics:
                 </Typography>
@@ -919,7 +919,7 @@ export default function JEEPaper2PreparationPage() {
                   </ListItem>
                 </List>
               </Grid>
-              <Grid item xs={12} md={6}>
+              <Grid size={{ xs: 12, md: 6 }}>
                 <Typography variant="h6" fontWeight={600} mb={2}>
                   Aptitude Test:
                 </Typography>
@@ -941,7 +941,7 @@ export default function JEEPaper2PreparationPage() {
                   </ListItem>
                 </List>
               </Grid>
-              <Grid item xs={12}>
+              <Grid size={{ xs: 12 }}>
                 <Typography variant="h6" fontWeight={600} mb={2}>
                   Drawing:
                 </Typography>
@@ -1132,7 +1132,7 @@ export default function JEEPaper2PreparationPage() {
               <AccordionDetails>
                 <Typography paragraph>
                   Digital drawing is the biggest challenge for most students.
-                  Here's how to master it:
+                  Here&apos;s how to master it:
                 </Typography>
                 <Typography fontWeight={600} mb={1}>
                   Step-by-Step Approach:
@@ -1154,7 +1154,7 @@ export default function JEEPaper2PreparationPage() {
                   </ListItem>
                   <ListItem>
                     <strong>4. Practice NTA Interface:</strong> Take mock tests
-                    on NTA's practice portal to get familiar with actual exam
+                    on NTA&apos;s practice portal to get familiar with actual exam
                     environment
                   </ListItem>
                   <ListItem>
@@ -1282,7 +1282,7 @@ export default function JEEPaper2PreparationPage() {
               Ready to Crack JEE Paper 2 with 99+ Percentile?
             </Typography>
             <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-              Join neramClasses - India's #1 JEE B.Arch coaching with proven
+              Join neramClasses - India&apos;s #1 JEE B.Arch coaching with proven
               track record
             </Typography>
             <Button

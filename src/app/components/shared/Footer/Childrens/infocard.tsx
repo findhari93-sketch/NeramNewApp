@@ -74,7 +74,7 @@ const FooterCard: React.FC = () => {
           {socialIcons.map((Item, index) => {
             const Icon = Item.icon;
             return (
-              <Grid item key={index}>
+              <Grid key={index}>
                 <MuiLink
                   href={Item.href}
                   color="inherit"

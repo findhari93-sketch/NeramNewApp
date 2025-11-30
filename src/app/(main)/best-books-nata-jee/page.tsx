@@ -322,7 +322,7 @@ export default function BestBooksPage() {
             </Typography>
             <Grid container spacing={3}>
               {books[selectedExam].mathematics.map((book, idx) => (
-                <Grid item xs={12} md={6} key={idx}>
+                <Grid size={{ xs: 12, md: 6 }} key={idx}>
                   <Paper
                     elevation={2}
                     sx={{ p: 3, height: "100%", position: "relative" }}
@@ -399,7 +399,7 @@ export default function BestBooksPage() {
             </Typography>
             <Grid container spacing={3}>
               {books[selectedExam].aptitude.map((book, idx) => (
-                <Grid item xs={12} md={6} key={idx}>
+                <Grid size={{ xs: 12, md: 6 }} key={idx}>
                   <Paper
                     elevation={2}
                     sx={{ p: 3, height: "100%", position: "relative" }}
@@ -476,7 +476,7 @@ export default function BestBooksPage() {
             </Typography>
             <Grid container spacing={3}>
               {books[selectedExam].drawing.map((book, idx) => (
-                <Grid item xs={12} md={6} key={idx}>
+                <Grid size={{ xs: 12, md: 6 }} key={idx}>
                   <Paper
                     elevation={2}
                     sx={{ p: 3, height: "100%", position: "relative" }}
@@ -554,7 +554,7 @@ export default function BestBooksPage() {
                 </Typography>
                 <Grid container spacing={3}>
                   {books.nata.previous.map((book, idx) => (
-                    <Grid item xs={12} md={6} key={idx}>
+                    <Grid size={{ xs: 12, md: 6 }} key={idx}>
                       <Paper
                         elevation={2}
                         sx={{ p: 3, height: "100%", position: "relative" }}
@@ -636,7 +636,7 @@ export default function BestBooksPage() {
               📖 How to Use These Books Effectively
             </Typography>
             <Grid container spacing={3}>
-              <Grid item xs={12} md={6}>
+              <Grid size={{ xs: 12, md: 6 }}>
                 <Typography variant="h6" fontWeight={600} mb={2}>
                   For Mathematics:
                 </Typography>
@@ -659,7 +659,7 @@ export default function BestBooksPage() {
                   </ListItem>
                 </List>
               </Grid>
-              <Grid item xs={12} md={6}>
+              <Grid size={{ xs: 12, md: 6 }}>
                 <Typography variant="h6" fontWeight={600} mb={2}>
                   For Aptitude & Drawing:
                 </Typography>

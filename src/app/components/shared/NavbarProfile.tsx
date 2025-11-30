@@ -51,7 +51,7 @@ export default function NavbarProfile({
   // Stabilize handlers to avoid unnecessary re-renders in parent trees
   const handleToggle = React.useCallback(
     (e: React.MouseEvent<HTMLElement>) => {
-      // If parent provided an anchor (anchorEl or anchorRef), don't mutate internal state;
+      // If parent provided an anchor (anchorEl or anchorRef), don&apos;t mutate internal state;
       // delegate open/close control to the parent via onOpenChange.
       const parentAnchored = Boolean(parentAnchorEl || anchorRef?.current);
       if (parentAnchored) {

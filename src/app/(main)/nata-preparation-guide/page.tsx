@@ -772,10 +772,10 @@ export default function NATAPreparationGuidePage() {
                   <ListItem>
                     <strong>1. Drawing Skills (Start from Day 1):</strong> This
                     requires the most time to develop. Start daily practice
-                    immediately, even if you're a beginner.
+                    immediately, even if you&apos;re a beginner.
                   </ListItem>
                   <ListItem>
-                    <strong>2. Mathematics:</strong> Begin with topics you're
+                    <strong>2. Mathematics:</strong> Begin with topics you&apos;re
                     weak in. Focus on Coordinate Geometry and Calculus first.
                   </ListItem>
                   <ListItem>
@@ -983,7 +983,7 @@ export default function NATAPreparationGuidePage() {
               Ready to Start Your NATA Journey?
             </Typography>
             <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-              Join India's #1 NATA coaching platform with 5000+ successful
+              Join India&apos;s #1 NATA coaching platform with 5000+ successful
               students
             </Typography>
             <Button

@@ -888,12 +888,12 @@ export default async function CityCoachingPage({ params }: { params: Promise<{ c
               </Typography>
 
               <Typography variant="body1" sx={{ mb: 3, lineHeight: 1.8 }}>
-                We specialize in training <strong>Malayali & Tamil students</strong> living in <strong>{cityInfo.name}</strong> and across the Gulf region who want to pursue architecture in India's top colleges.
+                We specialize in training <strong>Malayali & Tamil students</strong> living in <strong>{cityInfo.name}</strong> and across the Gulf region who want to pursue architecture in India&apos;s top colleges.
                 Our online classes are designed keeping Gulf time zones in mind, with flexible batch timings that work for UAE, Qatar, Oman, Saudi Arabia, Kuwait & Bahrain students.
               </Typography>
 
               <Grid container spacing={3} sx={{ mb: 3 }}>
-                <Grid item xs={12} md={6}>
+                <Grid size={{ xs: 12, md: 6 }}>
                   <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
                     <AccessTimeIcon color="secondary" sx={{ fontSize: 40 }} />
                     <Box>
@@ -907,7 +907,7 @@ export default async function CityCoachingPage({ params }: { params: Promise<{ c
                   </Box>
                 </Grid>
 
-                <Grid item xs={12} md={6}>
+                <Grid size={{ xs: 12, md: 6 }}>
                   <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
                     <OnlinePredictionIcon color="secondary" sx={{ fontSize: 40 }} />
                     <Box>
@@ -921,7 +921,7 @@ export default async function CityCoachingPage({ params }: { params: Promise<{ c
                   </Box>
                 </Grid>
 
-                <Grid item xs={12} md={6}>
+                <Grid size={{ xs: 12, md: 6 }}>
                   <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
                     <SchoolIcon color="secondary" sx={{ fontSize: 40 }} />
                     <Box>
@@ -935,7 +935,7 @@ export default async function CityCoachingPage({ params }: { params: Promise<{ c
                   </Box>
                 </Grid>
 
-                <Grid item xs={12} md={6}>
+                <Grid size={{ xs: 12, md: 6 }}>
                   <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
                     <CheckCircleIcon color="secondary" sx={{ fontSize: 40 }} />
                     <Box>
@@ -979,7 +979,7 @@ export default async function CityCoachingPage({ params }: { params: Promise<{ c
             </Typography>
 
             <Grid container spacing={3} sx={{ mb: 3 }}>
-              <Grid item xs={12} md={6}>
+              <Grid size={{ xs: 12, md: 6 }}>
                 <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
                   <AccessTimeIcon color="primary" sx={{ fontSize: 40 }} />
                   <Box>
@@ -993,7 +993,7 @@ export default async function CityCoachingPage({ params }: { params: Promise<{ c
                 </Box>
               </Grid>
 
-              <Grid item xs={12} md={6}>
+              <Grid size={{ xs: 12, md: 6 }}>
                 <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
                   <OnlinePredictionIcon color="primary" sx={{ fontSize: 40 }} />
                   <Box>
@@ -1007,7 +1007,7 @@ export default async function CityCoachingPage({ params }: { params: Promise<{ c
                 </Box>
               </Grid>
 
-              <Grid item xs={12} md={6}>
+              <Grid size={{ xs: 12, md: 6 }}>
                 <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
                   <SchoolIcon color="primary" sx={{ fontSize: 40 }} />
                   <Box>
@@ -1021,7 +1021,7 @@ export default async function CityCoachingPage({ params }: { params: Promise<{ c
                 </Box>
               </Grid>
 
-              <Grid item xs={12} md={6}>
+              <Grid size={{ xs: 12, md: 6 }}>
                 <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
                   <CheckCircleIcon color="primary" sx={{ fontSize: 40 }} />
                   <Box>
@@ -1078,7 +1078,7 @@ export default async function CityCoachingPage({ params }: { params: Promise<{ c
                   desc: "Weekly tests that simulate actual exam conditions. Detailed performance analysis to track your progress."
                 },
               ].map((benefit, index) => (
-                <Grid item xs={12} sm={6} key={index}>
+                <Grid size={{ xs: 12, sm: 6 }} key={index}>
                   <Box
                     sx={{
                       display: "flex",
@@ -1122,7 +1122,7 @@ export default async function CityCoachingPage({ params }: { params: Promise<{ c
                 ))}
               </Box>
               <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-                With Neram Classes online coaching, you'll be fully prepared regardless of which exam center you're assigned to!
+                With Neram Classes online coaching, you&apos;ll be fully prepared regardless of which exam center you&apos;re assigned to!
               </Typography>
             </Paper>
           )}

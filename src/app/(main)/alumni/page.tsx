@@ -199,7 +199,7 @@ export default function AlumniPage() {
             { label: "NATA ≥180 Scores", value: stats.nataTopScores },
             { label: "JEE Ranks ≤200", value: stats.jeeTopRanks },
           ].map((s) => (
-            <Grid item xs={6} md={2} key={s.label}>
+            <Grid size={{ xs: 6, md: 2 }} key={s.label}>
               <Card
                 sx={{ textAlign: "center", py: 2 }}
                 aria-label={`${s.label} summary`}
@@ -271,7 +271,7 @@ export default function AlumniPage() {
           enableColumnActions={false}
           enableDensityToggle={false}
           initialState={{
-            pagination: { pageSize: 10 },
+            pagination: { pageSize: 10, pageIndex: 0 },
             showGlobalFilter: false,
           }}
           muiTableBodyRowProps={({ row }) => ({
@@ -290,7 +290,7 @@ export default function AlumniPage() {
         <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
           Consistent mock performance, iterative sketch critiques, time
           calibration drills and portfolio guidance are core pillars of Neram
-          Academy's architecture entrance success pathway. Many of these alumni
+          Academy&apos;s architecture entrance success pathway. Many of these alumni
           contributed peer insights that shaped newer cohorts.
         </Typography>
 

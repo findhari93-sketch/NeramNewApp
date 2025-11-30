@@ -453,7 +453,7 @@ export default function CareersPage() {
               Why Work With Us?
             </Typography>
             <Grid container spacing={3}>
-              <Grid item xs={12} sm={6} md={3}>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                 <Paper
                   elevation={0}
                   sx={{ p: 3, textAlign: "center", bgcolor: "#f8f9ff" }}
@@ -469,7 +469,7 @@ export default function CareersPage() {
                   </Typography>
                 </Paper>
               </Grid>
-              <Grid item xs={12} sm={6} md={3}>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                 <Paper
                   elevation={0}
                   sx={{ p: 3, textAlign: "center", bgcolor: "#fff8f0" }}
@@ -485,7 +485,7 @@ export default function CareersPage() {
                   </Typography>
                 </Paper>
               </Grid>
-              <Grid item xs={12} sm={6} md={3}>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                 <Paper
                   elevation={0}
                   sx={{ p: 3, textAlign: "center", bgcolor: "#f0fff4" }}
@@ -501,7 +501,7 @@ export default function CareersPage() {
                   </Typography>
                 </Paper>
               </Grid>
-              <Grid item xs={12} sm={6} md={3}>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                 <Paper
                   elevation={0}
                   sx={{ p: 3, textAlign: "center", bgcolor: "#fef2f2" }}
@@ -693,7 +693,7 @@ export default function CareersPage() {
             </Typography>
 
             <Grid container spacing={3} justifyContent="center">
-              <Grid item xs={12} sm={6} md={4}>
+              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                 <Paper sx={{ p: 3, textAlign: "center" }}>
                   <WhatsAppIcon
                     sx={{ fontSize: 48, color: "#25D366", mb: 2 }}
@@ -714,7 +714,7 @@ export default function CareersPage() {
                 </Paper>
               </Grid>
 
-              <Grid item xs={12} sm={6} md={4}>
+              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                 <Paper sx={{ p: 3, textAlign: "center" }}>
                   <EmailIcon
                     sx={{ fontSize: 48, color: "primary.main", mb: 2 }}
@@ -736,7 +736,7 @@ export default function CareersPage() {
                 </Paper>
               </Grid>
 
-              <Grid item xs={12} sm={6} md={4}>
+              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                 <Paper sx={{ p: 3, textAlign: "center" }}>
                   <ChatIcon
                     sx={{ fontSize: 48, color: "secondary.main", mb: 2 }}

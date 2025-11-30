@@ -238,7 +238,7 @@ export default function PreviousYearPapersPage() {
             {selectedExam === "nata" ? (
               <Grid container spacing={3}>
                 {nataPapers.map((paper) => (
-                  <Grid item xs={12} md={6} key={paper.year}>
+                  <Grid size={{ xs: 12, md: 6 }} key={paper.year}>
                     <Paper
                       elevation={2}
                       sx={{
@@ -318,7 +318,7 @@ export default function PreviousYearPapersPage() {
             ) : (
               <Grid container spacing={3}>
                 {jeePapers.map((paper) => (
-                  <Grid item xs={12} md={6} key={paper.year}>
+                  <Grid size={{ xs: 12, md: 6 }} key={paper.year}>
                     <Paper
                       elevation={2}
                       sx={{
@@ -428,7 +428,7 @@ export default function PreviousYearPapersPage() {
               <AccordionDetails>
                 <List>
                   <ListItem>
-                    <strong>1. Don't attempt yet</strong> - First just read
+                    <strong>1. Don&apos;t attempt yet</strong> - First just read
                     through the papers
                   </ListItem>
                   <ListItem>
@@ -539,13 +539,13 @@ export default function PreviousYearPapersPage() {
               📊 Topic-wise Question Analysis (Last 5 Years)
             </Typography>
             <Typography paragraph color="text.secondary">
-              Based on previous year papers, here's how questions are
+              Based on previous year papers, here&apos;s how questions are
               distributed:
             </Typography>
 
             {selectedExam === "nata" ? (
               <Grid container spacing={3}>
-                <Grid item xs={12} md={6}>
+                <Grid size={{ xs: 12, md: 6 }}>
                   <Paper sx={{ p: 3, bgcolor: "success.light" }}>
                     <Typography variant="h6" fontWeight={600} mb={2}>
                       Mathematics Topics
@@ -561,7 +561,7 @@ export default function PreviousYearPapersPage() {
                     </List>
                   </Paper>
                 </Grid>
-                <Grid item xs={12} md={6}>
+                <Grid size={{ xs: 12, md: 6 }}>
                   <Paper sx={{ p: 3, bgcolor: "info.light" }}>
                     <Typography variant="h6" fontWeight={600} mb={2}>
                       General Aptitude Topics
@@ -576,7 +576,7 @@ export default function PreviousYearPapersPage() {
                     </List>
                   </Paper>
                 </Grid>
-                <Grid item xs={12}>
+                <Grid size={{ xs: 12 }}>
                   <Paper sx={{ p: 3, bgcolor: "warning.light" }}>
                     <Typography variant="h6" fontWeight={600} mb={2}>
                       Drawing Test Themes (Most Common)
@@ -595,7 +595,7 @@ export default function PreviousYearPapersPage() {
               </Grid>
             ) : (
               <Grid container spacing={3}>
-                <Grid item xs={12} md={4}>
+                <Grid size={{ xs: 12, md: 4 }}>
                   <Paper sx={{ p: 3, bgcolor: "success.light" }}>
                     <Typography variant="h6" fontWeight={600} mb={2}>
                       Mathematics
@@ -610,7 +610,7 @@ export default function PreviousYearPapersPage() {
                     </List>
                   </Paper>
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid size={{ xs: 12, md: 4 }}>
                   <Paper sx={{ p: 3, bgcolor: "info.light" }}>
                     <Typography variant="h6" fontWeight={600} mb={2}>
                       Aptitude Test
@@ -624,7 +624,7 @@ export default function PreviousYearPapersPage() {
                     </List>
                   </Paper>
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid size={{ xs: 12, md: 4 }}>
                   <Paper sx={{ p: 3, bgcolor: "warning.light" }}>
                     <Typography variant="h6" fontWeight={600} mb={2}>
                       Drawing Themes

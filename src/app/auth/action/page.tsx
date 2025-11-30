@@ -67,7 +67,7 @@ export default function AuthActionPage() {
                   ? localStorage.getItem("firebase_id_token")
                   : null;
               if (maybeToken) {
-                // We can't directly set the client auth state from a raw token, but
+                // We can&apos;t directly set the client auth state from a raw token, but
                 // we can call a lightweight /api/auth/restore-session which will
                 // (optionally) validate token server-side and set a session cookie
                 // or return user info. We'll attempt a restore and then call

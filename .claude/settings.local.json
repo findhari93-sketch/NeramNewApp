@@ -14,7 +14,14 @@
       "Bash(npm install:*)",
       "Bash(if [ -f .env.local ])",
       "Bash(then grep -q \"PAYMENT_TOKEN_SECRET\" .env.local)",
-      "Bash(else echo \"⚠️ .env.local file not found\")"
+      "Bash(else echo \"⚠️ .env.local file not found\")",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(cmd //c taskkill //PID 21792 //F)",
+      "Bash(git reset:*)",
+      "Bash(npm run build:*)",
+      "Bash(find:*)",
+      "Bash(powershell -Command \"Get-ChildItem -Path ''src/app'' -Filter ''*.tsx'' -Recurse | ForEach-Object { (Get-Content $_.FullName -Raw) -replace \"\"([a-zA-Z])''([a-z])\"\", ''$1&apos;$2'' | Set-Content $_.FullName -NoNewline }\")"
     ],
     "deny": [],
     "ask": []

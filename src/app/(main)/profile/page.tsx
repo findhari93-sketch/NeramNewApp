@@ -552,7 +552,7 @@ function ProfilePageInner() {
       }
 
       const trimmed = username.trim();
-      // If username hasn't changed from current user's username, it's available
+      // If username hasn't changed from current user's username, it&apos;s available
       if (trimmed === (user as any)?.username) {
         setUsernameAvailable(true);
         return;
@@ -1239,7 +1239,7 @@ function ProfilePageInner() {
         {/* Wrap Grid to compensate for spacing negative margins on small screens */}
         <Box sx={{ px: { xs: 0, sm: 0 } }}>
           <Grid container spacing={3}>
-            <Grid item component="div" xs={12} md={4}>
+            <Grid component="div" size={{ xs: 12, md: 4 }}>
               <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 <HeaderCardDesign
                   title="Profile Details"
@@ -1356,9 +1356,9 @@ function ProfilePageInner() {
               </Box>
             </Grid>
 
-            <Grid item component="div" xs={12} md={8}>
+            <Grid component="div" size={{ xs: 12, md: 8 }}>
               <Grid container spacing={2} direction="column">
-                <Grid item xs={12}>
+                <Grid size={{ xs: 12 }}>
                   <HeaderCardDesign
                     title="Account Details"
                     icon={null}
@@ -1460,7 +1460,7 @@ function ProfilePageInner() {
                 </Grid>
 
                 {/* Purchases / Entitlements */}
-                <Grid item xs={12}>
+                <Grid size={{ xs: 12 }}>
                   <HeaderCardDesign
                     title="Purchases"
                     icon={null}
@@ -1507,7 +1507,7 @@ function ProfilePageInner() {
                   </HeaderCardDesign>
                 </Grid>
 
-                <Grid item xs={12}>
+                <Grid size={{ xs: 12 }}>
                   <HeaderCardDesign
                     title="Contact Details"
                     icon={null}
@@ -1619,7 +1619,7 @@ function ProfilePageInner() {
                   </HeaderCardDesign>
                 </Grid>
 
-                <Grid item xs={12}>
+                <Grid size={{ xs: 12 }}>
                   <HeaderCardDesign
                     title="Education Details"
                     icon={null}
@@ -1639,7 +1639,7 @@ function ProfilePageInner() {
                     }}
                   >
                     <Grid container spacing={3}>
-                      <Grid item xs={12} md={6}>
+                      <Grid size={{ xs: 12, md: 6 }}>
                         <Stack spacing={2}>
                           <Stack direction="row" spacing={1}>
                             <Typography

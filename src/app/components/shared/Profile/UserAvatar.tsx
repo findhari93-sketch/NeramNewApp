@@ -175,13 +175,13 @@ export default function UserAvatar({
       user?.student_name || user?.displayName || user?.email || user?.phone;
     if (!name) return "?";
 
-    // If it's an email, use the part before @
+    // If it&apos;s an email, use the part before @
     if (name.includes("@")) {
       const emailName = name.split("@")[0];
       return emailName.substring(0, 2).toUpperCase();
     }
 
-    // If it's a phone number, use first 2 digits
+    // If it&apos;s a phone number, use first 2 digits
     if (/^\+?\d+$/.test(name.replace(/\s/g, ""))) {
       return name.replace(/\D/g, "").substring(0, 2);
     }

@@ -43,13 +43,13 @@ export function getOrganizationSchema(): WithContext<Organization> {
         { '@type': 'Country', name: 'Oman' },
         { '@type': 'Country', name: 'Saudi Arabia' },
         // Offline locations in Tamil Nadu
-        { '@type': 'City', name: 'Trichy', addressRegion: 'Tamil Nadu', addressCountry: 'India' },
-        { '@type': 'City', name: 'Chennai', addressRegion: 'Tamil Nadu', addressCountry: 'India' },
-        { '@type': 'City', name: 'Madurai', addressRegion: 'Tamil Nadu', addressCountry: 'India' },
-        { '@type': 'City', name: 'Coimbatore', addressRegion: 'Tamil Nadu', addressCountry: 'India' },
-        { '@type': 'City', name: 'Tiruppur', addressRegion: 'Tamil Nadu', addressCountry: 'India' },
+        { '@type': 'City', name: 'Trichy' },
+        { '@type': 'City', name: 'Chennai' },
+        { '@type': 'City', name: 'Madurai' },
+        { '@type': 'City', name: 'Coimbatore' },
+        { '@type': 'City', name: 'Tiruppur' },
         // Offline locations in Karnataka
-        { '@type': 'City', name: 'Bangalore', addressRegion: 'Karnataka', addressCountry: 'India' },
+        { '@type': 'City', name: 'Bangalore' },
       ],
     },
     address: {
@@ -81,7 +81,6 @@ export function getWebSiteSchema(): WithContext<WebSite> {
         '@type': 'EntryPoint',
         urlTemplate: `${siteUrl}/search?q={search_term_string}`,
       },
-      'query-input': 'required name=search_term_string',
     },
   };
 }
@@ -150,14 +149,11 @@ export function getProductSchema(options: {
       '@type': 'Offer',
       price: options.price,
       priceCurrency: options.currency || 'INR',
-      availability: options.availability || 'https://schema.org/InStock',
+      ...(options.availability && { availability: options.availability as any }),
       ...(options.validThrough && { priceValidUntil: options.validThrough }),
       seller: {
         '@id': `${siteUrl}/#organization`,
       },
-    },
-    provider: {
-      '@id': `${siteUrl}/#organization`,
     },
   };
 }

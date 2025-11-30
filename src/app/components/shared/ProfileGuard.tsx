@@ -25,7 +25,7 @@ export default function ProfileGuard({
 
   // Track repeated validation/network failures to avoid infinite modal reopen
   // loops on flaky networks. After a few consecutive failures enter a short
-  // cooldown where we won't reopen the modal automatically.
+  // cooldown where we won&apos;t reopen the modal automatically.
   const validationFailuresRef = React.useRef<number>(0);
   const lastValidationFailureAtRef = React.useRef<number | null>(null);
   const VALIDATION_FAILURE_THRESHOLD = 3;
@@ -351,7 +351,7 @@ export default function ProfileGuard({
             // clear controller after response
             upsertControllerRef.current = null;
             // Treat phone verification as success even if upsert response is not ok;
-            // we don't want to trap the user in the modal due to a transient network/db issue.
+            // we don&apos;t want to trap the user in the modal due to a transient network/db issue.
             const success = Boolean(res.ok && j && (j as any).ok);
             setProfileForceComplete(false);
             setOpen(false);

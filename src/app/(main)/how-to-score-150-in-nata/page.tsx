@@ -164,7 +164,7 @@ export default function ScoreImprovementPage() {
               🎯 150+ Score Breakdown
             </Typography>
             <Grid container spacing={3}>
-              <Grid item xs={12} md={4}>
+              <Grid size={{ xs: 12, md: 4 }}>
                 <Paper
                   sx={{
                     p: 3,
@@ -192,7 +192,7 @@ export default function ScoreImprovementPage() {
                   <Typography variant="body2">Target Accuracy: 95%+</Typography>
                 </Paper>
               </Grid>
-              <Grid item xs={12} md={4}>
+              <Grid size={{ xs: 12, md: 4 }}>
                 <Paper
                   sx={{
                     p: 3,
@@ -220,7 +220,7 @@ export default function ScoreImprovementPage() {
                   <Typography variant="body2">Target Accuracy: 90%+</Typography>
                 </Paper>
               </Grid>
-              <Grid item xs={12} md={4}>
+              <Grid size={{ xs: 12, md: 4 }}>
                 <Paper
                   sx={{
                     p: 3,
@@ -278,7 +278,7 @@ export default function ScoreImprovementPage() {
               High-Scoring Topics (Focus 80% effort here):
             </Typography>
             <Grid container spacing={2} mb={3}>
-              <Grid item xs={12} md={6}>
+              <Grid size={{ xs: 12, md: 6 }}>
                 <Paper sx={{ p: 2, bgcolor: "success.light" }}>
                   <Typography fontWeight={600} mb={1}>
                     Must-Master Topics:
@@ -299,7 +299,7 @@ export default function ScoreImprovementPage() {
                   </List>
                 </Paper>
               </Grid>
-              <Grid item xs={12} md={6}>
+              <Grid size={{ xs: 12, md: 6 }}>
                 <Paper sx={{ p: 2, bgcolor: "info.light" }}>
                   <Typography fontWeight={600} mb={1}>
                     Moderate Priority:
@@ -337,7 +337,7 @@ export default function ScoreImprovementPage() {
                 </ListItem>
                 <ListItem>
                   <strong>Difficult Questions (3-5):</strong> Skip or
-                  intelligent guess → Don't waste time
+                  intelligent guess → Don&apos;t waste time
                 </ListItem>
               </List>
               <Alert severity="error" sx={{ mt: 2 }}>
@@ -391,7 +391,7 @@ export default function ScoreImprovementPage() {
               Scoring Strategy by Sub-section:
             </Typography>
             <Grid container spacing={3}>
-              <Grid item xs={12} md={6}>
+              <Grid size={{ xs: 12, md: 6 }}>
                 <Paper sx={{ p: 3, bgcolor: "info.light" }}>
                   <Typography variant="h6" fontWeight={600} mb={2}>
                     📐 Visualizing 3D from 2D (30-35%)
@@ -415,7 +415,7 @@ export default function ScoreImprovementPage() {
                   </List>
                 </Paper>
               </Grid>
-              <Grid item xs={12} md={6}>
+              <Grid size={{ xs: 12, md: 6 }}>
                 <Paper sx={{ p: 3, bgcolor: "success.light" }}>
                   <Typography variant="h6" fontWeight={600} mb={2}>
                     🏛️ Architectural Awareness (25-30%)
@@ -439,7 +439,7 @@ export default function ScoreImprovementPage() {
                   </List>
                 </Paper>
               </Grid>
-              <Grid item xs={12} md={6}>
+              <Grid size={{ xs: 12, md: 6 }}>
                 <Paper sx={{ p: 3, bgcolor: "warning.light" }}>
                   <Typography variant="h6" fontWeight={600} mb={2}>
                     🎨 Objects, Textures & Materials (20-25%)
@@ -464,7 +464,7 @@ export default function ScoreImprovementPage() {
                   </List>
                 </Paper>
               </Grid>
-              <Grid item xs={12} md={6}>
+              <Grid size={{ xs: 12, md: 6 }}>
                 <Paper sx={{ p: 3, bgcolor: "error.light" }}>
                   <Typography variant="h6" fontWeight={600} mb={2}>
                     🧩 Logical Reasoning (15-20%)
@@ -544,7 +544,7 @@ export default function ScoreImprovementPage() {
               Scoring Breakdown (How Drawing is Evaluated):
             </Typography>
             <Grid container spacing={2} mb={3}>
-              <Grid item xs={12} md={6}>
+              <Grid size={{ xs: 12, md: 6 }}>
                 <Paper sx={{ p: 2 }}>
                   <Typography fontWeight={600} mb={1}>
                     Question 1: (35-40 marks)
@@ -558,7 +558,7 @@ export default function ScoreImprovementPage() {
                   </List>
                 </Paper>
               </Grid>
-              <Grid item xs={12} md={6}>
+              <Grid size={{ xs: 12, md: 6 }}>
                 <Paper sx={{ p: 2 }}>
                   <Typography fontWeight={600} mb={1}>
                     Question 2: (35-40 marks)
@@ -681,7 +681,7 @@ export default function ScoreImprovementPage() {
               ⚠️ Common Mistakes That Cost You 10-20 Marks
             </Typography>
             <Grid container spacing={2}>
-              <Grid item xs={12} md={6}>
+              <Grid size={{ xs: 12, md: 6 }}>
                 <Typography fontWeight={600} mb={1}>
                   Mathematics Mistakes:
                 </Typography>
@@ -694,7 +694,7 @@ export default function ScoreImprovementPage() {
                   <ListItem>❌ Not attempting easy questions first</ListItem>
                 </List>
               </Grid>
-              <Grid item xs={12} md={6}>
+              <Grid size={{ xs: 12, md: 6 }}>
                 <Typography fontWeight={600} mb={1}>
                   General Aptitude Mistakes:
                 </Typography>
@@ -709,7 +709,7 @@ export default function ScoreImprovementPage() {
                   <ListItem>❌ Not practicing enough MCQs</ListItem>
                 </List>
               </Grid>
-              <Grid item xs={12}>
+              <Grid size={{ xs: 12 }}>
                 <Typography fontWeight={600} mb={1}>
                   Drawing Mistakes:
                 </Typography>
