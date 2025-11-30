@@ -12,6 +12,7 @@ type Props = {
 export default function NavLinkText({ primary, badge, secondary }: Props) {
   const trimmed = badge?.trim();
   const isFree = (trimmed ?? "").toLowerCase() === "free";
+  const isAlumni = (trimmed ?? "").toLowerCase() === "alumni";
   const toTitleCase = (s: string) =>
     s
       .split(/\s+/)
@@ -37,7 +38,9 @@ export default function NavLinkText({ primary, badge, secondary }: Props) {
       {displayBadge ? (
         <Box
           sx={(theme) => ({
-            color: theme.palette.highlight.main,
+            color: isAlumni
+              ? theme.palette.white.main
+              : theme.palette.highlight.main,
             fontSize: 10,
             fontWeight: 800,
             letterSpacing: 0.4,

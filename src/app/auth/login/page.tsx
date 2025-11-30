@@ -23,6 +23,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { auth } from "../../../lib/firebase";
 import { friendlyFirebaseError } from "../../../lib/firebaseErrorMessages";
 import {
+  getWebPageSchema,
+  getBreadcrumbSchema,
+  renderJsonLd,
+} from "@/lib/schema";
+import {
   GoogleAuthProvider,
   signInWithPopup,
   signOut,
@@ -679,6 +684,7 @@ function LoginPageInner() {
   React.useEffect(() => {
     const n = searchParams?.get("notice");
     const email = searchParams?.get("email");
+    const next = searchParams?.get("next");
 
     // Always set email from query if present (even if already set)
     if (email) {
@@ -712,7 +718,13 @@ function LoginPageInner() {
     } else if (n === "already_logged_in") {
       setNotice("You are already signed in.");
     } else if (n === "login_required") {
-      setNotice("Please log in to continue.");
+      // Only show "login required" notice if user was actually redirected from a protected page
+      // (indicated by the presence of the 'next' parameter)
+      if (next) {
+        setNotice("Please log in to continue.");
+      } else {
+        setNotice(null);
+      }
     } else {
       setNotice(null);
       // Clear email from query when no notice
@@ -2019,10 +2031,36 @@ function LoginPageInner() {
 }
 
 export default function LoginPage() {
+  const webPageSchema = getWebPageSchema({
+    name: "Sign In / Sign Up - Neram Classes",
+    description:
+      "Sign in to your Neram Classes account or create a new account to access architecture exam preparation courses",
+    url: "/auth/login",
+    breadcrumbs: [
+      { name: "Home", url: "/" },
+      { name: "Login", url: "/auth/login" },
+    ],
+  });
+  const breadcrumbSchema = getBreadcrumbSchema([
+    { name: "Home", url: "/" },
+    { name: "Login", url: "/auth/login" },
+  ]);
+
   // Wrap the client page in Suspense so hooks like useSearchParams bailouts are supported
   return (
-    <Suspense fallback={null}>
-      <LoginPageInner />
-    </Suspense>
+    <>
+      {/* Schema Markup for Login Page */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={renderJsonLd(webPageSchema)}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={renderJsonLd(breadcrumbSchema)}
+      />
+      <Suspense fallback={null}>
+        <LoginPageInner />
+      </Suspense>
+    </>
   );
 }

@@ -10,6 +10,9 @@ import MenuIcon from "@mui/icons-material/Menu";
 import CloseIcon from "@mui/icons-material/Close";
 import LoginRounded from "@mui/icons-material/LoginRounded";
 import HomeRounded from "@mui/icons-material/HomeRounded";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import Menu from "@mui/material/Menu";
+import MenuItem from "@mui/material/MenuItem";
 import Box from "@mui/material/Box";
 import Drawer from "@mui/material/Drawer";
 import List from "@mui/material/List";
@@ -30,10 +33,34 @@ import NavLinkText from "./NavLinkText";
 // Menu items are static; keep at module scope to avoid re-creating on each render
 const MENU_ITEMS: Array<{ label: string; href: string; badge?: string }> = [
   { label: "Materials", href: "/materials", badge: "Free" },
-  { label: "NATA", href: "/applicationform", badge: "Syllabus" },
-  { label: "JEE B.Arch", href: "/about", badge: "Paper 2" },
-  { label: "Alumni", href: "/alumni", badge: "Neram Nata" },
+  {
+    label: "NATA",
+    href: "/nata-preparation-guide#syllabus",
+    badge: "Syllabus",
+  },
+  {
+    label: "JEE B.Arch",
+    href: "/jee-paper-2-preparation#syllabus",
+    badge: "Paper 2",
+  },
+  { label: "Neram NATA", href: "/alumni", badge: "Alumni" },
   { label: "Contact", href: "/contact", badge: "Office" },
+];
+
+const MORE_MENU_ITEMS: Array<{ label: string; href: string }> = [
+  { label: "NATA Preparation Guide", href: "/nata-preparation-guide" },
+  { label: "JEE Paper 2 Preparation", href: "/jee-paper-2-preparation" },
+  { label: "Best Books - NATA & JEE", href: "/best-books-nata-jee" },
+  { label: "Previous Year Papers", href: "/previous-year-papers" },
+  { label: "How to Score 150 in NATA", href: "/how-to-score-150-in-nata" },
+  { label: "NATA Cutoff Calculator", href: "/nata-cutoff-calculator" },
+  { label: "Free Books", href: "/freebooks" },
+  { label: "Ask Seniors", href: "/askSeniors" },
+  { label: "Premium", href: "/premium" },
+  { label: "Careers", href: "/careers" },
+  { label: "Application Form", href: "/applicationform" },
+  { label: "Privacy Policy", href: "/privacy" },
+  { label: "Terms & Conditions", href: "/terms" },
 ];
 
 type TopNavBarProps = {
@@ -68,6 +95,8 @@ export default function TopNavBar({
   titleBar,
 }: TopNavBarProps) {
   const [open, setOpen] = React.useState(false);
+  const [moreMenuAnchor, setMoreMenuAnchor] =
+    React.useState<null | HTMLElement>(null);
   const [userLabel, setUserLabel] = React.useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = React.useState<string | null>(() => {
     try {
@@ -564,6 +593,32 @@ export default function TopNavBar({
                 </React.Fragment>
               );
             })}
+            {/* More Menu Button */}
+            <Box
+              aria-hidden
+              sx={{
+                width: "2px",
+                height: "25px",
+                mx: 1,
+                bgcolor: "rgba(255,255,255,0.15)",
+                borderRadius: 0.5,
+                alignSelf: "center",
+              }}
+            />
+            <Button
+              aria-label="More menu"
+              onClick={(e) => setMoreMenuAnchor(e.currentTarget)}
+              endIcon={<KeyboardArrowDownIcon />}
+              sx={(theme) => ({
+                color: theme.palette.custom.yellow,
+                fontWeight: 600,
+                "&:hover": {
+                  backgroundColor: "rgba(255,251,1,0.08)",
+                },
+              })}
+            >
+              More
+            </Button>
           </Box>
 
           <Box>
@@ -626,6 +681,44 @@ export default function TopNavBar({
       of the AppBar and not visually hidden behind it. */}
         {renderTitleBar()}
       </AppBar>
+
+      {/* More Menu Dropdown */}
+      <Menu
+        anchorEl={moreMenuAnchor}
+        open={Boolean(moreMenuAnchor)}
+        onClose={() => setMoreMenuAnchor(null)}
+        anchorOrigin={{
+          vertical: "bottom",
+          horizontal: "right",
+        }}
+        transformOrigin={{
+          vertical: "top",
+          horizontal: "right",
+        }}
+        sx={{
+          "& .MuiPaper-root": {
+            maxHeight: 400,
+            width: 280,
+          },
+        }}
+      >
+        {MORE_MENU_ITEMS.map((item) => (
+          <MenuItem
+            key={item.href}
+            onClick={() => {
+              setMoreMenuAnchor(null);
+              router.push(item.href);
+            }}
+            sx={{
+              "&:hover": {
+                backgroundColor: "rgba(128, 90, 213, 0.08)",
+              },
+            }}
+          >
+            <Typography variant="body2">{item.label}</Typography>
+          </MenuItem>
+        ))}
+      </Menu>
 
       <Drawer open={open} onClose={handleCloseDrawer} role="presentation">
         <Box
@@ -699,6 +792,36 @@ export default function TopNavBar({
                 </ListItem>
               );
             })}
+          </List>
+          <Divider
+            sx={{
+              borderColor: "rgba(255,255,255,0.15)",
+            }}
+          />
+          {/* More Menu Items in Mobile Drawer */}
+          <Box sx={{ px: 2, py: 1 }}>
+            <Typography
+              variant="caption"
+              sx={{ color: "rgba(255,255,255,0.7)", fontWeight: 600 }}
+            >
+              MORE PAGES
+            </Typography>
+          </Box>
+          <List sx={{ pt: 0 }}>
+            {MORE_MENU_ITEMS.map((item) => (
+              <ListItem key={item.href} disablePadding>
+                <Link
+                  href={item.href}
+                  style={{ textDecoration: "none", width: "100%" }}
+                >
+                  <ListItemButton onClick={handleCloseDrawer}>
+                    <Typography variant="body2" sx={{ color: "white" }}>
+                      {item.label}
+                    </Typography>
+                  </ListItemButton>
+                </Link>
+              </ListItem>
+            ))}
           </List>
           <Divider
             orientation="vertical"

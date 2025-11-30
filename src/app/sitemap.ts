@@ -2,6 +2,130 @@ import type { MetadataRoute } from "next";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://example.com";
 
+const cities = [
+  // Tamil Nadu - All 38 districts
+  "chennai",
+  "coimbatore",
+  "madurai",
+  "trichy",
+  "tiruppur",
+  "salem",
+  "erode",
+  "vellore",
+  "thoothukudi",
+  "thanjavur",
+  "dindigul",
+  "nagercoil",
+  "kancheepuram",
+  "karur",
+  "tirunelveli",
+  "ariyalur",
+  "chengalpattu",
+  "cuddalore",
+  "dharmapuri",
+  "kallakurichi",
+  "krishnagiri",
+  "mayiladuthurai",
+  "nagapattinam",
+  "namakkal",
+  "perambalur",
+  "pudukkottai",
+  "ramanathapuram",
+  "ranipet",
+  "sivaganga",
+  "tenkasi",
+  "ooty",
+  "theni",
+  "thiruvallur",
+  "thiruvarur",
+  "tirupathur",
+  "tiruvannamalai",
+  "viluppuram",
+  "virudhunagar",
+  // Karnataka - All 31 districts
+  "bangalore",
+  "mysore",
+  "mangalore",
+  "hubli",
+  "belgaum",
+  "gulbarga",
+  "tumkur",
+  "davanagere",
+  "bellary",
+  "shimoga",
+  "bagalkote",
+  "bengaluru-rural",
+  "bidar",
+  "chamarajanagar",
+  "chikkaballapura",
+  "chikkamagaluru",
+  "chitradurga",
+  "dharwad",
+  "gadag",
+  "hassan",
+  "haveri",
+  "kodagu",
+  "kolar",
+  "koppal",
+  "mandya",
+  "raichur",
+  "ramanagara",
+  "udupi",
+  "karwar",
+  "bijapur",
+  "yadgir",
+  "vijayanagara",
+  // UAE & Gulf Countries - International students (42 cities)
+  // UAE
+  "dubai",
+  "abu-dhabi",
+  "sharjah",
+  "ajman",
+  "ras-al-khaimah",
+  "fujairah",
+  // Qatar
+  "doha",
+  "al-wakrah",
+  "al-khor",
+  "lusail",
+  "mesaieed",
+  "dukhan",
+  "umm-salal",
+  // Oman
+  "muscat",
+  "ruwi",
+  "seeb",
+  "sohar",
+  "salalah",
+  "nizwa",
+  "ibri",
+  "sur",
+  // Saudi Arabia
+  "riyadh",
+  "jeddah",
+  "dammam",
+  "al-khobar",
+  "jubail",
+  "yanbu",
+  "makkah",
+  "madinah",
+  "al-ahsa",
+  // Kuwait
+  "kuwait-city",
+  "farwaniya",
+  "salmiya",
+  "hawally",
+  "fahaheel",
+  "mangaf",
+  "ahmadi",
+  // Bahrain
+  "manama",
+  "muharraq",
+  "riffa",
+  "sitra",
+  "isa-town",
+];
+
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date().toISOString();
 
@@ -11,6 +135,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified: now,
       changeFrequency: "weekly",
       priority: 1,
+    },
+    {
+      url: `${siteUrl}/coaching`,
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.9,
     },
     {
       url: `${siteUrl}/application`,
@@ -43,15 +173,85 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.8,
     },
     {
+      url: `${siteUrl}/premium`,
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.8,
+    },
+    {
+      url: `${siteUrl}/careers`,
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.85,
+    },
+    {
+      url: `${siteUrl}/alumni`,
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.9,
+    },
+    {
       url: `${siteUrl}/settings`,
+      lastModified: now,
+      changeFrequency: "yearly",
+      priority: 0.3,
+    },
+    // SEO Content Pages - High Priority for Organic Search
+    {
+      url: `${siteUrl}/nata-preparation-guide`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.95,
+    },
+    {
+      url: `${siteUrl}/jee-paper-2-preparation`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.95,
+    },
+    {
+      url: `${siteUrl}/best-books-nata-jee`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.9,
+    },
+    {
+      url: `${siteUrl}/previous-year-papers`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.9,
+    },
+    {
+      url: `${siteUrl}/how-to-score-150-in-nata`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.9,
+    },
+    // Legal & Policy Pages
+    {
+      url: `${siteUrl}/privacy`,
+      lastModified: now,
+      changeFrequency: "yearly",
+      priority: 0.3,
+    },
+    {
+      url: `${siteUrl}/terms`,
       lastModified: now,
       changeFrequency: "yearly",
       priority: 0.3,
     },
   ];
 
+  // City-specific coaching pages - high priority for local SEO
+  const cityPages: MetadataRoute.Sitemap = cities.map((city) => ({
+    url: `${siteUrl}/coaching/${city}`,
+    lastModified: now,
+    changeFrequency: "weekly",
+    priority: 0.85,
+  }));
+
   // Exclude private/auth/profile routes from sitemap
   // (They'll be reachable if a user is logged in, but we don't advertise them to crawlers.)
 
-  return routes;
+  return [...routes, ...cityPages];
 }

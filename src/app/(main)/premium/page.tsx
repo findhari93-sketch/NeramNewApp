@@ -9,6 +9,13 @@ import CircularProgress from "@mui/material/CircularProgress";
 import Button from "@mui/material/Button";
 import Paper from "@mui/material/Paper";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import {
+  getProductSchema,
+  getBreadcrumbSchema,
+  renderJsonLd,
+} from "@/lib/schema";
+import Footer from "../../components/shared/Footer/footer";
+import HeroWaves from "../homepage/sections/Hero/HeroWaves";
 
 function PremiumContent({
   searchParams,
@@ -113,11 +120,40 @@ function PremiumContent({
 
 export default function PremiumPage() {
   const router = useRouter();
+  const productSchema = getProductSchema({
+    name: "Neram Classes Premium Subscription",
+    description:
+      "Get access to all premium features, courses, and study materials for architecture entrance exam preparation",
+    price: "999",
+    currency: "INR",
+  });
+  const breadcrumbSchema = getBreadcrumbSchema([
+    { name: "Home", url: "/" },
+    { name: "Premium", url: "/premium" },
+  ]);
+
   return (
-    <SafeSearchParams>
-      {(searchParams) => (
-        <PremiumContent searchParams={searchParams} router={router} />
-      )}
-    </SafeSearchParams>
+    <>
+      {/* Schema Markup for Premium Page */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={renderJsonLd(productSchema)}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={renderJsonLd(breadcrumbSchema)}
+      />
+      <SafeSearchParams>
+        {(searchParams) => (
+          <PremiumContent searchParams={searchParams} router={router} />
+        )}
+      </SafeSearchParams>
+
+      {/* Footer Section */}
+      <Box sx={{ position: "relative" }}>
+        <HeroWaves position="top" bgcolor="#fff" />
+        <Footer />
+      </Box>
+    </>
   );
 }

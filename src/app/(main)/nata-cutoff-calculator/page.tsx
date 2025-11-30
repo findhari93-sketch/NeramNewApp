@@ -18,10 +18,22 @@ import NataCutoffCalculator from "./components/nataCutoffCalculator";
 import { auth } from "../../../lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { useRouter } from "next/navigation";
+import { getSoftwareApplicationSchema, getBreadcrumbSchema, renderJsonLd } from "@/lib/schema";
 
 export default function NataCutoffCalculatorPage() {
   const router = useRouter();
   const [loginPromptOpen, setLoginPromptOpen] = useState(false);
+
+  const softwareSchema = getSoftwareApplicationSchema({
+    name: "NATA Cutoff Calculator",
+    description: "Free online NATA (National Aptitude Test in Architecture) cutoff calculator to predict your college admission chances based on your scores",
+    url: "/nata-cutoff-calculator",
+    applicationCategory: "EducationalApplication",
+  });
+  const breadcrumbSchema = getBreadcrumbSchema([
+    { name: "Home", url: "/" },
+    { name: "NATA Cutoff Calculator", url: "/nata-cutoff-calculator" }
+  ]);
 
   useEffect(() => {
     const current = auth.currentUser;
@@ -38,6 +50,15 @@ export default function NataCutoffCalculatorPage() {
 
   return (
     <Suspense fallback={null}>
+      {/* Schema Markup for Calculator Tool */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={renderJsonLd(softwareSchema)}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={renderJsonLd(breadcrumbSchema)}
+      />
       <Box
         sx={{
           minHeight: "100dvh",

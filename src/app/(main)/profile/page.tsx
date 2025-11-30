@@ -46,6 +46,7 @@ import {
   getFieldsForEducationType,
   CACHE_CONFIG,
 } from "@/config/profileSchema";
+import { getProfilePageSchema, getBreadcrumbSchema, renderJsonLd } from "@/lib/schema";
 
 // DrawerState type for component state
 
@@ -2827,15 +2828,36 @@ function ProfilePageInner() {
 }
 
 export default function ProfilePage() {
+  const profileSchema = getProfilePageSchema({
+    name: "User Profile - Neram Classes",
+    description: "Manage your Neram Classes profile, settings, and account information",
+    url: "/profile",
+  });
+  const breadcrumbSchema = getBreadcrumbSchema([
+    { name: "Home", url: "/" },
+    { name: "Profile", url: "/profile" }
+  ]);
+
   return (
-    <Suspense
-      fallback={
-        <Container maxWidth="sm" sx={{ textAlign: "center" }}>
-          <CircularProgress />
-        </Container>
-      }
-    >
-      <ProfilePageInner />
-    </Suspense>
+    <>
+      {/* Schema Markup for Profile Page */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={renderJsonLd(profileSchema)}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={renderJsonLd(breadcrumbSchema)}
+      />
+      <Suspense
+        fallback={
+          <Container maxWidth="sm" sx={{ textAlign: "center" }}>
+            <CircularProgress />
+          </Container>
+        }
+      >
+        <ProfilePageInner />
+      </Suspense>
+    </>
   );
 }
