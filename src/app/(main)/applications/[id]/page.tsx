@@ -13,13 +13,22 @@ import {
   CircularProgress,
   Container,
   Divider,
-  Grid as MUIGrid,
+  Stack,
+  Tooltip,
+  Avatar,
 } from "@mui/material";
+import Grid from "@mui/material/Grid";
+const MUIGrid: any = Grid;
 import {
   CheckCircle as CheckCircleIcon,
   Pending as PendingIcon,
   Error as ErrorIcon,
   Payment as PaymentIcon,
+  CalendarMonth as CalendarMonthIcon,
+  School as SchoolIcon,
+  Person as PersonIcon,
+  Phone as PhoneIcon,
+  AssignmentTurnedIn as AssignmentIcon,
 } from "@mui/icons-material";
 
 type Props = {
@@ -96,144 +105,146 @@ export default function ApplicationDetail({ params }: Props) {
 
   async function createPayment() {
     try {
-      const res = await fetch(`/api/applications/${id}/payment`, {
+      if (!id) return;
+      const res = await fetch(`/api/applications/${id}/payment-token`, {
         method: "POST",
+        credentials: "include",
       });
-      const payload = await res.json();
-      if (payload?.payment_url) window.location.href = payload.payment_url;
+      const json = await res.json().catch(() => null);
+      if (json?.payUrl) {
+        window.location.href = json.payUrl;
+        return;
+      }
+      if (json?.token) {
+        const origin = window.location.origin.replace(/\/$/, "");
+        window.location.href = `${origin}/pay?v=${json.token}&type=razorpay`;
+        return;
+      }
+      console.error("Payment token generation failed", json);
     } catch (err) {
-      console.error("Failed to create payment", err);
+      console.error("Failed to start payment", err);
     }
   }
 
-  const categorizeData = (data: Record<string, any>) => {
-    const sections: Record<string, Array<[string, any]>> = {
-      "Personal Information": [],
-      "Course Details": [],
-      "Contact Information": [],
-      "Address Details": [],
-      "Education Details": [],
-      "Other Details": [],
-    };
+  const appData = app.data && typeof app.data === "object" ? app.data : {};
 
-    const personalKeys = [
-      "studentName",
-      "student_name",
-      "fatherName",
-      "father_name",
-      "gender",
-      "dob",
-      "dateOfBirth",
-      "age",
-    ];
-    const courseKeys = [
-      "course",
-      "selectedCourse",
-      "selected_course",
-      "softwareCourse",
-      "software_course",
-      "batch",
-      "program",
-    ];
-    const contactKeys = [
-      "email",
-      "phone",
-      "mobile",
-      "altPhone",
-      "alt_phone",
-      "instagram",
-      "instagramId",
-      "instagram_handle",
-    ];
-    const addressKeys = [
-      "address",
-      "city",
-      "state",
-      "country",
-      "zipCode",
-      "zip_code",
-      "pincode",
-    ];
-    const educationKeys = [
-      "school",
-      "schoolName",
-      "school_name",
-      "college",
-      "collegeName",
-      "college_name",
-      "collegeYear",
-      "college_year",
-      "diploma",
-      "diplomaCourse",
-      "diploma_course",
-      "diplomaYear",
-      "diploma_year",
-      "diplomaCollege",
-      "diploma_college",
-      "board",
-      "boardYear",
-      "board_year",
-      "educationType",
-      "education_type",
-      "classGrade",
-      "class_grade",
-      "standard",
-      "schoolStd",
-      "school_std",
-      "otherDescription",
-      "other_description",
-    ];
-
-    for (const [key, value] of Object.entries(data)) {
-      const lowerKey = key.toLowerCase();
-      let placed = false;
-
-      if (
-        personalKeys.some((pk) => lowerKey.includes(pk.toLowerCase())) ||
-        lowerKey.includes("name")
-      ) {
-        sections["Personal Information"].push([key, value]);
-        placed = true;
-      } else if (courseKeys.some((ck) => lowerKey.includes(ck.toLowerCase()))) {
-        sections["Course Details"].push([key, value]);
-        placed = true;
-      } else if (
-        contactKeys.some((ck) => lowerKey.includes(ck.toLowerCase())) ||
-        lowerKey.includes("email") ||
-        lowerKey.includes("phone")
-      ) {
-        sections["Contact Information"].push([key, value]);
-        placed = true;
-      } else if (
-        addressKeys.some((ak) => lowerKey.includes(ak.toLowerCase())) ||
-        lowerKey.includes("address") ||
-        lowerKey.includes("city") ||
-        lowerKey.includes("state")
-      ) {
-        sections["Address Details"].push([key, value]);
-        placed = true;
-      } else if (
-        educationKeys.some((ek) => lowerKey.includes(ek.toLowerCase())) ||
-        lowerKey.includes("school") ||
-        lowerKey.includes("college") ||
-        lowerKey.includes("education")
-      ) {
-        sections["Education Details"].push([key, value]);
-        placed = true;
-      }
-
-      if (!placed) {
-        sections["Other Details"].push([key, value]);
-      }
+  const readValue = (obj: Record<string, any>, path: string) => {
+    if (!path) return null;
+    if (path.includes(".")) {
+      return path.split(".").reduce<any>((acc, key) => {
+        if (acc && typeof acc === "object") return acc[key];
+        return undefined;
+      }, obj);
     }
-
-    return Object.fromEntries(
-      Object.entries(sections).filter(([, items]) => items.length > 0)
-    );
+    return obj[path];
   };
 
-  const appData = app.data && typeof app.data === "object" ? app.data : {};
-  const sections = categorizeData(appData);
+  const resolveField = (keys: string[]) => {
+    for (const key of keys) {
+      const value = readValue(appData, key);
+      if (value !== undefined && value !== null && value !== "") {
+        return value;
+      }
+    }
+    return null;
+  };
+
+  const SECTION_CONFIG: Array<{
+    title: string;
+    icon: React.ReactNode;
+    fields: Array<{
+      label: string;
+      keys: string[];
+      format?: (val: any) => string;
+    }>;
+  }> = [
+    {
+      title: "Applicant Snapshot",
+      icon: <PersonIcon fontSize="small" />,
+      fields: [
+        { label: "Student Name", keys: ["student_name", "studentName"] },
+        { label: "Email", keys: ["email", "contact.email"] },
+        { label: "Phone", keys: ["phone", "contact.phone"] },
+        { label: "City", keys: ["city", "contact.city"] },
+        { label: "State", keys: ["state", "contact.state"] },
+        {
+          label: "Date of Birth",
+          keys: ["dob", "dateOfBirth"],
+          format: (val) => new Date(val).toLocaleDateString("en-IN"),
+        },
+      ],
+    },
+    {
+      title: "Course Preferences",
+      icon: <AssignmentIcon fontSize="small" />,
+      fields: [
+        {
+          label: "Selected Course",
+          keys: ["selected_course", "selectedCourse", "course"],
+        },
+        { label: "Program", keys: ["program"] },
+        { label: "Batch", keys: ["batch"] },
+        {
+          label: "Attempt Year",
+          keys: ["nata_attempt_year", "nataAttemptYear"],
+        },
+        {
+          label: "Software Course",
+          keys: ["software_course", "softwareCourse"],
+        },
+      ],
+    },
+    {
+      title: "Parent / Guardian",
+      icon: <PhoneIcon fontSize="small" />,
+      fields: [
+        { label: "Father Name", keys: ["father_name", "fatherName"] },
+        {
+          label: "Guardian Contact",
+          keys: ["alternate_phone", "altPhone", "guardian_phone"],
+        },
+        {
+          label: "Instagram Handle",
+          keys: ["instagram_handle", "instagramId"],
+        },
+      ],
+    },
+    {
+      title: "Education Details",
+      icon: <SchoolIcon fontSize="small" />,
+      fields: [
+        { label: "Education Type", keys: ["education_type", "educationType"] },
+        {
+          label: "School / College",
+          keys: ["school_name", "college_name", "school", "college"],
+        },
+        { label: "Board", keys: ["board"] },
+        { label: "Year", keys: ["board_year", "college_year", "school_year"] },
+        { label: "Diploma", keys: ["diploma_course", "diplomaCourse"] },
+      ],
+    },
+  ];
+
+  const sectionBlocks = SECTION_CONFIG.map((section) => {
+    const resolvedFields = section.fields
+      .map((field) => {
+        const value = resolveField(field.keys);
+        if (!value) return null;
+        return {
+          label: field.label,
+          value: field.format ? field.format(value) : value,
+        };
+      })
+      .filter(Boolean) as Array<{ label: string; value: React.ReactNode }>;
+
+    return resolvedFields.length > 0
+      ? { ...section, fields: resolvedFields }
+      : null;
+  }).filter(Boolean) as Array<{
+    title: string;
+    icon: React.ReactNode;
+    fields: Array<{ label: string; value: React.ReactNode }>;
+  }>;
 
   const getStatusChip = (status: string) => {
     const normalized = String(status || "pending").toLowerCase();
@@ -285,131 +296,184 @@ export default function ApplicationDetail({ params }: Props) {
     normalized.includes("approve") || normalized.includes("accept");
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Box sx={{ mb: 3 }}>
-        <Typography
-          variant="h6"
-          sx={{ color: "text.secondary", mb: 2, fontWeight: 600 }}
-        >
-          {`Application No: ${applicationNumber}`}
-        </Typography>
-        <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
-          <Chip
-            label={`Status: ${app.status || "Pending"}`}
-            color={statusChip.color}
-            icon={statusChip.icon}
-            variant="outlined"
-            sx={{ fontWeight: 500 }}
-          />
-          <Chip
-            label={`Payment: ${app.payment_status || "Pending"}`}
-            color={paymentChip.color}
-            icon={paymentChip.icon}
-            variant="outlined"
-            sx={{ fontWeight: 500 }}
-          />
-        </Box>
-      </Box>
-
-      <Divider sx={{ mb: 3 }} />
-
-      <MUIGrid container spacing={3}>
-        {Object.entries(sections).map(([sectionTitle, items]) => (
-          <MUIGrid size={{ xs: 12, md: 6 }} key={sectionTitle}>
-            <Card
-              elevation={0}
-              sx={{
-                border: "1px solid",
-                borderColor: "divider",
-                borderRadius: 2,
-                height: "100%",
-              }}
-            >
-              <CardContent>
-                <Typography
-                  variant="h6"
-                  sx={{
-                    fontWeight: 600,
-                    mb: 2,
-                    color: "primary.main",
-                    fontSize: "1.1rem",
-                  }}
-                >
-                  {sectionTitle}
-                </Typography>
-                <Box
-                  sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}
-                >
-                  {items.map(([key, value]) => (
-                    <Box key={key}>
-                      <Typography
-                        variant="caption"
-                        sx={{
-                          color: "text.secondary",
-                          textTransform: "uppercase",
-                          fontWeight: 600,
-                          letterSpacing: 0.5,
-                          fontSize: "0.7rem",
-                        }}
-                      >
-                        {key.replace(/_/g, " ")}
-                      </Typography>
-                      <Typography
-                        variant="body1"
-                        sx={{ color: "text.primary", mt: 0.5 }}
-                      >
-                        {value !== null && value !== undefined
-                          ? String(value)
-                          : "—"}
-                      </Typography>
-                    </Box>
-                  ))}
-                </Box>
-              </CardContent>
-            </Card>
-          </MUIGrid>
-        ))}
-      </MUIGrid>
-
-      <Box
-        sx={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "flex-end",
-          mt: 4,
-          gap: 1,
-        }}
-      >
-        <Button
-          variant="contained"
-          color="primary"
-          size="large"
-          startIcon={<PaymentIcon />}
-          onClick={createPayment}
-          disabled={!isApproved}
+    <Container maxWidth="lg" sx={{ py: { xs: 3, md: 5 } }}>
+      <Stack spacing={3}>
+        <Card
           sx={{
-            textTransform: "none",
-            fontWeight: 600,
-            px: 4,
-            py: 1.5,
-            borderRadius: 2,
-            boxShadow: isApproved ? 2 : 0,
-            "&:hover": {
-              boxShadow: isApproved ? 4 : 0,
-            },
+            background: "linear-gradient(135deg, #6a11cb 0%, #2575fc 100%)",
+            color: "#fff",
+            borderRadius: 3,
           }}
         >
-          Complete Payment
-        </Button>
-        {!isApproved && (
-          <Typography
-            variant="body2"
-            sx={{ color: "text.secondary", textAlign: "right" }}
+          <CardContent>
+            <Stack
+              direction={{ xs: "column", md: "row" }}
+              justifyContent="space-between"
+              alignItems={{ xs: "flex-start", md: "center" }}
+              spacing={2}
+            >
+              <Box>
+                <Typography variant="overline" sx={{ opacity: 0.8 }}>
+                  Application Number
+                </Typography>
+                <Typography variant="h5" sx={{ fontWeight: 700 }}>
+                  {applicationNumber}
+                </Typography>
+                <Stack direction="row" spacing={1} mt={2} flexWrap="wrap">
+                  <Chip
+                    label={`Status: ${app.status || "Pending"}`}
+                    color={statusChip.color}
+                    icon={statusChip.icon}
+                    sx={{
+                      backgroundColor: "rgba(255,255,255,0.15)",
+                      color: "#fff",
+                    }}
+                  />
+                  <Chip
+                    label={`Payment: ${app.payment_status || "Pending"}`}
+                    color={paymentChip.color}
+                    icon={paymentChip.icon}
+                    sx={{
+                      backgroundColor: "rgba(255,255,255,0.15)",
+                      color: "#fff",
+                    }}
+                  />
+                </Stack>
+              </Box>
+              <Stack direction="row" spacing={3}>
+                {[
+                  {
+                    label: "Submitted",
+                    value: app.created_at || app.submitted_at || app.createdAt,
+                    icon: <CalendarMonthIcon fontSize="small" />,
+                  },
+                  {
+                    label: "Approval",
+                    value: app.approved_at || app.approvedAt,
+                    icon: <CheckCircleIcon fontSize="small" />,
+                  },
+                ].map((stat) => (
+                  <Box key={stat.label} textAlign="right">
+                    <Typography variant="caption" sx={{ opacity: 0.8 }}>
+                      {stat.label}
+                    </Typography>
+                    <Stack direction="row" alignItems="center" spacing={0.5}>
+                      {stat.icon}
+                      <Typography sx={{ fontWeight: 600 }}>
+                        {stat.value
+                          ? new Date(stat.value).toLocaleDateString("en-IN")
+                          : "—"}
+                      </Typography>
+                    </Stack>
+                  </Box>
+                ))}
+              </Stack>
+            </Stack>
+          </CardContent>
+        </Card>
+
+        <MUIGrid container spacing={2}>
+          {sectionBlocks.length === 0 && (
+            <MUIGrid size={{ xs: 12 }}>
+              <Card variant="outlined">
+                <CardContent>
+                  <Typography color="text.secondary">
+                    We couldn’t find structured data for this application.
+                  </Typography>
+                </CardContent>
+              </Card>
+            </MUIGrid>
+          )}
+          {sectionBlocks.map((section) => (
+            <MUIGrid size={{ xs: 12, md: 6 }} key={section.title}>
+              <Card variant="outlined" sx={{ height: "100%", borderRadius: 2 }}>
+                <CardContent>
+                  <Stack direction="row" spacing={1} alignItems="center" mb={2}>
+                    <Avatar
+                      sx={{
+                        bgcolor: "primary.light",
+                        width: 32,
+                        height: 32,
+                        color: "primary.dark",
+                      }}
+                    >
+                      {section.icon}
+                    </Avatar>
+                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                      {section.title}
+                    </Typography>
+                  </Stack>
+                  <Stack spacing={1.5}>
+                    {section.fields.map((field) => (
+                      <Box key={field.label}>
+                        <Typography
+                          variant="caption"
+                          sx={{ color: "text.secondary", letterSpacing: 0.4 }}
+                        >
+                          {field.label}
+                        </Typography>
+                        <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                          {field.value || "—"}
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Stack>
+                </CardContent>
+              </Card>
+            </MUIGrid>
+          ))}
+        </MUIGrid>
+
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-end",
+            mt: 4,
+            gap: 1,
+          }}
+        >
+          <Tooltip
+            title={
+              isApproved
+                ? "Proceed to Razorpay secure checkout"
+                : "Approval pending. Payment will be enabled once admin approves."
+            }
           >
-            Wait for admin approval or contact 9176137043 for reminder
-          </Typography>
-        )}
-      </Box>
+            <span>
+              <Button
+                variant="contained"
+                color="primary"
+                size="large"
+                startIcon={<PaymentIcon />}
+                onClick={createPayment}
+                disabled={!isApproved}
+                sx={{
+                  textTransform: "none",
+                  fontWeight: 600,
+                  px: 4,
+                  py: 1.5,
+                  borderRadius: 2,
+                  boxShadow: isApproved ? 2 : 0,
+                  "&:hover": {
+                    boxShadow: isApproved ? 4 : 0,
+                  },
+                }}
+              >
+                Complete Payment
+              </Button>
+            </span>
+          </Tooltip>
+          {!isApproved && (
+            <Typography
+              variant="body2"
+              sx={{ color: "text.secondary", textAlign: "right" }}
+            >
+              Wait for admin approval or contact 9176137043 for reminder
+            </Typography>
+          )}
+        </Box>
+      </Stack>
     </Container>
   );
 }

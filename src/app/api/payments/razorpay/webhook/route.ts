@@ -21,6 +21,12 @@ export const runtime = "nodejs";
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { createClient } from "@supabase/supabase-js";
+import { renderInvoicePdf } from "@/lib/invoice";
+import {
+  getGraphToken,
+  sendEmailWithAttachment,
+  generateInvoiceEmailHTML,
+} from "@/lib/emailService";
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -29,6 +35,141 @@ const supabase = createClient(
 
 function log(msg: string, extra?: any) {
   console.log(`[razorpay:webhook] ${msg}`, extra ?? "");
+}
+
+/**
+ * Create notification in notifications table
+ */
+async function createNotification(params: {
+  userId: string;
+  type:
+    | "payment_completed"
+    | "payment_failed"
+    | "payment_pending"
+    | "user_registered";
+  title: string;
+  message: string;
+  data?: any;
+  priority?: "low" | "normal" | "high" | "urgent";
+}) {
+  try {
+    const { error } = await supabase.from("notifications").insert({
+      user_id: params.userId,
+      notification_type: params.type,
+      title: params.title,
+      message: params.message,
+      data: params.data || {},
+      priority: params.priority || "normal",
+      is_read: false,
+    });
+
+    if (error) {
+      log("⚠️ Failed to create notification", { error, userId: params.userId });
+    } else {
+      log("✅ Notification created", {
+        userId: params.userId,
+        type: params.type,
+      });
+    }
+  } catch (err) {
+    log("❌ Error creating notification", err);
+  }
+}
+
+/**
+ * Send payment confirmation email with PDF invoice
+ */
+async function sendPaymentConfirmationEmail(params: {
+  userEmail: string;
+  studentName: string;
+  courseName: string;
+  amountPaid: number;
+  paymentId: string;
+  orderId: string;
+  paymentDate: string;
+}) {
+  try {
+    // Generate invoice number (e.g., INV-2025-001234)
+    const invoiceNumber = `INV-${new Date(
+      params.paymentDate
+    ).getFullYear()}-${params.paymentId.substring(4, 10).toUpperCase()}`;
+
+    // Generate PDF invoice
+    const pdfBytes = await renderInvoicePdf({
+      studentName: params.studentName,
+      email: params.userEmail,
+      course: params.courseName,
+      orderId: params.orderId,
+      paymentId: params.paymentId,
+      amount: params.amountPaid,
+      currency: "INR",
+      issuedAt: params.paymentDate,
+    });
+
+    // Get Microsoft Graph token
+    const graphToken = await getGraphToken();
+    if (!graphToken) {
+      log("⚠️ Cannot send email: Graph token not available");
+      return;
+    }
+
+    // Generate email HTML
+    const emailHTML = generateInvoiceEmailHTML({
+      studentName: params.studentName,
+      courseName: params.courseName,
+      amountPaid: params.amountPaid,
+      paymentId: params.paymentId,
+      invoiceNumber,
+      paymentDate: params.paymentDate,
+    });
+
+    // Send email with PDF attachment
+    await sendEmailWithAttachment(
+      graphToken,
+      params.userEmail,
+      `Payment Successful - Invoice ${invoiceNumber}`,
+      emailHTML,
+      Buffer.from(pdfBytes),
+      `Invoice_${invoiceNumber}.pdf`
+    );
+
+    log("✅ Payment confirmation email sent", {
+      email: params.userEmail,
+      invoiceNumber,
+    });
+  } catch (err) {
+    log("❌ Error sending payment confirmation email", err);
+  }
+}
+
+/**
+ * Get admin user IDs for notifications
+ */
+async function getAdminUserIds(): Promise<string[]> {
+  try {
+    // Query users_duplicate for admin users (adjust role field as needed)
+    const { data: admins } = await supabase
+      .from("users_duplicate")
+      .select("id")
+      .eq("account->>role", "admin")
+      .limit(10);
+
+    if (admins && admins.length > 0) {
+      return admins.map((a) => a.id);
+    }
+
+    // Fallback: Get first user as admin if no role-based admins found
+    const { data: fallbackAdmin } = await supabase
+      .from("users_duplicate")
+      .select("id")
+      .limit(1)
+      .single();
+
+    return fallbackAdmin ? [fallbackAdmin.id] : [];
+  } catch (err) {
+    log("⚠️ Error getting admin users", err);
+    return [];
+  }
 }
 
 export async function POST(req: Request) {
@@ -261,6 +402,97 @@ export async function POST(req: Request) {
       amount: paymentDetails.amount,
       method: entity.method,
     });
+
+    // Send email and notifications for successful payments
+    if (newPaymentStatus === "paid") {
+      // Extract user details from application
+      const basic = appDetails.basic || {};
+      const contact = appDetails.contact || {};
+      const studentName = basic.student_name || basic.name || "Student";
+      const userEmail = contact.email || entity.email || "";
+
+      const courseName =
+        appDetails.course_name || appDetails.program || "NATA/JEE Coaching";
+
+      // Send payment confirmation email with PDF invoice
+      if (userEmail) {
+        await sendPaymentConfirmationEmail({
+          userEmail,
+          studentName,
+          courseName,
+          amountPaid: paymentDetails.amount || 0,
+          paymentId,
+          orderId,
+          paymentDate: paymentDetails.webhook_received_at,
+        });
+      }
+
+      // Create user notification
+      await createNotification({
+        userId: applicationId,
+        type: "payment_completed",
+        title: "Payment Successful",
+        message: `Your payment of ₹${paymentDetails.amount?.toLocaleString(
+          "en-IN"
+        )} has been received successfully. Invoice sent to your email.`,
+        data: {
+          payment_id: paymentId,
+          order_id: orderId,
+          amount: paymentDetails.amount,
+          method: entity.method,
+          payment_date: paymentDetails.webhook_received_at,
+        },
+        priority: "high",
+      });
+
+      // Create admin notifications
+      const adminIds = await getAdminUserIds();
+      for (const adminId of adminIds) {
+        await createNotification({
+          userId: adminId,
+          type: "payment_completed",
+          title: "New Payment Received",
+          message: `${studentName} completed payment of ₹${paymentDetails.amount?.toLocaleString(
+            "en-IN"
+          )} via ${entity.method || "online"}.`,
+          data: {
+            student_name: studentName,
+            student_email: userEmail,
+            application_id: applicationId,
+            payment_id: paymentId,
+            order_id: orderId,
+            amount: paymentDetails.amount,
+            method: entity.method,
+            payment_date: paymentDetails.webhook_received_at,
+          },
+          priority: "high",
+        });
+      }
+
+      log("✅ Email and notifications sent for successful payment");
+    }
+
+    // Create notifications for failed payments
+    if (newPaymentStatus === "failed") {
+      await createNotification({
+        userId: applicationId,
+        type: "payment_failed",
+        title: "Payment Failed",
+        message: `Your payment attempt failed. ${
+          entity.error_description || "Please try again."
+        }`,
+        data: {
+          payment_id: paymentId,
+          order_id: orderId,
+          amount: paymentDetails.amount,
+          error_code: entity.error_code,
+          error_description: entity.error_description,
+        },
+        priority: "high",
+      });
+
+      log("✅ Notification created for failed payment");
+    }
 
     return NextResponse.json({
       ok: true,

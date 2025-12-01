@@ -46,7 +46,11 @@ import {
   getFieldsForEducationType,
   CACHE_CONFIG,
 } from "@/config/profileSchema";
-import { getProfilePageSchema, getBreadcrumbSchema, renderJsonLd } from "@/lib/schema";
+import {
+  getProfilePageSchema,
+  getBreadcrumbSchema,
+  renderJsonLd,
+} from "@/lib/schema";
 
 // DrawerState type for component state
 
@@ -187,15 +191,20 @@ function ProfilePageInner() {
   const [reauthenticated, setReauthenticated] = React.useState(false);
 
   // Set Password dialog state (for Google users without password)
-  const [setPasswordDialogOpen, setSetPasswordDialogOpen] = React.useState(false);
+  const [setPasswordDialogOpen, setSetPasswordDialogOpen] =
+    React.useState(false);
   const [setPasswordLoading, setSetPasswordLoading] = React.useState(false);
   const [setPasswordUsername, setSetPasswordUsername] = React.useState("");
   const [setPasswordNew, setSetPasswordNew] = React.useState("");
   const [setPasswordConfirm, setSetPasswordConfirm] = React.useState("");
-  const [setPasswordError, setSetPasswordError] = React.useState<string | null>(null);
+  const [setPasswordError, setSetPasswordError] = React.useState<string | null>(
+    null
+  );
   const [showPassword, setShowPassword] = React.useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
-  const [usernameAvailable, setUsernameAvailable] = React.useState<boolean | null>(null);
+  const [usernameAvailable, setUsernameAvailable] = React.useState<
+    boolean | null
+  >(null);
   const [checkingUsername, setCheckingUsername] = React.useState(false);
 
   const { control, handleSubmit, reset } = useForm<Record<string, any>>({
@@ -1037,8 +1046,15 @@ function ProfilePageInner() {
       }
     };
 
-    window.addEventListener("neram:googleAuthComplete", handleGoogleAuthComplete);
-    return () => window.removeEventListener("neram:googleAuthComplete", handleGoogleAuthComplete);
+    window.addEventListener(
+      "neram:googleAuthComplete",
+      handleGoogleAuthComplete
+    );
+    return () =>
+      window.removeEventListener(
+        "neram:googleAuthComplete",
+        handleGoogleAuthComplete
+      );
   }, [writeUserCache, setUser]);
 
   React.useEffect(() => {
@@ -1425,7 +1441,9 @@ function ProfilePageInner() {
                             variant="contained"
                             size="small"
                             onClick={() => {
-                              setSetPasswordUsername((user as any)?.username || "");
+                              setSetPasswordUsername(
+                                (user as any)?.username || ""
+                              );
                               setSetPasswordDialogOpen(true);
                             }}
                             aria-label="set-password"
@@ -1448,11 +1466,29 @@ function ProfilePageInner() {
                       >
                         Account Type:
                       </Typography>
-                      <Typography variant="body2">
-                        {(user as any)?.accountType ||
-                          (user as any)?.account_type ||
-                          "Free"}
-                      </Typography>
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                      >
+                        <Typography variant="body2">
+                          {(user as any)?.accountType ||
+                            (user as any)?.account_type ||
+                            "Free"}
+                        </Typography>
+                        {((user as any)?.payment_status === "paid" ||
+                          (user as any)?.accountType ===
+                            "Paid Premium Student") && (
+                          <Chip
+                            label="Premium"
+                            size="small"
+                            sx={{
+                              backgroundColor: "#4caf50",
+                              color: "white",
+                              fontWeight: "bold",
+                              fontSize: "0.7rem",
+                            }}
+                          />
+                        )}
+                      </Box>
                     </Stack>
 
                     {/* account type */}
@@ -2462,7 +2498,8 @@ function ProfilePageInner() {
             Create Username & Password
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            Set up login credentials for easier access without Google authentication
+            Set up login credentials for easier access without Google
+            authentication
           </Typography>
         </DialogTitle>
         <DialogContent sx={{ pt: 2 }}>
@@ -2476,7 +2513,9 @@ function ProfilePageInner() {
                 name="username"
                 value={setPasswordUsername}
                 onChange={(e) => {
-                  const value = e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "");
+                  const value = e.target.value
+                    .toLowerCase()
+                    .replace(/[^a-z0-9_]/g, "");
                   setSetPasswordUsername(value);
                   setUsernameAvailable(null);
                 }}
@@ -2496,11 +2535,15 @@ function ProfilePageInner() {
                   endAdornment: checkingUsername ? (
                     <CircularProgress size={20} sx={{ mr: 1 }} />
                   ) : usernameAvailable === true ? (
-                    <Typography sx={{ mr: 1, color: "success.main", fontSize: 20 }}>
+                    <Typography
+                      sx={{ mr: 1, color: "success.main", fontSize: 20 }}
+                    >
                       ✓
                     </Typography>
                   ) : usernameAvailable === false ? (
-                    <Typography sx={{ mr: 1, color: "error.main", fontSize: 20 }}>
+                    <Typography
+                      sx={{ mr: 1, color: "error.main", fontSize: 20 }}
+                    >
                       ✗
                     </Typography>
                   ) : null,
@@ -2540,14 +2583,24 @@ function ProfilePageInner() {
                       sx={{ mr: 0.5 }}
                     >
                       {showPassword ? (
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                        <svg
+                          width="20"
+                          height="20"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                        >
                           <path
                             d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"
                             fill="currentColor"
                           />
                         </svg>
                       ) : (
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                        <svg
+                          width="20"
+                          height="20"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                        >
                           <path
                             d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"
                             fill="currentColor"
@@ -2559,7 +2612,11 @@ function ProfilePageInner() {
                 }}
               />
               {setPasswordNew && setPasswordNew.length < 6 && (
-                <Typography variant="caption" color="warning.main" sx={{ mt: 0.5, display: "block" }}>
+                <Typography
+                  variant="caption"
+                  color="warning.main"
+                  sx={{ mt: 0.5, display: "block" }}
+                >
                   Password is too short (minimum 6 characters)
                 </Typography>
               )}
@@ -2581,7 +2638,8 @@ function ProfilePageInner() {
                   setPasswordNew !== setPasswordConfirm
                 }
                 helperText={
-                  setPasswordConfirm.length > 0 && setPasswordNew !== setPasswordConfirm
+                  setPasswordConfirm.length > 0 &&
+                  setPasswordNew !== setPasswordConfirm
                     ? "Passwords do not match"
                     : "Re-enter your password to confirm"
                 }
@@ -2589,20 +2647,32 @@ function ProfilePageInner() {
                   endAdornment: (
                     <IconButton
                       aria-label="toggle confirm password visibility"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      onClick={() =>
+                        setShowConfirmPassword(!showConfirmPassword)
+                      }
                       edge="end"
                       size="small"
                       sx={{ mr: 0.5 }}
                     >
                       {showConfirmPassword ? (
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                        <svg
+                          width="20"
+                          height="20"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                        >
                           <path
                             d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"
                             fill="currentColor"
                           />
                         </svg>
                       ) : (
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                        <svg
+                          width="20"
+                          height="20"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                        >
                           <path
                             d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"
                             fill="currentColor"
@@ -2666,7 +2736,10 @@ function ProfilePageInner() {
               setSetPasswordError(null);
 
               // Validation
-              if (!setPasswordUsername || setPasswordUsername.trim().length < 3) {
+              if (
+                !setPasswordUsername ||
+                setPasswordUsername.trim().length < 3
+              ) {
                 setSetPasswordError("Username must be at least 3 characters");
                 return;
               }
@@ -2697,7 +2770,9 @@ function ProfilePageInner() {
                 }
 
                 if (!current.email) {
-                  setSetPasswordError("Your account doesn't have an email address. Cannot create password login.");
+                  setSetPasswordError(
+                    "Your account doesn't have an email address. Cannot create password login."
+                  );
                   setSetPasswordLoading(false);
                   return;
                 }
@@ -2710,7 +2785,10 @@ function ProfilePageInner() {
                     username: trimmedUsername, // Send at top level - mapping function maps to account.username
                   };
 
-                  console.log("[set-password] Updating username:", trimmedUsername);
+                  console.log(
+                    "[set-password] Updating username:",
+                    trimmedUsername
+                  );
 
                   const usernameRes = await apiClient(`/api/users/upsert`, {
                     method: "POST",
@@ -2719,14 +2797,23 @@ function ProfilePageInner() {
                   });
 
                   if (!usernameRes || usernameRes.status >= 400) {
-                    const errorBody = await usernameRes?.json().catch(() => null);
-                    console.error("[set-password] Failed to save username:", errorBody);
-                    throw new Error(errorBody?.error || "Failed to set username");
+                    const errorBody = await usernameRes
+                      ?.json()
+                      .catch(() => null);
+                    console.error(
+                      "[set-password] Failed to save username:",
+                      errorBody
+                    );
+                    throw new Error(
+                      errorBody?.error || "Failed to set username"
+                    );
                   }
 
                   console.log("[set-password] Username saved successfully");
                 } catch (usernameErr: any) {
-                  setSetPasswordError(`Failed to set username: ${usernameErr.message}`);
+                  setSetPasswordError(
+                    `Failed to set username: ${usernameErr.message}`
+                  );
                   setSetPasswordLoading(false);
                   return;
                 }
@@ -2737,19 +2824,27 @@ function ProfilePageInner() {
                     current.email,
                     setPasswordNew
                   );
-                  console.log("[set-password] Linking password credential to account");
+                  console.log(
+                    "[set-password] Linking password credential to account"
+                  );
                   await linkWithCredential(current, credential);
-                  console.log("[set-password] Password credential linked successfully");
+                  console.log(
+                    "[set-password] Password credential linked successfully"
+                  );
 
                   // Force refresh Firebase auth state to get updated providerData
                   console.log("[set-password] Refreshing Firebase auth state");
                   await current.reload();
                   const refreshedUser = auth.currentUser;
-                  console.log("[set-password] Firebase user providers:", refreshedUser?.providerData);
+                  console.log(
+                    "[set-password] Firebase user providers:",
+                    refreshedUser?.providerData
+                  );
 
                   setToast({
                     open: true,
-                    message: "Username and password created successfully! You can now log in with your credentials.",
+                    message:
+                      "Username and password created successfully! You can now log in with your credentials.",
                     severity: "success",
                   });
 
@@ -2765,25 +2860,36 @@ function ProfilePageInner() {
 
                   // Refresh user data from database to get updated username
                   try {
-                    console.log("[set-password] Fetching updated user data from database");
+                    console.log(
+                      "[set-password] Fetching updated user data from database"
+                    );
                     const res = await apiClient(`/api/users/me`);
                     if (res && res.ok) {
                       const parsed = await res.json().catch(() => null);
-                      const dbUser = parsed && parsed.user ? parsed.user : parsed;
+                      const dbUser =
+                        parsed && parsed.user ? parsed.user : parsed;
                       if (dbUser) {
-                        console.log("[set-password] Updated user data:", { username: dbUser.username, providers: refreshedUser?.providerData });
+                        console.log("[set-password] Updated user data:", {
+                          username: dbUser.username,
+                          providers: refreshedUser?.providerData,
+                        });
                         setUser(dbUser);
                       }
                     }
                   } catch (fetchErr) {
-                    console.error("[set-password] Failed to fetch updated user:", fetchErr);
+                    console.error(
+                      "[set-password] Failed to fetch updated user:",
+                      fetchErr
+                    );
                   }
                 } catch (linkErr: any) {
                   let errorMsg = "Failed to create password login";
                   if (linkErr?.code === "auth/email-already-in-use") {
-                    errorMsg = "This email is already associated with password login";
+                    errorMsg =
+                      "This email is already associated with password login";
                   } else if (linkErr?.code === "auth/provider-already-linked") {
-                    errorMsg = "Password login is already set up for this account";
+                    errorMsg =
+                      "Password login is already set up for this account";
                   } else if (linkErr?.message) {
                     errorMsg = linkErr.message;
                   }
@@ -2830,12 +2936,13 @@ function ProfilePageInner() {
 export default function ProfilePage() {
   const profileSchema = getProfilePageSchema({
     name: "User Profile - Neram Classes",
-    description: "Manage your Neram Classes profile, settings, and account information",
+    description:
+      "Manage your Neram Classes profile, settings, and account information",
     url: "/profile",
   });
   const breadcrumbSchema = getBreadcrumbSchema([
     { name: "Home", url: "/" },
-    { name: "Profile", url: "/profile" }
+    { name: "Profile", url: "/profile" },
   ]);
 
   return (

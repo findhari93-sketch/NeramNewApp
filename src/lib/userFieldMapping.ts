@@ -212,6 +212,14 @@ export function mapFromUsersDuplicate(
   const contact = dbRow.contact || {};
   const aboutUser = dbRow.about_user || {};
   const education = dbRow.education || {};
+  const applicationDetails = dbRow.application_details || {};
+
+  // Determine account type based on payment status
+  const paymentStatus = applicationDetails.final_fee_payment?.payment_status;
+  const computedAccountType =
+    paymentStatus === "paid"
+      ? "Paid Premium Student"
+      : account.account_type || "Free";
 
   return {
     // Top-level fields
@@ -240,8 +248,8 @@ export function mapFromUsersDuplicate(
     emailVerified: account.email_verified,
     phone_verified: account.phone_verified,
     phoneVerified: account.phone_verified,
-    account_type: account.account_type,
-    accountType: account.account_type,
+    account_type: computedAccountType, // Computed based on payment status
+    accountType: computedAccountType, // Computed based on payment status
     last_sign_in: account.last_sign_in,
     lastSignIn: account.last_sign_in,
     providers: account.providers,
@@ -304,6 +312,16 @@ export function mapFromUsersDuplicate(
     other_description: education.other_description,
     otherDescription: education.other_description,
 
+    // Application details (flattened for easy access)
+    payment_status: applicationDetails.final_fee_payment?.payment_status,
+    paymentStatus: applicationDetails.final_fee_payment?.payment_status,
+    razorpay_payment_id:
+      applicationDetails.final_fee_payment?.razorpay_payment_id,
+    razorpayPaymentId:
+      applicationDetails.final_fee_payment?.razorpay_payment_id,
+    payment_at: applicationDetails.final_fee_payment?.payment_at,
+    paymentAt: applicationDetails.final_fee_payment?.payment_at,
+
     // Keep grouped objects for new code
     account,
     basic,
@@ -311,6 +329,8 @@ export function mapFromUsersDuplicate(
     about_user: aboutUser,
     aboutUser,
     education,
+    application_details: dbRow.application_details,
+    applicationDetails: dbRow.application_details,
 
     // Legacy profile shape
     profile: {

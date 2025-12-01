@@ -1366,6 +1366,11 @@ function LoginPageInner() {
     };
     const strength = computePasswordStrength(form.password);
 
+    // Hide email/username + password inputs entirely when already signed in.
+    if (authState.user && hasEmailOrGoogleAuth(authState.user)) {
+      return null;
+    }
+
     return (
       <Box
         component="form"
