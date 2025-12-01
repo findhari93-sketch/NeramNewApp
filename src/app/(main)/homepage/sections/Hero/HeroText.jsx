@@ -11,6 +11,7 @@ import InstagramIcon from "@mui/icons-material/Instagram";
 import { useTheme } from "@mui/material/styles";
 import { HilightBtn, MyButton } from "../../../../components/shared/Buttons";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 
 // MUI version of ClockText, ClockSubText, NormalText
 const textSx = {
@@ -88,6 +89,34 @@ export default function HeroText() {
           NATA Coaching
         </Box>
       </Typography>
+
+      {/* Microsoft Certified Badge */}
+      <Box
+        sx={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 1,
+          px: 2,
+          py: 1,
+          mt: 2,
+          mb: 1,
+          background: "linear-gradient(135deg, #0078D4 0%, #00BCF2 100%)",
+          borderRadius: 2,
+          color: "white",
+          fontSize: { xs: "0.75rem", md: "0.875rem" },
+          fontWeight: 600,
+          boxShadow: "0 4px 12px rgba(0,120,212,0.3)",
+        }}
+      >
+        <Image
+          src="/brand/microsoft-logo.png"
+          alt="Microsoft"
+          width={20}
+          height={20}
+          style={{ filter: "brightness(0) invert(1)" }}
+        />
+        Microsoft Certified Classroom
+      </Box>
 
       <Stack
         id="Social"

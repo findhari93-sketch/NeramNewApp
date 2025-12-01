@@ -198,6 +198,74 @@ export default function sitemap(): MetadataRoute.Sitemap {
     },
     // SEO Content Pages - High Priority for Organic Search
     {
+      url: `${siteUrl}/nata-coaching-online`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 1.0, // Highest priority - main transactional page
+    },
+    {
+      url: `${siteUrl}/jee-paper-2-coaching`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 1.0, // Highest priority - main transactional page
+    },
+    {
+      url: `${siteUrl}/nata-syllabus-subjects`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.95, // High priority - informational page
+    },
+    {
+      url: `${siteUrl}/nata-important-questions`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.9, // High priority - practice resource page
+    },
+    // Blog Pages
+    {
+      url: `${siteUrl}/blog`,
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.85, // High priority - content marketing hub
+    },
+    {
+      url: `${siteUrl}/blog/nata-2025-preparation-strategy`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.8, // Featured blog post
+    },
+    {
+      url: `${siteUrl}/blog/top-10-drawing-techniques-nata`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.8, // Featured blog post
+    },
+    // City-specific blog posts
+    {
+      url: `${siteUrl}/blog/best-nata-coaching-chennai-online`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.85, // High priority for city SEO
+    },
+    {
+      url: `${siteUrl}/blog/best-nata-coaching-coimbatore-online`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.85, // High priority for city SEO
+    },
+    {
+      url: `${siteUrl}/blog/best-nata-coaching-madurai-online`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.85, // High priority for city SEO
+    },
+    {
+      url: `${siteUrl}/blog/best-nata-coaching-trichy-online`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.85, // High priority for city SEO
+    },
+    {
       url: `${siteUrl}/nata-preparation-guide`,
       lastModified: now,
       changeFrequency: "monthly",

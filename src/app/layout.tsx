@@ -62,38 +62,59 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://example.com";
 
 export const metadata: Metadata = {
   title:
-    "Neram Classes - NATA & JEE B.Arch Coaching | Online & Offline in Tamil Nadu, Karnataka, UAE",
+    "Neram Classes - Best NATA & JEE B.Arch Coaching | Microsoft Certified Online Classes",
   description:
-    "Premier NATA & JEE B.Arch coaching offering online classes across India, UAE, Dubai, Oman, Saudi Arabia and offline coaching in Trichy, Chennai, Madurai, Coimbatore, Bangalore, Tiruppur. Expert architecture entrance exam preparation with proven results.",
+    "Top-ranked NATA & JEE B.Arch coaching by IIT/NIT architects. Microsoft certified online classes across India, UAE, Dubai, Qatar. Offline coaching in Trichy, Chennai, Bangalore, Coimbatore. AIR 1 results. 500+ practice questions. Enroll now!",
   metadataBase: new URL(siteUrl),
   openGraph: {
     url: siteUrl,
     siteName: "Neram Classes",
     type: "website",
     title:
-      "Neram Classes - NATA & JEE B.Arch Coaching | Tamil Nadu, Karnataka, UAE",
+      "Neram Classes - Best NATA & JEE B.Arch Coaching | Microsoft Certified",
     description:
-      "Premier NATA & JEE B.Arch coaching offering online classes across India, UAE, Dubai, Oman, Saudi Arabia and offline coaching in Trichy, Chennai, Madurai, Coimbatore, Bangalore, Tiruppur.",
+      "IIT/NIT faculty, Live classes, 99.99 percentile results. Microsoft certified platform. Online coaching for India, UAE, Dubai. Offline in Tamil Nadu & Karnataka.",
   },
   alternates: {
     canonical: "/",
   },
   keywords: [
+    // Primary keywords
+    "best nata coaching",
+    "best jee paper 2 coaching",
+    "nata coaching online",
+    "jee b arch coaching online",
+    "microsoft certified nata coaching",
+
     // Exam-specific keywords
     "NATA coaching",
     "JEE B.Arch coaching",
+    "JEE Paper 2 coaching",
     "architecture entrance exam",
     "NATA preparation",
     "JEE B.Arch preparation",
     "architecture exam coaching",
+    "nata syllabus",
+    "jee paper 2 syllabus",
+
+    // Feature keywords
+    "IIT NIT faculty coaching",
+    "live online architecture classes",
+    "nata drawing coaching",
+    "nata mathematics coaching",
+    "dual nata jee preparation",
+
     // Online location keywords
     "NATA coaching online India",
     "JEE B.Arch online coaching",
     "architecture coaching UAE",
     "NATA coaching Dubai",
-    "architecture exam coaching Oman",
+    "architecture exam coaching Qatar",
+    "NATA coaching Oman",
     "NATA coaching Saudi Arabia",
     "online architecture classes",
+    "nata coaching for gulf students",
+
     // Tamil Nadu cities
     "NATA coaching Trichy",
     "JEE B.Arch coaching Chennai",
@@ -101,10 +122,19 @@ export const metadata: Metadata = {
     "architecture coaching Coimbatore",
     "NATA coaching Tiruppur",
     "architecture entrance coaching Tamil Nadu",
+    "nata coaching bangalore",
+
     // Karnataka cities
     "NATA coaching Bangalore",
     "JEE B.Arch coaching Karnataka",
     "architecture coaching Bangalore",
+
+    // Results keywords
+    "nata toppers coaching",
+    "jee paper 2 air 1",
+    "99 percentile jee coaching",
+    "nata 180+ score coaching",
+
     // General
     "best NATA coaching",
     "top architecture coaching institute",
