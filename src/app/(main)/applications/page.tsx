@@ -17,6 +17,7 @@ import {
   Button,
   CircularProgress,
   Alert,
+  Tooltip,
 } from "@mui/material";
 import GridOrig from "@mui/material/Grid";
 import {
@@ -125,6 +126,41 @@ function ApplicationsPageContent() {
     };
   };
 
+  // Helper: create payment handler
+  const createPayment = async (appId: string) => {
+    try {
+      if (!appId) return;
+      // GET request - fetches admin-generated token from database
+      const res = await fetch(`/api/applications/${appId}/payment-token`);
+      
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({ error: 'Unknown error' }));
+        console.error("Payment token fetch failed:", json);
+        alert(json?.hint || json?.error || "Unable to start payment. Please contact support.");
+        return;
+      }
+      
+      const json = await res.json();
+      
+      if (json?.payUrl) {
+        window.location.href = json.payUrl;
+        return;
+      }
+      
+      if (json?.token) {
+        const origin = window.location.origin.replace(/\/$/, "");
+        window.location.href = `${origin}/pay?v=${json.token}&type=razorpay`;
+        return;
+      }
+      
+      console.error("No payment URL or token in response", json);
+      alert("Payment link not available. Please contact admin.");
+    } catch (err) {
+      console.error("Failed to start payment", err);
+      alert("Error starting payment. Please try again or contact support.");
+    }
+  };
+
   // Empty state
   if (!apps || apps.length === 0) {
     return (
@@ -197,6 +233,11 @@ function ApplicationsPageContent() {
           const course =
             app?.data?.selectedCourse ?? app?.data?.selected_course ?? "—";
 
+          // Check if application is approved
+          const normalized = String(app.status || "pending").toLowerCase();
+          const isApproved =
+            normalized.includes("approve") || normalized.includes("accept");
+
           return (
             <Grid key={app.id} size={{ xs: 12, md: 6, lg: 4 }}>
               <Card
@@ -206,12 +247,14 @@ function ApplicationsPageContent() {
                   borderColor: "divider",
                   borderRadius: 2,
                   height: "100%",
+                  display: "flex",
+                  flexDirection: "column",
                 }}
               >
                 <CardActionArea
                   component={Link as any}
                   href={`/applications/${app.id}`}
-                  sx={{ p: 2 }}
+                  sx={{ p: 2, flexGrow: 1 }}
                 >
                   <Box
                     sx={{
@@ -268,10 +311,47 @@ function ApplicationsPageContent() {
                     </Typography>
                   </Box>
                 </CardActionArea>
-                <CardActions sx={{ justifyContent: "flex-end", px: 2, pb: 2 }}>
+                <CardActions
+                  sx={{
+                    justifyContent: "flex-end",
+                    px: 2,
+                    pb: 2,
+                    gap: 1,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <Tooltip
+                    title={
+                      isApproved
+                        ? "Proceed to payment"
+                        : "Approval pending. Payment will be enabled once admin approves."
+                    }
+                  >
+                    <span>
+                      <Button
+                        variant="outlined"
+                        color="primary"
+                        size="small"
+                        startIcon={<PaymentIcon />}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          createPayment(app.id);
+                        }}
+                        disabled={!isApproved}
+                        sx={{
+                          textTransform: "none",
+                          fontWeight: 600,
+                        }}
+                      >
+                        Complete Payment
+                      </Button>
+                    </span>
+                  </Tooltip>
                   <Button
                     variant="contained"
                     color="primary"
+                    size="small"
                     component={Link as any}
                     href={`/applications/${app.id}`}
                     endIcon={<ArrowForwardIcon />}

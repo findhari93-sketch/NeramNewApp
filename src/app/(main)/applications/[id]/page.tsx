@@ -106,23 +106,32 @@ export default function ApplicationDetail({ params }: Props) {
   async function createPayment() {
     try {
       if (!id) return;
-      const res = await fetch(`/api/applications/${id}/payment-token`, {
-        method: "POST",
-        credentials: "include",
-      });
+      // GET request - fetches admin-generated token from database (no auth required)
+      const res = await fetch(`/api/applications/${id}/payment-token`);
       const json = await res.json().catch(() => null);
+      
+      if (!res.ok) {
+        console.error("Payment token fetch failed:", json);
+        alert(json?.hint || json?.error || "Unable to start payment. Please contact support.");
+        return;
+      }
+      
       if (json?.payUrl) {
         window.location.href = json.payUrl;
         return;
       }
+      
       if (json?.token) {
         const origin = window.location.origin.replace(/\/$/, "");
         window.location.href = `${origin}/pay?v=${json.token}&type=razorpay`;
         return;
       }
-      console.error("Payment token generation failed", json);
+      
+      console.error("No payment URL or token in response", json);
+      alert("Payment link not available. Please contact admin.");
     } catch (err) {
       console.error("Failed to start payment", err);
+      alert("Error starting payment. Please try again or contact support.");
     }
   }
 
