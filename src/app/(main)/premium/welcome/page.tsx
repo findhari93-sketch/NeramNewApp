@@ -13,7 +13,7 @@ import {
   Button,
   Card,
   CardContent,
-  Grid,
+  Grid as GridOrig,
   Chip,
   Alert,
   AlertTitle,
@@ -25,6 +25,9 @@ import {
   Link as MuiLink,
   CircularProgress,
 } from '@mui/material';
+
+// Alias Grid to support size prop
+const Grid: any = GridOrig;
 import {
   CheckCircle,
   School,
