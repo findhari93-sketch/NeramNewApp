@@ -132,27 +132,31 @@ function ApplicationsPageContent() {
       if (!appId) return;
       // GET request - fetches admin-generated token from database
       const res = await fetch(`/api/applications/${appId}/payment-token`);
-      
+
       if (!res.ok) {
-        const json = await res.json().catch(() => ({ error: 'Unknown error' }));
+        const json = await res.json().catch(() => ({ error: "Unknown error" }));
         console.error("Payment token fetch failed:", json);
-        alert(json?.hint || json?.error || "Unable to start payment. Please contact support.");
+        alert(
+          json?.hint ||
+            json?.error ||
+            "Unable to start payment. Please contact support."
+        );
         return;
       }
-      
+
       const json = await res.json();
-      
+
       if (json?.payUrl) {
         window.location.href = json.payUrl;
         return;
       }
-      
+
       if (json?.token) {
         const origin = window.location.origin.replace(/\/$/, "");
         window.location.href = `${origin}/pay?v=${json.token}&type=razorpay`;
         return;
       }
-      
+
       console.error("No payment URL or token in response", json);
       alert("Payment link not available. Please contact admin.");
     } catch (err) {

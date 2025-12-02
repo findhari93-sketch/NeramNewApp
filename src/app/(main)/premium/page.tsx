@@ -77,41 +77,142 @@ function PremiumContent({
         alignItems: "center",
         justifyContent: "center",
         minHeight: "100vh",
+        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
         p: 3,
       }}
     >
-      <Paper sx={{ maxWidth: 600, p: 4, textAlign: "center" }}>
-        <CheckCircleOutlineIcon
-          sx={{ fontSize: 80, color: "success.main", mb: 2 }}
-        />
-        <Typography variant="h4" sx={{ mb: 2, fontWeight: 600 }}>
+      <Paper
+        elevation={8}
+        sx={{
+          maxWidth: 650,
+          p: { xs: 3, sm: 5 },
+          textAlign: "center",
+          borderRadius: 3,
+          position: "relative",
+          overflow: "visible",
+        }}
+      >
+        {/* Success Animation Circle */}
+        <Box
+          sx={{
+            width: 100,
+            height: 100,
+            borderRadius: "50%",
+            bgcolor: "success.main",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            mx: "auto",
+            mb: 3,
+            boxShadow: "0 8px 24px rgba(76, 175, 80, 0.3)",
+            animation: "scaleIn 0.5s ease-out",
+            "@keyframes scaleIn": {
+              "0%": { transform: "scale(0)" },
+              "50%": { transform: "scale(1.1)" },
+              "100%": { transform: "scale(1)" },
+            },
+          }}
+        >
+          <CheckCircleOutlineIcon
+            sx={{ fontSize: 60, color: "white" }}
+          />
+        </Box>
+
+        <Typography
+          variant="h3"
+          sx={{
+            mb: 2,
+            fontWeight: 700,
+            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+          }}
+        >
           Payment Successful!
         </Typography>
-        <Typography variant="body1" sx={{ mb: 3 }}>
-          Thank you for your payment. Your account has been upgraded to premium.
+
+        <Typography variant="h6" color="text.secondary" sx={{ mb: 1 }}>
+          Thank you for your payment.
         </Typography>
+
+        <Typography variant="body1" sx={{ mb: 4, color: "success.main", fontWeight: 600 }}>
+          Your account has been upgraded to premium.
+        </Typography>
+
         {tokenValid && (
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            You now have access to all premium features and courses.
-          </Typography>
+          <Paper
+            elevation={0}
+            sx={{
+              bgcolor: "success.50",
+              p: 2,
+              mb: 4,
+              border: "1px solid",
+              borderColor: "success.200",
+              borderRadius: 2,
+            }}
+          >
+            <Typography variant="body2" color="success.dark" sx={{ fontWeight: 500 }}>
+              ✨ You now have access to all premium features, study materials, and live classes!
+            </Typography>
+          </Paper>
         )}
+
         <Box
           sx={{
             display: "flex",
+            flexDirection: { xs: "column", sm: "row" },
             gap: 2,
             justifyContent: "center",
-            flexWrap: "wrap",
+            mb: 3,
           }}
         >
-          <Button variant="contained" onClick={() => router.push("/dashboard")}>
-            Go to Dashboard
+          <Button
+            variant="contained"
+            size="large"
+            onClick={() => router.push("/premium/welcome")}
+            sx={{
+              py: 1.5,
+              px: 4,
+              fontSize: "1.1rem",
+              fontWeight: 600,
+              background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+              "&:hover": {
+                background: "linear-gradient(135deg, #5568d3 0%, #6a3f8f 100%)",
+              },
+            }}
+          >
+            Get Started →
           </Button>
           <Button
             variant="outlined"
-            onClick={() => router.push("/applicationform")}
+            size="large"
+            onClick={() => router.push("/applications")}
+            sx={{ py: 1.5, px: 4 }}
           >
             View My Application
           </Button>
+        </Box>
+
+        <Button
+          variant="text"
+          size="small"
+          onClick={() => window.open("/api/payments/invoice", "_blank")}
+          sx={{
+            textTransform: "none",
+            color: "text.secondary",
+            "&:hover": { color: "primary.main" },
+          }}
+        >
+          📄 Download Invoice
+        </Button>
+
+        <Box sx={{ mt: 4, pt: 3, borderTop: "1px solid", borderColor: "divider" }}>
+          <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
+            Next Steps:
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Check your email for account credentials and class schedule
+          </Typography>
         </Box>
       </Paper>
     </Box>

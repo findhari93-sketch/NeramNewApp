@@ -41,15 +41,17 @@ export async function GET(req: NextRequest, { params }: { params: any }) {
   const adminFilled = (row as any).admin_filled || {};
 
   // Debug logging to help locate token
-  console.log('[payment-token] Debug info:', {
+  console.log("[payment-token] Debug info:", {
     id,
     hasAppDetails: !!appDetails,
     hasPaymentMetadata: !!appDetails.payment_metadata,
     hasFinalFee: !!finalFee,
     hasAdminFilled: !!adminFilled,
-    paymentMetadataKeys: appDetails.payment_metadata ? Object.keys(appDetails.payment_metadata) : [],
+    paymentMetadataKeys: appDetails.payment_metadata
+      ? Object.keys(appDetails.payment_metadata)
+      : [],
     finalFeeKeys: Object.keys(finalFee),
-    adminFilledKeys: Object.keys(adminFilled)
+    adminFilledKeys: Object.keys(adminFilled),
   });
 
   // Check approval status
@@ -71,40 +73,45 @@ export async function GET(req: NextRequest, { params }: { params: any }) {
 
   // Look for admin-generated JWT token in multiple possible locations
   let token: string | null = null;
-  
+
   // Priority 1: application_details.payment_metadata.token (admin app generates here)
   if (appDetails.payment_metadata?.token) {
     token = appDetails.payment_metadata.token;
-    console.log('[payment-token] Found token in payment_metadata.token');
+    console.log("[payment-token] Found token in payment_metadata.token");
   }
-  
+
   // Priority 2: final_fee_payment.token (legacy location)
   if (!token && finalFee.token) {
     token = finalFee.token;
-    console.log('[payment-token] Found token in final_fee_payment.token');
+    console.log("[payment-token] Found token in final_fee_payment.token");
   }
-  
+
   // Priority 3: admin_filled.payment_token (alternative location)
   if (!token && adminFilled.payment_token) {
     token = adminFilled.payment_token;
-    console.log('[payment-token] Found token in admin_filled.payment_token');
+    console.log("[payment-token] Found token in admin_filled.payment_token");
   }
-  
+
   // Priority 4: Check if it's stored directly in application_details
   if (!token && (appDetails as any).token) {
     token = (appDetails as any).token;
-    console.log('[payment-token] Found token in application_details.token');
+    console.log("[payment-token] Found token in application_details.token");
   }
 
   // If no token exists, generate one on-demand (fallback for old approvals)
   if (!token) {
-    console.log('[payment-token] No existing token found, generating new one...');
-    
+    console.log(
+      "[payment-token] No existing token found, generating new one..."
+    );
+
     const secret = process.env.PAYMENT_TOKEN_SECRET;
     if (!secret) {
-      console.error('[payment-token] PAYMENT_TOKEN_SECRET not configured');
+      console.error("[payment-token] PAYMENT_TOKEN_SECRET not configured");
       return NextResponse.json(
-        { error: "server_misconfigured", hint: "Payment system not configured. Contact admin." },
+        {
+          error: "server_misconfigured",
+          hint: "Payment system not configured. Contact admin.",
+        },
         { status: 500 }
       );
     }
@@ -121,9 +128,15 @@ export async function GET(req: NextRequest, { params }: { params: any }) {
     );
 
     if (!Number.isFinite(rupees) || rupees <= 0) {
-      console.error('[payment-token] No valid amount found:', { adminFilled, finalFee });
+      console.error("[payment-token] No valid amount found:", {
+        adminFilled,
+        finalFee,
+      });
       return NextResponse.json(
-        { error: "invalid_amount", hint: "No valid payable amount configured. Contact admin." },
+        {
+          error: "invalid_amount",
+          hint: "No valid payable amount configured. Contact admin.",
+        },
         { status: 400 }
       );
     }
@@ -135,14 +148,16 @@ export async function GET(req: NextRequest, { params }: { params: any }) {
 
     // Store token in database for future use
     const now = new Date().toISOString();
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    const expiresAt = new Date(
+      Date.now() + 7 * 24 * 60 * 60 * 1000
+    ).toISOString();
 
     const updatedFinalFee = {
       ...finalFee,
       token,
       token_expires: expiresAt,
       token_generated_at: now,
-      payable_amount: rupees
+      payable_amount: rupees,
     };
 
     await supabase
@@ -150,8 +165,8 @@ export async function GET(req: NextRequest, { params }: { params: any }) {
       .update({ final_fee_payment: updatedFinalFee })
       .eq("id", id);
 
-    console.log('[payment-token] Generated and stored new token');
-  }  // Get amount (use same amount that was used for token generation)
+    console.log("[payment-token] Generated and stored new token");
+  } // Get amount (use same amount that was used for token generation)
   const rupees = Number(
     adminFilled.final_fee_payment_amount ||
       adminFilled.amount ||
@@ -167,6 +182,9 @@ export async function GET(req: NextRequest, { params }: { params: any }) {
   const origin = site || `https://${req.headers.get("host") || ""}`;
   const payUrl = `${origin.replace(/\/$/, "")}/pay?v=${token}&type=razorpay`;
 
-  console.log('[payment-token] Returning payment URL:', { amount: rupees, hasToken: !!token });
+  console.log("[payment-token] Returning payment URL:", {
+    amount: rupees,
+    hasToken: !!token,
+  });
   return NextResponse.json({ token, payUrl, amount: rupees });
 }

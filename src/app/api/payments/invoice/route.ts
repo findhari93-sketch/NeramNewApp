@@ -33,6 +33,74 @@ if (!admin.apps.length) {
   }
 }
 
+/**
+ * GET /api/payments/invoice
+ * Download the latest invoice for the authenticated user
+ */
+export async function GET(req: Request) {
+  try {
+    const authHeader = req.headers.get("authorization") || "";
+    const idToken = authHeader.startsWith("Bearer ")
+      ? authHeader.split(" ")[1]
+      : "";
+
+    if (!idToken) {
+      return NextResponse.json({ error: "invalid_token" }, { status: 401 });
+    }
+
+    const decoded = await admin.auth().verifyIdToken(idToken);
+    const uid = decoded.uid;
+
+    // Fetch user's latest invoice from users_duplicate table
+    const { data: userRow, error: fetchErr } = await supabaseServer
+      .from("users_duplicate")
+      .select("id, final_fee_payment, email, basic, contact")
+      .eq("account->>firebase_uid", uid)
+      .maybeSingle();
+
+    if (fetchErr || !userRow) {
+      return NextResponse.json({ error: "user_not_found" }, { status: 404 });
+    }
+
+    const finalFee = (userRow as any).final_fee_payment || {};
+    const invoices = finalFee.invoice || [];
+
+    if (!Array.isArray(invoices) || invoices.length === 0) {
+      return NextResponse.json({ error: "no_invoice_found" }, { status: 404 });
+    }
+
+    // Get the latest invoice
+    const latestInvoice = invoices[invoices.length - 1];
+
+    if (latestInvoice.url) {
+      // Redirect to the invoice URL in storage
+      return NextResponse.redirect(latestInvoice.url);
+    }
+
+    // If no URL, try to fetch from storage using invoice number
+    if (latestInvoice.number) {
+      const bucket = process.env.SUPABASE_INVOICE_BUCKET || "payment-proofs";
+      const storagePath = `invoices/${userRow.id}/${latestInvoice.number}.pdf`;
+
+      const { data: publicUrlData } = await (supabaseServer as any).storage
+        .from(bucket)
+        .getPublicUrl(storagePath);
+
+      if (publicUrlData?.publicUrl) {
+        return NextResponse.redirect(publicUrlData.publicUrl);
+      }
+    }
+
+    return NextResponse.json({ error: "invoice_url_not_found" }, { status: 404 });
+  } catch (err: any) {
+    console.error("GET invoice error", err);
+    return NextResponse.json(
+      { error: "invoice_fetch_failed", hint: err?.message || String(err) },
+      { status: 500 }
+    );
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const allowUnauth = process.env.ALLOW_UNAUTH_RAZORPAY === "true";

@@ -109,24 +109,28 @@ export default function ApplicationDetail({ params }: Props) {
       // GET request - fetches admin-generated token from database (no auth required)
       const res = await fetch(`/api/applications/${id}/payment-token`);
       const json = await res.json().catch(() => null);
-      
+
       if (!res.ok) {
         console.error("Payment token fetch failed:", json);
-        alert(json?.hint || json?.error || "Unable to start payment. Please contact support.");
+        alert(
+          json?.hint ||
+            json?.error ||
+            "Unable to start payment. Please contact support."
+        );
         return;
       }
-      
+
       if (json?.payUrl) {
         window.location.href = json.payUrl;
         return;
       }
-      
+
       if (json?.token) {
         const origin = window.location.origin.replace(/\/$/, "");
         window.location.href = `${origin}/pay?v=${json.token}&type=razorpay`;
         return;
       }
-      
+
       console.error("No payment URL or token in response", json);
       alert("Payment link not available. Please contact admin.");
     } catch (err) {
@@ -304,6 +308,13 @@ export default function ApplicationDetail({ params }: Props) {
   const isApproved =
     normalized.includes("approve") || normalized.includes("accept");
 
+  // Check if payment is completed
+  const paymentStatus = String(app.payment_status || "").toLowerCase();
+  const isPaid =
+    paymentStatus === "paid" ||
+    paymentStatus === "completed" ||
+    paymentStatus === "success";
+
   return (
     <Container maxWidth="lg" sx={{ py: { xs: 3, md: 5 } }}>
       <Stack spacing={3}>
@@ -442,44 +453,82 @@ export default function ApplicationDetail({ params }: Props) {
             gap: 1,
           }}
         >
-          <Tooltip
-            title={
-              isApproved
-                ? "Proceed to Razorpay secure checkout"
-                : "Approval pending. Payment will be enabled once admin approves."
-            }
-          >
-            <span>
-              <Button
-                variant="contained"
-                color="primary"
-                size="large"
-                startIcon={<PaymentIcon />}
-                onClick={createPayment}
-                disabled={!isApproved}
+          {isPaid ? (
+            <Box sx={{ textAlign: "right" }}>
+              <Chip
+                label="Payment Completed ✓"
+                color="success"
+                icon={<CheckCircleIcon />}
                 sx={{
-                  textTransform: "none",
+                  fontSize: "1rem",
                   fontWeight: 600,
-                  px: 4,
+                  px: 2,
                   py: 1.5,
-                  borderRadius: 2,
-                  boxShadow: isApproved ? 2 : 0,
-                  "&:hover": {
-                    boxShadow: isApproved ? 4 : 0,
-                  },
+                  mb: 2,
                 }}
+              />
+              <Typography variant="body2" color="text.secondary" paragraph>
+                Your payment has been successfully processed.
+              </Typography>
+              <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => router.push("/premium/welcome")}
+                >
+                  View Premium Access
+                </Button>
+                <Button
+                  variant="text"
+                  size="small"
+                  onClick={() => window.open("/api/payments/invoice", "_blank")}
+                >
+                  Download Invoice
+                </Button>
+              </Box>
+            </Box>
+          ) : (
+            <>
+              <Tooltip
+                title={
+                  isApproved
+                    ? "Proceed to Razorpay secure checkout"
+                    : "Approval pending. Payment will be enabled once admin approves."
+                }
               >
-                Complete Payment
-              </Button>
-            </span>
-          </Tooltip>
-          {!isApproved && (
-            <Typography
-              variant="body2"
-              sx={{ color: "text.secondary", textAlign: "right" }}
-            >
-              Wait for admin approval or contact 9176137043 for reminder
-            </Typography>
+                <span>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    size="large"
+                    startIcon={<PaymentIcon />}
+                    onClick={createPayment}
+                    disabled={!isApproved}
+                    sx={{
+                      textTransform: "none",
+                      fontWeight: 600,
+                      px: 4,
+                      py: 1.5,
+                      borderRadius: 2,
+                      boxShadow: isApproved ? 2 : 0,
+                      "&:hover": {
+                        boxShadow: isApproved ? 4 : 0,
+                      },
+                    }}
+                  >
+                    Complete Payment
+                  </Button>
+                </span>
+              </Tooltip>
+              {!isApproved && (
+                <Typography
+                  variant="body2"
+                  sx={{ color: "text.secondary", textAlign: "right" }}
+                >
+                  Wait for admin approval or contact 9176137043 for reminder
+                </Typography>
+              )}
+            </>
           )}
         </Box>
       </Stack>

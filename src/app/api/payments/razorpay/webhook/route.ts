@@ -23,11 +23,9 @@ import crypto from "crypto";
 import { createClient } from "@supabase/supabase-js";
 import { renderInvoicePdf } from "@/lib/invoice";
 import {
-  getGraphToken,
-  sendEmailWithAttachment,
-  generateInvoiceEmailHTML,
+  sendPaymentConfirmation,
   sendAdminPaymentNotification,
-} from "@/lib/emailService";
+} from "@/lib/email/sendPaymentConfirmation";
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -78,7 +76,7 @@ async function createNotification(params: {
 }
 
 /**
- * Send payment confirmation email with PDF invoice
+ * Send payment confirmation email with PDF invoice via SendGrid
  */
 async function sendPaymentConfirmationEmail(params: {
   userEmail: string;
@@ -91,9 +89,7 @@ async function sendPaymentConfirmationEmail(params: {
 }) {
   try {
     // Generate invoice number (e.g., INV-2025-001234)
-    const invoiceNumber = `INV-${new Date(
-      params.paymentDate
-    ).getFullYear()}-${params.paymentId.substring(4, 10).toUpperCase()}`;
+    const invoiceNumber = `INV-${new Date(params.paymentDate).getFullYear()}-${params.paymentId.substring(4, 10).toUpperCase()}`;
 
     // Generate PDF invoice
     const pdfBytes = await renderInvoicePdf({
@@ -107,39 +103,36 @@ async function sendPaymentConfirmationEmail(params: {
       issuedAt: params.paymentDate,
     });
 
-    // Get Microsoft Graph token
-    const graphToken = await getGraphToken();
-    if (!graphToken) {
-      log("⚠️ Cannot send email: Graph token not available");
-      return;
-    }
-
-    // Generate email HTML
-    const emailHTML = generateInvoiceEmailHTML({
-      studentName: params.studentName,
-      courseName: params.courseName,
-      amountPaid: params.amountPaid,
-      paymentId: params.paymentId,
-      invoiceNumber,
-      paymentDate: params.paymentDate,
-    });
-
-    // Send email with PDF attachment
-    await sendEmailWithAttachment(
-      graphToken,
-      params.userEmail,
-      `Payment Successful - Invoice ${invoiceNumber}`,
-      emailHTML,
-      Buffer.from(pdfBytes),
-      `Invoice_${invoiceNumber}.pdf`
+    // Send payment confirmation email with PDF attachment via SendGrid
+    const result = await sendPaymentConfirmation(
+      {
+        userName: params.studentName,
+        userEmail: params.userEmail,
+        orderId: params.orderId,
+        paymentId: params.paymentId,
+        amount: params.amountPaid,
+        currency: "INR",
+        paidAt: params.paymentDate,
+        courseName: params.courseName,
+        invoiceNumber,
+      },
+      Buffer.from(pdfBytes)
     );
 
-    log("✅ Payment confirmation email sent", {
-      email: params.userEmail,
-      invoiceNumber,
-    });
+    if (result.success) {
+      log("✅ Payment confirmation email sent via SendGrid", {
+        email: params.userEmail,
+        invoiceNumber,
+        messageId: result.messageId,
+      });
+    } else {
+      log("⚠️ Failed to send payment confirmation email", {
+        error: result.error,
+      });
+    }
   } catch (err) {
     log("❌ Error sending payment confirmation email", err);
+    // Don't throw - email failures shouldn't break webhook processing
   }
 }
 
@@ -409,8 +402,10 @@ export async function POST(req: Request) {
       // Extract user details from application
       const basic = appDetails.basic || {};
       const contact = appDetails.contact || {};
-      const studentName = basic.student_name || basic.name || "Student";
-      const userEmail = contact.email || entity.email || "";
+      const studentName =
+        basic.student_name || basic.name || "Student";
+      const userEmail =
+        contact.email || entity.email || "";
 
       const courseName =
         appDetails.course_name || appDetails.program || "NATA/JEE Coaching";
@@ -433,9 +428,7 @@ export async function POST(req: Request) {
         userId: applicationId,
         type: "payment_completed",
         title: "Payment Successful",
-        message: `Your payment of ₹${paymentDetails.amount?.toLocaleString(
-          "en-IN"
-        )} has been received successfully. Invoice sent to your email.`,
+        message: `Your payment of ₹${paymentDetails.amount?.toLocaleString("en-IN")} has been received successfully. Invoice sent to your email.`,
         data: {
           payment_id: paymentId,
           order_id: orderId,
@@ -446,16 +439,24 @@ export async function POST(req: Request) {
         priority: "high",
       });
 
-      // Create admin notifications
+      // Send admin email notification
+      await sendAdminPaymentNotification({
+        studentName,
+        studentEmail: userEmail,
+        amount: paymentDetails.amount || 0,
+        paymentId,
+        orderId,
+        paymentMethod: entity.method,
+      });
+
+      // Create admin notifications (in-app)
       const adminIds = await getAdminUserIds();
       for (const adminId of adminIds) {
         await createNotification({
           userId: adminId,
           type: "payment_completed",
           title: "New Payment Received",
-          message: `${studentName} completed payment of ₹${paymentDetails.amount?.toLocaleString(
-            "en-IN"
-          )} via ${entity.method || "online"}.`,
+          message: `${studentName} completed payment of ₹${paymentDetails.amount?.toLocaleString("en-IN")} via ${entity.method || "online"}.`,
           data: {
             student_name: studentName,
             student_email: userEmail,
@@ -470,25 +471,6 @@ export async function POST(req: Request) {
         });
       }
 
-      // Send admin email notification
-      try {
-        log("Sending admin email notification...");
-        await sendAdminPaymentNotification({
-          studentName,
-          studentEmail: userEmail || "Not provided",
-          courseName,
-          amountPaid: paymentDetails.amount || 0,
-          paymentId,
-          orderId,
-          paymentMethod: entity.method || "Razorpay",
-          paymentDate: paymentDetails.webhook_received_at,
-          applicationId,
-        });
-        log("✅ Admin email notification sent successfully");
-      } catch (adminEmailErr) {
-        log("❌ Failed to send admin email notification", adminEmailErr);
-      }
-
       log("✅ Email and notifications sent for successful payment");
     }
 
@@ -498,9 +480,7 @@ export async function POST(req: Request) {
         userId: applicationId,
         type: "payment_failed",
         title: "Payment Failed",
-        message: `Your payment attempt failed. ${
-          entity.error_description || "Please try again."
-        }`,
+        message: `Your payment attempt failed. ${entity.error_description || "Please try again."}`,
         data: {
           payment_id: paymentId,
           order_id: orderId,
