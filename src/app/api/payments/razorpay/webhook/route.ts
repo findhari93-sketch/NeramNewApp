@@ -26,6 +26,7 @@ import {
   getGraphToken,
   sendEmailWithAttachment,
   generateInvoiceEmailHTML,
+  sendAdminPaymentNotification,
 } from "@/lib/emailService";
 
 const supabase = createClient(
@@ -467,6 +468,25 @@ export async function POST(req: Request) {
           },
           priority: "high",
         });
+      }
+
+      // Send admin email notification
+      try {
+        log("Sending admin email notification...");
+        await sendAdminPaymentNotification({
+          studentName,
+          studentEmail: userEmail || "Not provided",
+          courseName,
+          amountPaid: paymentDetails.amount || 0,
+          paymentId,
+          orderId,
+          paymentMethod: entity.method || "Razorpay",
+          paymentDate: paymentDetails.webhook_received_at,
+          applicationId,
+        });
+        log("✅ Admin email notification sent successfully");
+      } catch (adminEmailErr) {
+        log("❌ Failed to send admin email notification", adminEmailErr);
       }
 
       log("✅ Email and notifications sent for successful payment");

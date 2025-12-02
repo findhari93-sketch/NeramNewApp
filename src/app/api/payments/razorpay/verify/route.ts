@@ -5,7 +5,7 @@ import crypto from "crypto";
 import { createClient } from "@supabase/supabase-js";
 import { verifyPaymentTokenServer } from "@/lib/validatePaymentToken";
 import { generateInvoicePDF, generateInvoiceNumber, InvoiceData } from "@/lib/generateInvoicePDF";
-import { getGraphToken, sendEmailWithAttachment, generateInvoiceEmailHTML } from "@/lib/emailService";
+import { getGraphToken, sendEmailWithAttachment, generateInvoiceEmailHTML, sendAdminPaymentNotification } from "@/lib/emailService";
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -332,6 +332,25 @@ export async function POST(req: Request) {
         console.log("[verify] Admin notification inserted");
       } catch (nErr) {
         console.warn("[verify] Failed to insert admin notification:", nErr);
+      }
+
+      // Send admin email notification
+      try {
+        console.log("[verify] Sending admin email notification...");
+        await sendAdminPaymentNotification({
+          studentName,
+          studentEmail: studentEmail || "Not provided",
+          courseName,
+          amountPaid,
+          paymentId,
+          orderId,
+          paymentMethod: "Razorpay",
+          paymentDate: now,
+          applicationId,
+        });
+        console.log("[verify] ✅ Admin email notification sent successfully");
+      } catch (adminEmailErr) {
+        console.error("[verify] ❌ Failed to send admin email notification:", adminEmailErr);
       }
     } catch (invoiceErr) {
       console.error("[verify] Failed to generate/send invoice:", invoiceErr);
