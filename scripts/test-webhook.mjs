@@ -10,21 +10,39 @@
 
 import crypto from "crypto";
 import https from "https";
+import { config as loadEnv } from "dotenv";
+import { createClient } from "@supabase/supabase-js";
+
+// Load environment from .env.local for local testing
+loadEnv({ path: ".env.local" });
 
 const WEBHOOK_SECRET =
   process.env.RAZORPAY_WEBHOOK_SECRET || "neram_webhook_secret_2025";
-const WEBHOOK_URL =
-  process.env.WEBHOOK_URL ||
-  "http://localhost:3001/api/payments/razorpay/webhook";
+// Resolve webhook URL in this order:
+// 1) explicit WEBHOOK_URL
+// 2) NEXT_PUBLIC_APP_URL + path
+// 3) localhost:3000 default
+const WEBHOOK_URL = (() => {
+  if (process.env.WEBHOOK_URL) return process.env.WEBHOOK_URL;
+  const base = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  try {
+    return new URL(
+      "/api/payments/razorpay/webhook",
+      base.endsWith("/") ? base : base + "/"
+    ).toString();
+  } catch {
+    return "http://localhost:3000/api/payments/razorpay/webhook";
+  }
+})();
 
-// Test payment captured event
+// Test payment captured event (order_id will be resolved dynamically below)
 const testPayload = {
   event: "payment.captured",
   payload: {
     payment: {
       entity: {
         id: "pay_test_" + Date.now(),
-        order_id: "order_LbYcX3GzvTz9Ue", // Replace with actual order_id from your DB
+        order_id: "order_LbYcX3GzvTz9Ue", // will be replaced at runtime if possible
         amount: 250000, // 2500.00 INR in paise
         currency: "INR",
         status: "captured",
@@ -166,12 +184,72 @@ async function main() {
   }
 
   console.log("\n⚠️  IMPORTANT: Make sure you have:");
-  console.log("  1. Started your dev server (npm run dev)");
   console.log(
-    "  2. Created a payment order with order_id: order_LbYcX3GzvTz9Ue"
+    "  1. Started your dev server (npm run dev) on the same URL shown above"
   );
-  console.log("     (or update the order_id in this script)");
+  console.log(
+    "  2. Created a payment order whose order_id matches a user's application_details.final_fee_payment.razorpay_order_id"
+  );
+  console.log(
+    "     (update order_id in this script if needed, currently: order_LbYcX3GzvTz9Ue)"
+  );
   console.log("\n");
+
+  // Try to resolve a real order_id from Supabase automatically
+  let selectedOrderId = process.env.TEST_ORDER_ID || null;
+  let selectedUserInfo = null;
+  try {
+    const supabaseUrl =
+      process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey =
+      process.env.SUPABASE_SERVICE_ROLE_KEY ||
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (supabaseUrl && supabaseKey) {
+      const supabase = createClient(supabaseUrl, supabaseKey);
+      const { data, error } = await supabase
+        .from("users_duplicate")
+        .select("id,basic,contact,application_details,updated_at")
+        .order("updated_at", { ascending: false })
+        .limit(200);
+
+      if (!error && Array.isArray(data)) {
+        for (const row of data) {
+          const details = row?.application_details || {};
+          const finalFee = details?.final_fee_payment || {};
+          const orderId = finalFee?.razorpay_order_id;
+          if (orderId) {
+            selectedOrderId = orderId;
+            selectedUserInfo = {
+              id: row.id,
+              name: row?.basic?.student_name || row?.basic?.name || "Student",
+              email: row?.contact?.email || "",
+            };
+            break;
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.log(
+      "⚠️  Could not auto-resolve order_id from Supabase:",
+      e.message
+    );
+  }
+
+  if (selectedOrderId) {
+    testPayload.payload.payment.entity.order_id = selectedOrderId;
+    console.log("🔗 Using order_id from Supabase:", selectedOrderId);
+    if (selectedUserInfo) {
+      console.log(
+        `   → user id: ${selectedUserInfo.id}, name: ${selectedUserInfo.name}, email: ${selectedUserInfo.email}`
+      );
+    }
+  } else {
+    console.log(
+      "⚠️  No order_id found in DB. Using the fallback order in the script."
+    );
+  }
 
   // Test 1: Successful payment
   await sendWebhook(testPayload, "Payment Captured (Success)");

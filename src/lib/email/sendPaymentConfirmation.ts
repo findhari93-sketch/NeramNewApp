@@ -3,8 +3,8 @@
  * Sends professional invoice emails using nodemailer + SendGrid SMTP
  */
 
-import nodemailer from 'nodemailer';
-import type { Transporter } from 'nodemailer';
+import nodemailer from "nodemailer";
+import type { Transporter } from "nodemailer";
 
 interface PaymentDetails {
   userName: string;
@@ -25,8 +25,8 @@ function getTransporter(): Transporter {
   if (!transporter) {
     transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: process.env.SMTP_SECURE === 'true',
+      port: parseInt(process.env.SMTP_PORT || "587"),
+      secure: process.env.SMTP_SECURE === "true",
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
@@ -40,13 +40,17 @@ function getTransporter(): Transporter {
  * Generate professional invoice HTML email template
  */
 function generateInvoiceHTML(payment: PaymentDetails): string {
-  const formattedDate = new Date(payment.paidAt).toLocaleString('en-IN', {
-    timeZone: 'Asia/Kolkata',
-    dateStyle: 'full',
-    timeStyle: 'short',
+  const formattedDate = new Date(payment.paidAt).toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata",
+    dateStyle: "full",
+    timeStyle: "short",
   });
 
-  const invoiceNum = payment.invoiceNumber || `INV-${new Date(payment.paidAt).getFullYear()}-${payment.paymentId.substring(4, 10).toUpperCase()}`;
+  const invoiceNum =
+    payment.invoiceNumber ||
+    `INV-${new Date(payment.paidAt).getFullYear()}-${payment.paymentId
+      .substring(4, 10)
+      .toUpperCase()}`;
 
   return `
 <!DOCTYPE html>
@@ -235,12 +239,16 @@ function generateInvoiceHTML(payment: PaymentDetails): string {
           <span class="detail-value">${payment.paymentId}</span>
         </div>
 
-        ${payment.courseName ? `
+        ${
+          payment.courseName
+            ? `
         <div class="detail-row">
           <span class="detail-label">Course/Program:</span>
           <span class="detail-value">${payment.courseName}</span>
         </div>
-        ` : ''}
+        `
+            : ""
+        }
 
         <div class="detail-row">
           <span class="detail-label">Payment Date:</span>
@@ -250,13 +258,20 @@ function generateInvoiceHTML(payment: PaymentDetails): string {
         <div class="amount-row">
           <div class="detail-row" style="border: none;">
             <span class="detail-label">Total Amount Paid:</span>
-            <span class="detail-value">${payment.currency} ${payment.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            <span class="detail-value">${
+              payment.currency
+            } ${payment.amount.toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}</span>
           </div>
         </div>
       </div>
 
       <div class="help-section">
-        <p><strong>Need Help?</strong> If you have any questions about this payment or need assistance, please contact us at <strong>${process.env.HELP_DESK_EMAIL || 'support@neram.co.in'}</strong></p>
+        <p><strong>Need Help?</strong> If you have any questions about this payment or need assistance, please contact us at <strong>${
+          process.env.HELP_DESK_EMAIL || "support@neram.co.in"
+        }</strong></p>
       </div>
 
       <div class="message">
@@ -268,7 +283,9 @@ function generateInvoiceHTML(payment: PaymentDetails): string {
       <p><strong>Neram Classes</strong></p>
       <p>© ${new Date().getFullYear()} Neram Classes. All rights reserved.</p>
       <p style="margin-top: 10px;">This is an automated email. Please do not reply to this message.</p>
-      <p>For support, contact: ${process.env.HELP_DESK_EMAIL || 'support@neram.co.in'}</p>
+      <p>For support, contact: ${
+        process.env.HELP_DESK_EMAIL || "support@neram.co.in"
+      }</p>
     </div>
   </div>
 </body>
@@ -287,25 +304,29 @@ export async function sendPaymentConfirmation(
     const transport = getTransporter();
 
     // Verify transporter configuration (optional, for debugging)
-    if (process.env.NODE_ENV === 'development') {
+    if (process.env.NODE_ENV === "development") {
       await transport.verify();
-      console.log('✅ SMTP transporter verified');
+      console.log("✅ SMTP transporter verified");
     }
 
     const mailOptions = {
       from: {
-        name: 'Neram Classes',
-        address: process.env.MAIL_FROM || 'noreply@neramclasses.com',
+        name: "Neram Classes",
+        address: process.env.MAIL_FROM || "noreply@neramclasses.com",
       },
       to: payment.userEmail,
-      subject: `Payment Confirmation - Invoice ${payment.invoiceNumber || payment.orderId}`,
+      subject: `Payment Confirmation - Invoice ${
+        payment.invoiceNumber || payment.orderId
+      }`,
       html: generateInvoiceHTML(payment),
       attachments: pdfAttachment
         ? [
             {
-              filename: `Invoice_${payment.invoiceNumber || payment.orderId}.pdf`,
+              filename: `Invoice_${
+                payment.invoiceNumber || payment.orderId
+              }.pdf`,
               content: pdfAttachment,
-              contentType: 'application/pdf',
+              contentType: "application/pdf",
             },
           ]
         : undefined,
@@ -314,7 +335,7 @@ export async function sendPaymentConfirmation(
     // Send email
     const info = await transport.sendMail(mailOptions);
 
-    console.log('✅ Payment confirmation email sent successfully', {
+    console.log("✅ Payment confirmation email sent successfully", {
       messageId: info.messageId,
       email: payment.userEmail,
       invoiceNumber: payment.invoiceNumber,
@@ -325,7 +346,7 @@ export async function sendPaymentConfirmation(
       messageId: info.messageId,
     };
   } catch (error) {
-    console.error('❌ Failed to send payment confirmation email:', error);
+    console.error("❌ Failed to send payment confirmation email:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : String(error),
@@ -345,10 +366,11 @@ export async function sendAdminPaymentNotification(params: {
   paymentMethod?: string;
 }): Promise<void> {
   try {
-    const adminEmails = process.env.ADMIN_EMAILS?.split(',').map(e => e.trim()) || [];
-    
+    const adminEmails =
+      process.env.ADMIN_EMAILS?.split(",").map((e) => e.trim()) || [];
+
     if (adminEmails.length === 0) {
-      console.log('⚠️ No admin emails configured, skipping admin notification');
+      console.log("⚠️ No admin emails configured, skipping admin notification");
       return;
     }
 
@@ -362,10 +384,12 @@ export async function sendAdminPaymentNotification(params: {
           <ul style="line-height: 1.8;">
             <li><strong>Student:</strong> ${params.studentName}</li>
             <li><strong>Email:</strong> ${params.studentEmail}</li>
-            <li><strong>Amount:</strong> ₹${params.amount.toLocaleString('en-IN')}</li>
+            <li><strong>Amount:</strong> ₹${params.amount.toLocaleString(
+              "en-IN"
+            )}</li>
             <li><strong>Payment ID:</strong> ${params.paymentId}</li>
             <li><strong>Order ID:</strong> ${params.orderId}</li>
-            <li><strong>Method:</strong> ${params.paymentMethod || 'N/A'}</li>
+            <li><strong>Method:</strong> ${params.paymentMethod || "N/A"}</li>
           </ul>
           <p style="color: #666; font-size: 12px; margin-top: 20px;">
             This is an automated notification from Neram Classes payment system.
@@ -376,17 +400,22 @@ export async function sendAdminPaymentNotification(params: {
 
     await transport.sendMail({
       from: {
-        name: 'Neram Payment System',
-        address: process.env.MAIL_FROM || 'noreply@neramclasses.com',
+        name: "Neram Payment System",
+        address: process.env.MAIL_FROM || "noreply@neramclasses.com",
       },
       to: adminEmails,
-      subject: `New Payment: ₹${params.amount.toLocaleString('en-IN')} from ${params.studentName}`,
+      subject: `New Payment: ₹${params.amount.toLocaleString("en-IN")} from ${
+        params.studentName
+      }`,
       html: htmlContent,
     });
 
-    console.log('✅ Admin payment notification sent to:', adminEmails.join(', '));
+    console.log(
+      "✅ Admin payment notification sent to:",
+      adminEmails.join(", ")
+    );
   } catch (error) {
-    console.error('❌ Failed to send admin notification:', error);
+    console.error("❌ Failed to send admin notification:", error);
     // Don't throw - admin notification failures shouldn't break the flow
   }
 }

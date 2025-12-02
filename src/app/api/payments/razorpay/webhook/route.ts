@@ -89,7 +89,9 @@ async function sendPaymentConfirmationEmail(params: {
 }) {
   try {
     // Generate invoice number (e.g., INV-2025-001234)
-    const invoiceNumber = `INV-${new Date(params.paymentDate).getFullYear()}-${params.paymentId.substring(4, 10).toUpperCase()}`;
+    const invoiceNumber = `INV-${new Date(
+      params.paymentDate
+    ).getFullYear()}-${params.paymentId.substring(4, 10).toUpperCase()}`;
 
     // Generate PDF invoice
     const pdfBytes = await renderInvoicePdf({
@@ -402,10 +404,8 @@ export async function POST(req: Request) {
       // Extract user details from application
       const basic = appDetails.basic || {};
       const contact = appDetails.contact || {};
-      const studentName =
-        basic.student_name || basic.name || "Student";
-      const userEmail =
-        contact.email || entity.email || "";
+      const studentName = basic.student_name || basic.name || "Student";
+      const userEmail = contact.email || entity.email || "";
 
       const courseName =
         appDetails.course_name || appDetails.program || "NATA/JEE Coaching";
@@ -428,7 +428,9 @@ export async function POST(req: Request) {
         userId: applicationId,
         type: "payment_completed",
         title: "Payment Successful",
-        message: `Your payment of ₹${paymentDetails.amount?.toLocaleString("en-IN")} has been received successfully. Invoice sent to your email.`,
+        message: `Your payment of ₹${paymentDetails.amount?.toLocaleString(
+          "en-IN"
+        )} has been received successfully. Invoice sent to your email.`,
         data: {
           payment_id: paymentId,
           order_id: orderId,
@@ -456,7 +458,9 @@ export async function POST(req: Request) {
           userId: adminId,
           type: "payment_completed",
           title: "New Payment Received",
-          message: `${studentName} completed payment of ₹${paymentDetails.amount?.toLocaleString("en-IN")} via ${entity.method || "online"}.`,
+          message: `${studentName} completed payment of ₹${paymentDetails.amount?.toLocaleString(
+            "en-IN"
+          )} via ${entity.method || "online"}.`,
           data: {
             student_name: studentName,
             student_email: userEmail,
@@ -480,7 +484,9 @@ export async function POST(req: Request) {
         userId: applicationId,
         type: "payment_failed",
         title: "Payment Failed",
-        message: `Your payment attempt failed. ${entity.error_description || "Please try again."}`,
+        message: `Your payment attempt failed. ${
+          entity.error_description || "Please try again."
+        }`,
         data: {
           payment_id: paymentId,
           order_id: orderId,
