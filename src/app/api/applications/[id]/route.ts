@@ -45,8 +45,7 @@ export async function GET(req: NextRequest, { params }: { params: any }) {
 
   // note: pass the `cookies` function (from next/headers) directly to the
   // auth helpers so they can read the request cookies in this runtime.
-  const cookieStore = await cookies();
-  const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+  const supabase = createRouteHandlerClient({ cookies });
 
   const { data, error } = await supabase
     .from("users_duplicate")
@@ -90,8 +89,7 @@ export async function PATCH(req: NextRequest, { params }: { params: any }) {
   if (!id)
     return NextResponse.json({ error: "Missing id param" }, { status: 400 });
 
-  const cookieStore = await cookies();
-  const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+  const supabase = createRouteHandlerClient({ cookies });
 
   // get current user session
   const {
@@ -298,8 +296,7 @@ export async function DELETE(req: NextRequest, { params }: { params: any }) {
   if (!id)
     return NextResponse.json({ error: "Missing id param" }, { status: 400 });
 
-  const cookieStore = await cookies();
-  const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+  const supabase = createRouteHandlerClient({ cookies });
 
   const {
     data: { user },
