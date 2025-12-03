@@ -217,7 +217,7 @@ export function mapFromUsersDuplicate(
   // Determine account type based on payment status or account.account_type
   const paymentStatus = applicationDetails.final_fee_payment?.payment_status;
   const storedAccountType = account.account_type;
-  
+
   const computedAccountType =
     paymentStatus === "paid" || storedAccountType === "premium"
       ? "premium"

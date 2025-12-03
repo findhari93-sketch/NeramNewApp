@@ -64,7 +64,7 @@ export async function GET(req: Request) {
     console.log("[Invoice] Query result:", {
       found: !!userRow,
       error: fetchErr?.message,
-      hasFinalFee: userRow ? !!(userRow as any).final_fee_payment : false
+      hasFinalFee: userRow ? !!(userRow as any).final_fee_payment : false,
     });
 
     if (fetchErr || !userRow) {
@@ -94,7 +94,8 @@ export async function GET(req: Request) {
     const invoiceData = {
       studentName: basic.student_name || basic.name || "Student",
       email: contact.email || "",
-      course: appDetails.course_name || finalFee.course_name || "NATA/JEE Coaching",
+      course:
+        appDetails.course_name || finalFee.course_name || "NATA/JEE Coaching",
       orderId: finalFee.razorpay_order_id || "",
       paymentId: finalFee.razorpay_payment_id || "",
       amount: finalFee.payable_amount || finalFee.amount || 0,

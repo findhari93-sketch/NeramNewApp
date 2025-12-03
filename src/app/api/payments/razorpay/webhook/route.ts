@@ -23,9 +23,9 @@ import crypto from "crypto";
 import { createClient } from "@supabase/supabase-js";
 import { renderInvoicePdf } from "@/lib/invoice";
 import {
-  sendPaymentConfirmation,
+  sendPaymentConfirmationEmail,
   sendAdminPaymentNotification,
-} from "@/lib/email/sendPaymentConfirmation";
+} from "@/lib/email/sendPaymentConfirmationGraph";
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -72,69 +72,6 @@ async function createNotification(params: {
     }
   } catch (err) {
     log("❌ Error creating notification", err);
-  }
-}
-
-/**
- * Send payment confirmation email with PDF invoice via SendGrid
- */
-async function sendPaymentConfirmationEmail(params: {
-  userEmail: string;
-  studentName: string;
-  courseName: string;
-  amountPaid: number;
-  paymentId: string;
-  orderId: string;
-  paymentDate: string;
-}) {
-  try {
-    // Generate invoice number (e.g., INV-2025-001234)
-    const invoiceNumber = `INV-${new Date(
-      params.paymentDate
-    ).getFullYear()}-${params.paymentId.substring(4, 10).toUpperCase()}`;
-
-    // Generate PDF invoice
-    const pdfBytes = await renderInvoicePdf({
-      studentName: params.studentName,
-      email: params.userEmail,
-      course: params.courseName,
-      orderId: params.orderId,
-      paymentId: params.paymentId,
-      amount: params.amountPaid,
-      currency: "INR",
-      issuedAt: params.paymentDate,
-    });
-
-    // Send payment confirmation email with PDF attachment via SendGrid
-    const result = await sendPaymentConfirmation(
-      {
-        userName: params.studentName,
-        userEmail: params.userEmail,
-        orderId: params.orderId,
-        paymentId: params.paymentId,
-        amount: params.amountPaid,
-        currency: "INR",
-        paidAt: params.paymentDate,
-        courseName: params.courseName,
-        invoiceNumber,
-      },
-      Buffer.from(pdfBytes)
-    );
-
-    if (result.success) {
-      log("✅ Payment confirmation email sent via SendGrid", {
-        email: params.userEmail,
-        invoiceNumber,
-        messageId: result.messageId,
-      });
-    } else {
-      log("⚠️ Failed to send payment confirmation email", {
-        error: result.error,
-      });
-    }
-  } catch (err) {
-    log("❌ Error sending payment confirmation email", err);
-    // Don't throw - email failures shouldn't break webhook processing
   }
 }
 
@@ -229,7 +166,9 @@ export async function POST(req: Request) {
     // Find application by razorpay_order_id in users_duplicate table
     const { data: applications } = await supabase
       .from("users_duplicate")
-      .select("id, final_fee_payment, application_details, basic, contact, account");
+      .select(
+        "id, final_fee_payment, application_details, basic, contact, account"
+      );
 
     if (!applications || applications.length === 0) {
       log("No applications found in database");

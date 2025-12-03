@@ -114,9 +114,7 @@ function PremiumContent({
             },
           }}
         >
-          <CheckCircleOutlineIcon
-            sx={{ fontSize: 60, color: "white" }}
-          />
+          <CheckCircleOutlineIcon sx={{ fontSize: 60, color: "white" }} />
         </Box>
 
         <Typography
@@ -136,7 +134,10 @@ function PremiumContent({
           Thank you for your payment.
         </Typography>
 
-        <Typography variant="body1" sx={{ mb: 4, color: "success.main", fontWeight: 600 }}>
+        <Typography
+          variant="body1"
+          sx={{ mb: 4, color: "success.main", fontWeight: 600 }}
+        >
           Your account has been upgraded to premium.
         </Typography>
 
@@ -152,8 +153,13 @@ function PremiumContent({
               borderRadius: 2,
             }}
           >
-            <Typography variant="body2" color="success.dark" sx={{ fontWeight: 500 }}>
-              ✨ You now have access to all premium features, study materials, and live classes!
+            <Typography
+              variant="body2"
+              color="success.dark"
+              sx={{ fontWeight: 500 }}
+            >
+              ✨ You now have access to all premium features, study materials,
+              and live classes!
             </Typography>
           </Paper>
         )}
@@ -199,11 +205,11 @@ function PremiumContent({
           size="small"
           onClick={async () => {
             try {
-              const res = await apiFetch('/api/payments/invoice');
-              if (!res.ok) throw new Error('Failed to download invoice');
+              const res = await apiFetch("/api/payments/invoice");
+              if (!res.ok) throw new Error("Failed to download invoice");
               const blob = await res.blob();
               const url = window.URL.createObjectURL(blob);
-              const a = document.createElement('a');
+              const a = document.createElement("a");
               a.href = url;
               a.download = `Invoice_${Date.now()}.pdf`;
               document.body.appendChild(a);
@@ -211,8 +217,8 @@ function PremiumContent({
               a.remove();
               window.URL.revokeObjectURL(url);
             } catch (e) {
-              console.error('Invoice download failed:', e);
-              alert('Failed to download invoice. Please try again.');
+              console.error("Invoice download failed:", e);
+              alert("Failed to download invoice. Please try again.");
             }
           }}
           sx={{
@@ -224,8 +230,15 @@ function PremiumContent({
           📄 Download Invoice
         </Button>
 
-        <Box sx={{ mt: 4, pt: 3, borderTop: "1px solid", borderColor: "divider" }}>
-          <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
+        <Box
+          sx={{ mt: 4, pt: 3, borderTop: "1px solid", borderColor: "divider" }}
+        >
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            display="block"
+            gutterBottom
+          >
             Next Steps:
           </Typography>
           <Typography variant="body2" color="text.secondary">

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Container,
@@ -24,7 +24,7 @@ import {
   Divider,
   Link as MuiLink,
   CircularProgress,
-} from '@mui/material';
+} from "@mui/material";
 
 // Alias Grid to support size prop
 const Grid: any = GridOrig;
@@ -43,52 +43,53 @@ import {
   Computer,
   AccountCircle,
   Celebration,
-} from '@mui/icons-material';
-import { useRouter } from 'next/navigation';
-import { getAuth } from 'firebase/auth';
-import apiFetch from '@/lib/apiClient';
+} from "@mui/icons-material";
+import { useRouter } from "next/navigation";
+import { getAuth } from "firebase/auth";
+import apiFetch from "@/lib/apiClient";
 
 const steps = [
   {
-    label: 'Payment Confirmed',
-    description: 'Your payment has been successfully processed',
+    label: "Payment Confirmed",
+    description: "Your payment has been successfully processed",
     icon: <CheckCircle />,
-    status: 'completed',
+    status: "completed",
   },
   {
-    label: 'Download Required Apps',
-    description: 'Install the apps you\'ll need for classes',
+    label: "Download Required Apps",
+    description: "Install the apps you'll need for classes",
     icon: <Download />,
-    status: 'active',
+    status: "active",
   },
   {
-    label: 'Account Setup (24-48 hours)',
-    description: 'Admin will create your study portal account',
+    label: "Account Setup (24-48 hours)",
+    description: "Admin will create your study portal account",
     icon: <AccountCircle />,
-    status: 'pending',
+    status: "pending",
   },
   {
-    label: 'Join Your First Class',
-    description: 'Start your learning journey',
+    label: "Join Your First Class",
+    description: "Start your learning journey",
     icon: <School />,
-    status: 'pending',
+    status: "pending",
   },
 ];
 
 const requiredApps = [
   {
-    name: 'Neram Classes Study Portal',
-    url: 'https://app.neramclasses.com',
-    description: 'Access study materials, practice tests, and track your progress',
-    icon: <MenuBook sx={{ fontSize: 40, color: '#4a148c' }} />,
-    color: '#e1bee7',
+    name: "Neram Classes Study Portal",
+    url: "https://app.neramclasses.com",
+    description:
+      "Access study materials, practice tests, and track your progress",
+    icon: <MenuBook sx={{ fontSize: 40, color: "#4a148c" }} />,
+    color: "#e1bee7",
   },
   {
-    name: 'Microsoft Teams',
-    url: 'https://www.microsoft.com/en/microsoft-teams/download-app',
-    description: 'Attend live online classes and interact with instructors',
-    icon: <VideoCall sx={{ fontSize: 40, color: '#1976d2' }} />,
-    color: '#bbdefb',
+    name: "Microsoft Teams",
+    url: "https://www.microsoft.com/en/microsoft-teams/download-app",
+    description: "Attend live online classes and interact with instructors",
+    icon: <VideoCall sx={{ fontSize: 40, color: "#1976d2" }} />,
+    color: "#bbdefb",
   },
 ];
 
@@ -105,18 +106,18 @@ export default function PremiumWelcomePage() {
       const user = auth.currentUser;
 
       if (!user) {
-        router.replace('/auth/login');
+        router.replace("/auth/login");
         return;
       }
 
       try {
-        const response = await fetch('/api/users/me');
+        const response = await fetch("/api/users/me");
         if (response.ok) {
           const data = await response.json();
           setApplicationData(data);
         }
       } catch (error) {
-        console.error('Error fetching application data:', error);
+        console.error("Error fetching application data:", error);
       } finally {
         setLoading(false);
       }
@@ -127,7 +128,14 @@ export default function PremiumWelcomePage() {
 
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '80vh' }}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: "80vh",
+        }}
+      >
         <CircularProgress />
       </Box>
     );
@@ -139,14 +147,14 @@ export default function PremiumWelcomePage() {
       <Paper
         elevation={0}
         sx={{
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          color: 'white',
+          background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+          color: "white",
           p: 4,
           borderRadius: 3,
           mb: 4,
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+        <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
           <Celebration sx={{ fontSize: 48, mr: 2 }} />
           <Box>
             <Typography variant="h3" fontWeight="bold">
@@ -157,9 +165,19 @@ export default function PremiumWelcomePage() {
             </Typography>
           </Box>
         </Box>
-        <Alert severity="success" sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: 'white', '& .MuiAlert-icon': { color: 'white' } }}>
-          <AlertTitle sx={{ fontWeight: 'bold' }}>Payment Successful!</AlertTitle>
-          Thank you for enrolling with Neram Classes. You now have full access to our premium learning platform.
+        <Alert
+          severity="success"
+          sx={{
+            bgcolor: "rgba(255,255,255,0.2)",
+            color: "white",
+            "& .MuiAlert-icon": { color: "white" },
+          }}
+        >
+          <AlertTitle sx={{ fontWeight: "bold" }}>
+            Payment Successful!
+          </AlertTitle>
+          Thank you for enrolling with Neram Classes. You now have full access
+          to our premium learning platform.
         </Alert>
       </Paper>
 
@@ -167,8 +185,13 @@ export default function PremiumWelcomePage() {
       <Grid container spacing={3}>
         <Grid size={{ xs: 12, md: 8 }}>
           <Paper elevation={2} sx={{ p: 3, borderRadius: 2, mb: 3 }}>
-            <Typography variant="h5" fontWeight="bold" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-              <AssignmentTurnedIn sx={{ mr: 1, color: 'primary.main' }} />
+            <Typography
+              variant="h5"
+              fontWeight="bold"
+              gutterBottom
+              sx={{ display: "flex", alignItems: "center" }}
+            >
+              <AssignmentTurnedIn sx={{ mr: 1, color: "primary.main" }} />
               Your Next Steps
             </Typography>
             <Divider sx={{ mb: 3 }} />
@@ -178,9 +201,9 @@ export default function PremiumWelcomePage() {
                 <Step key={step.label} completed={index < activeStep}>
                   <StepLabel
                     optional={
-                      step.status === 'pending' ? (
+                      step.status === "pending" ? (
                         <Typography variant="caption">Pending</Typography>
-                      ) : step.status === 'completed' ? (
+                      ) : step.status === "completed" ? (
                         <Chip label="Done" color="success" size="small" />
                       ) : null
                     }
@@ -189,12 +212,13 @@ export default function PremiumWelcomePage() {
                         sx={{
                           width: 40,
                           height: 40,
-                          borderRadius: '50%',
-                          bgcolor: index <= activeStep ? 'primary.main' : 'grey.300',
-                          color: 'white',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
+                          borderRadius: "50%",
+                          bgcolor:
+                            index <= activeStep ? "primary.main" : "grey.300",
+                          color: "white",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
                         }}
                       >
                         {step.icon}
@@ -226,8 +250,13 @@ export default function PremiumWelcomePage() {
 
           {/* Required Apps */}
           <Paper elevation={2} sx={{ p: 3, borderRadius: 2, mb: 3 }}>
-            <Typography variant="h5" fontWeight="bold" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-              <Download sx={{ mr: 1, color: 'primary.main' }} />
+            <Typography
+              variant="h5"
+              fontWeight="bold"
+              gutterBottom
+              sx={{ display: "flex", alignItems: "center" }}
+            >
+              <Download sx={{ mr: 1, color: "primary.main" }} />
               Required Apps & Tools
             </Typography>
             <Divider sx={{ mb: 3 }} />
@@ -238,32 +267,40 @@ export default function PremiumWelcomePage() {
                   <Card
                     elevation={0}
                     sx={{
-                      border: '2px solid',
-                      borderColor: 'divider',
-                      '&:hover': { borderColor: 'primary.main', boxShadow: 2 },
-                      transition: 'all 0.3s',
+                      border: "2px solid",
+                      borderColor: "divider",
+                      "&:hover": { borderColor: "primary.main", boxShadow: 2 },
+                      transition: "all 0.3s",
                     }}
                   >
                     <CardContent>
-                      <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+                      <Box sx={{ display: "flex", alignItems: "flex-start" }}>
                         <Box
                           sx={{
                             bgcolor: app.color,
                             p: 2,
                             borderRadius: 2,
                             mr: 2,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
                           }}
                         >
                           {app.icon}
                         </Box>
                         <Box sx={{ flex: 1 }}>
-                          <Typography variant="h6" fontWeight="bold" gutterBottom>
+                          <Typography
+                            variant="h6"
+                            fontWeight="bold"
+                            gutterBottom
+                          >
                             {app.name}
                           </Typography>
-                          <Typography variant="body2" color="text.secondary" paragraph>
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                            paragraph
+                          >
                             {app.description}
                           </Typography>
                           <Button
@@ -273,7 +310,7 @@ export default function PremiumWelcomePage() {
                             rel="noopener noreferrer"
                             startIcon={<Computer />}
                           >
-                            Open {app.name.split(' ')[0]}
+                            Open {app.name.split(" ")[0]}
                           </Button>
                         </Box>
                       </Box>
@@ -286,15 +323,21 @@ export default function PremiumWelcomePage() {
 
           {/* Account Setup Information */}
           <Paper elevation={2} sx={{ p: 3, borderRadius: 2 }}>
-            <Typography variant="h5" fontWeight="bold" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-              <AccountCircle sx={{ mr: 1, color: 'primary.main' }} />
+            <Typography
+              variant="h5"
+              fontWeight="bold"
+              gutterBottom
+              sx={{ display: "flex", alignItems: "center" }}
+            >
+              <AccountCircle sx={{ mr: 1, color: "primary.main" }} />
               Account Setup Process
             </Typography>
             <Divider sx={{ mb: 3 }} />
 
             <Alert severity="info" sx={{ mb: 2 }}>
               <AlertTitle>What Happens Next?</AlertTitle>
-              Our admin team will verify your payment and create your study portal account within 24-48 hours.
+              Our admin team will verify your payment and create your study
+              portal account within 24-48 hours.
             </Alert>
 
             <List>
@@ -337,7 +380,8 @@ export default function PremiumWelcomePage() {
             </List>
 
             <Alert severity="warning" sx={{ mt: 2 }}>
-              <strong>Important:</strong> Please check your email regularly (including spam folder) for your account credentials.
+              <strong>Important:</strong> Please check your email regularly
+              (including spam folder) for your account credentials.
             </Alert>
           </Paper>
         </Grid>
@@ -351,12 +395,12 @@ export default function PremiumWelcomePage() {
             </Typography>
             <Divider sx={{ mb: 2 }} />
 
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
               <Button
                 variant="contained"
                 fullWidth
                 startIcon={<AssignmentTurnedIn />}
-                onClick={() => router.push('/applications')}
+                onClick={() => router.push("/applications")}
               >
                 View My Application
               </Button>
@@ -366,11 +410,11 @@ export default function PremiumWelcomePage() {
                 startIcon={<Download />}
                 onClick={async () => {
                   try {
-                    const res = await apiFetch('/api/payments/invoice');
-                    if (!res.ok) throw new Error('Failed to download invoice');
+                    const res = await apiFetch("/api/payments/invoice");
+                    if (!res.ok) throw new Error("Failed to download invoice");
                     const blob = await res.blob();
                     const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
+                    const a = document.createElement("a");
                     a.href = url;
                     a.download = `Invoice_${Date.now()}.pdf`;
                     document.body.appendChild(a);
@@ -378,8 +422,8 @@ export default function PremiumWelcomePage() {
                     a.remove();
                     window.URL.revokeObjectURL(url);
                   } catch (e) {
-                    console.error('Invoice download failed:', e);
-                    alert('Failed to download invoice. Please try again.');
+                    console.error("Invoice download failed:", e);
+                    alert("Failed to download invoice. Please try again.");
                   }
                 }}
               >
@@ -399,7 +443,12 @@ export default function PremiumWelcomePage() {
 
           {/* Contact Support */}
           <Paper elevation={2} sx={{ p: 3, borderRadius: 2, mb: 3 }}>
-            <Typography variant="h6" fontWeight="bold" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+            <Typography
+              variant="h6"
+              fontWeight="bold"
+              gutterBottom
+              sx={{ display: "flex", alignItems: "center" }}
+            >
               <ContactSupport sx={{ mr: 1 }} />
               Need Help?
             </Typography>
@@ -443,7 +492,11 @@ export default function PremiumWelcomePage() {
                 <ListItemText
                   primary="WhatsApp"
                   secondary={
-                    <MuiLink href="https://wa.me/919176137043" target="_blank" color="inherit">
+                    <MuiLink
+                      href="https://wa.me/919176137043"
+                      target="_blank"
+                      color="inherit"
+                    >
                       Chat with us
                     </MuiLink>
                   }
@@ -460,7 +513,7 @@ export default function PremiumWelcomePage() {
               </Typography>
               <Divider sx={{ mb: 2 }} />
               <Typography variant="body2" color="text.secondary" paragraph>
-                {applicationData.selected_course || 'NATA/JEE Coaching'}
+                {applicationData.selected_course || "NATA/JEE Coaching"}
               </Typography>
               <Chip label="Premium Access" color="success" size="small" />
             </Paper>
