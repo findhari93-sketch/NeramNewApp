@@ -637,8 +637,6 @@ export default function TopNavBar({
                   role: "Visitor",
                   avatarUrl: avatarUrl,
                   accountType: syncedUser?.accountType || undefined,
-                  account_type: (syncedUser as any)?.account_type || undefined,
-                  payment_status: (syncedUser as any)?.payment_status || undefined,
                 }}
                 showDetails={false}
                 onSignOut={async () => {
