@@ -57,7 +57,7 @@ export async function POST(req: Request) {
 
     const { data: appsByOrder, error: orderErr } = await supabase
       .from("users_duplicate")
-      .select("id, final_fee_payment");
+      .select("id, final_fee_payment, contact, basic, account, application_details");
 
     if (!orderErr && appsByOrder) {
       for (const app of appsByOrder) {
@@ -102,7 +102,7 @@ export async function POST(req: Request) {
     if (!application) {
       const { data: app, error: fetchErr } = await supabase
         .from("users_duplicate")
-        .select("final_fee_payment")
+        .select("id, final_fee_payment, contact, basic, account, application_details")
         .eq("id", applicationId)
         .single();
 
@@ -194,14 +194,18 @@ export async function POST(req: Request) {
     try {
       console.log("[verify] Generating invoice PDF...");
 
-      // Extract student and course details
-      const studentName = application.student_name || application.basic?.student_name || application.name || "Student";
-      const studentEmail = application.email || application.contact?.email;
-      const studentPhone = application.contact?.phone || application.phone;
+      // Extract student and course details from JSONB fields
+      const contact = application.contact as any || {};
+      const basic = application.basic as any || {};
+      const appDetails = application.application_details as any || {};
+      
+      const studentName = basic.student_name || application.student_name || application.name || "Student";
+      const studentEmail = contact.email || application.email;
+      const studentPhone = contact.phone || application.phone;
 
       console.log("[verify] Student details:", { studentName, studentEmail, studentPhone });
 
-      const courseName = adminFilled.final_course_Name || application.selected_course || "N/A";
+      const courseName = adminFilled.final_course_Name || appDetails.selected_course || application.selected_course || "N/A";
       const courseDuration = adminFilled.course_duration || "N/A";
 
       // Use the payableAmount we calculated earlier
