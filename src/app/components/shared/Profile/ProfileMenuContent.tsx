@@ -51,8 +51,7 @@ export default function ProfileMenuContent({
   }, [user]);
   const isPremium = React.useMemo(
     () =>
-      user?.accountType === "premium" ||
-      user?.accountType === "Premium" ||
+      String(user?.accountType).toLowerCase() === "premium" ||
       (user as any)?.account_type === "premium" ||
       (user as any)?.payment_status === "paid",
     [user]
