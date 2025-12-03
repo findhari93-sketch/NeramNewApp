@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
     console.log("[Submit API] Azure token acquired");
 
     // Build email HTML
-    const adminLink = `https://neram.co.in/nexus/admin/applications/${user.id}`;
+    const adminLink = `https://admin.neramclasses.com/class-requests/${user.id}`;
 
     const emailHtml = `
 <!DOCTYPE html>

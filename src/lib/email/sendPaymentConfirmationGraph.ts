@@ -295,7 +295,7 @@ export async function sendPaymentConfirmationEmail(
   try {
     console.log("[Graph Email] === STARTING PAYMENT CONFIRMATION EMAIL ===");
     console.log("[Graph Email] Parameters:", JSON.stringify(params, null, 2));
-    
+
     console.log("[Graph Email] Step 1: Getting Azure AD token...");
     const token = await getGraphToken();
     console.log("[Graph Email] ✅ Token acquired");
@@ -318,8 +318,12 @@ export async function sendPaymentConfirmationEmail(
     };
 
     const pdfBytes = await renderInvoicePdf(invoiceData);
-    console.log("[Graph Email] ✅ PDF generated, size:", pdfBytes.length, "bytes");
-    
+    console.log(
+      "[Graph Email] ✅ PDF generated, size:",
+      pdfBytes.length,
+      "bytes"
+    );
+
     const pdfBase64 = Buffer.from(pdfBytes).toString("base64");
     console.log("[Graph Email] ✅ PDF encoded to base64");
 
@@ -372,7 +376,11 @@ export async function sendPaymentConfirmationEmail(
       }
     );
 
-    console.log("[Graph Email] Response status:", mailRes.status, mailRes.statusText);
+    console.log(
+      "[Graph Email] Response status:",
+      mailRes.status,
+      mailRes.statusText
+    );
 
     if (!mailRes.ok) {
       const error = await mailRes.text();
@@ -436,7 +444,10 @@ export async function sendAdminPaymentNotification(
     };
 
     console.log("[Graph Email Admin] Step 3: Sending to admins...");
-    console.log("[Graph Email Admin] Recipients:", [process.env.ADMIN_EMAIL, "support@neramclasses.com"]);
+    console.log("[Graph Email Admin] Recipients:", [
+      process.env.ADMIN_EMAIL,
+      "support@neramclasses.com",
+    ]);
 
     const mailRes = await fetch(
       `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(
@@ -452,7 +463,11 @@ export async function sendAdminPaymentNotification(
       }
     );
 
-    console.log("[Graph Email Admin] Response status:", mailRes.status, mailRes.statusText);
+    console.log(
+      "[Graph Email Admin] Response status:",
+      mailRes.status,
+      mailRes.statusText
+    );
 
     if (!mailRes.ok) {
       const error = await mailRes.text();
@@ -464,7 +479,9 @@ export async function sendAdminPaymentNotification(
     console.log("[Graph Email Admin] ✅✅✅ Admin notification SENT!");
     console.log("[Graph Email Admin] === ADMIN EMAIL COMPLETED ===");
   } catch (error: any) {
-    console.error("[Graph Email Admin] ❌❌❌ ERROR sending admin notification!");
+    console.error(
+      "[Graph Email Admin] ❌❌❌ ERROR sending admin notification!"
+    );
     console.error("[Graph Email Admin] Error:", error.message);
     // Don't throw - admin email failure shouldn't block the webhook
   }

@@ -1,6 +1,4 @@
-import type PDFKit from 'pdfkit';
-// dynamic import to avoid ESM/CJS issues in Next.js build
-const loadPDFKit = async (): Promise<typeof PDFKit> => (await import('pdfkit')).default as unknown as typeof PDFKit;
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
 export interface InvoiceData {
   invoiceNumber: string;
@@ -24,80 +22,154 @@ export interface InvoiceData {
 }
 
 export async function generateInvoicePDF(data: InvoiceData): Promise<Buffer> {
-  const PDFDocument = await loadPDFKit();
-  return new Promise((resolve, reject) => {
-    try {
-      const doc = new PDFDocument({ size: 'A4', margin: 50 });
-      const chunks: Buffer[] = [];
-      doc.on('data', (chunk: Buffer) => chunks.push(chunk));
-      doc.on('end', () => resolve(Buffer.concat(chunks)));
-      doc.on('error', reject);
+  const pdfDoc = await PDFDocument.create();
+  const page = pdfDoc.addPage([595.28, 841.89]); // A4
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-      doc.fontSize(24).fillColor('#4a148c').text('neramClasses.com', 50, 50);
-      doc.fontSize(10).fillColor('#666')
-        .text('Excellence in Education', 50, 80)
-        .text('Chennai, Tamil Nadu, India', 50, 95)
-        .text('Email: support@neram.co.in', 50, 110)
-        .text('Phone: +91 91761 37043', 50, 125);
+  const purple = rgb(0.29, 0.08, 0.55); // #4a148c
+  const gray = rgb(0.4, 0.4, 0.4);
+  const black = rgb(0, 0, 0);
+  const green = rgb(0.30, 0.69, 0.31); // #4caf50
 
-      doc.fontSize(20).fillColor('#000').text('PAYMENT INVOICE', 350, 50, { align: 'right' });
-      doc.fontSize(10).fillColor('#666')
-        .text(`Invoice #: ${data.invoiceNumber}`, 350, 80, { align: 'right' })
-        .text(`Date: ${formatDate(data.invoiceDate)}`, 350, 95, { align: 'right' })
-        .text(`Application ID: ${data.applicationId}`, 350, 110, { align: 'right' });
+  let y = 790;
 
-      doc.moveTo(50, 150).lineTo(550, 150).strokeColor('#4a148c').lineWidth(2).stroke();
+  // Header
+  page.drawText("neramClasses.com", { x: 50, y, size: 24, font: boldFont, color: purple });
+  y -= 20;
+  page.drawText("Excellence in Education", { x: 50, y, size: 10, font, color: gray });
+  y -= 15;
+  page.drawText("Chennai, Tamil Nadu, India", { x: 50, y, size: 10, font, color: gray });
+  y -= 15;
+  page.drawText("Email: support@neram.co.in | Phone: +91 91761 37043", { x: 50, y, size: 10, font, color: gray });
 
-      doc.fontSize(12).fillColor('#4a148c').text('STUDENT DETAILS', 50, 170);
-      doc.fontSize(10).fillColor('#000')
-        .text(`Name: ${data.studentName}`, 50, 195)
-        .text(`Email: ${data.studentEmail}`, 50, 210);
-      if (data.studentPhone) doc.text(`Phone: ${data.studentPhone}`, 50, 225);
+  // Invoice title (right side)
+  page.drawText("PAYMENT INVOICE", { x: 400, y: 790, size: 20, font: boldFont, color: black });
+  page.drawText(`Invoice #: ${data.invoiceNumber}`, { x: 400, y: 770, size: 10, font, color: gray });
+  page.drawText(`Date: ${formatDate(data.invoiceDate)}`, { x: 400, y: 755, size: 10, font, color: gray });
+  page.drawText(`Application: ${data.applicationId.slice(0, 8)}`, { x: 400, y: 740, size: 10, font, color: gray });
 
-      doc.fontSize(12).fillColor('#4a148c').text('COURSE DETAILS', 50, 260);
-      doc.fontSize(10).fillColor('#000')
-        .text(`Course Name: ${data.courseName}`, 50, 285)
-        .text(`Duration: ${data.courseDuration}`, 50, 300);
+  y = 700;
+  page.drawLine({ start: { x: 50, y }, end: { x: 545, y }, thickness: 2, color: purple });
 
-      doc.fontSize(12).fillColor('#4a148c').text('PAYMENT DETAILS', 50, 335);
-      doc.fontSize(10).fillColor('#000')
-        .text(`Payment ID: ${data.paymentId}`, 50, 360)
-        .text(`Order ID: ${data.orderId}`, 50, 375)
-        .text(`Payment Method: ${data.paymentMethod}`, 50, 390)
-        .text(`Payment Date: ${formatDate(data.paymentDate)}`, 50, 405)
-        .text(`Payment Type: ${data.paymentType}`, 50, 420);
+  // Student details
+  y -= 30;
+  page.drawText("STUDENT DETAILS", { x: 50, y, size: 12, font: boldFont, color: purple });
+  y -= 25;
+  page.drawText(`Name: ${data.studentName}`, { x: 50, y, size: 10, font, color: black });
+  y -= 15;
+  page.drawText(`Email: ${data.studentEmail}`, { x: 50, y, size: 10, font, color: black });
+  if (data.studentPhone) {
+    y -= 15;
+    page.drawText(`Phone: ${data.studentPhone}`, { x: 50, y, size: 10, font, color: black });
+  }
 
-      doc.fontSize(12).fillColor('#4a148c').text('FEES BREAKDOWN', 50, 455);
-      const tableTop = 480; const itemX = 50; const amountX = 450;
-      doc.fontSize(10).fillColor('#fff').rect(50, tableTop, 500, 25).fill('#7b1fa2');
-      doc.fillColor('#fff').text('Description', itemX + 10, tableTop + 8).text('Amount (₹)', amountX, tableTop + 8);
-      let y = tableTop + 35;
-      doc.fillColor('#000').text('Total Course Fees', itemX + 10, y).text(formatCurrency(data.totalCourseFees), amountX, y);
-      y += 25;
-      if (data.discount > 0) { doc.fillColor('#4caf50').text('Discount Applied', itemX + 10, y).text(`- ${formatCurrency(data.discount)}`, amountX, y); y += 25; }
-      doc.moveTo(50, y).lineTo(550, y).strokeColor('#ddd').lineWidth(1).stroke(); y += 15;
-      doc.fontSize(12).fillColor('#4a148c').text('Amount Paid', itemX + 10, y).text(formatCurrency(data.amountPaid), amountX, y);
-      y += 40;
-      doc.rect(50, y, 100, 30).fill('#4caf50');
-      doc.fontSize(12).fillColor('#fff').text('PAID', 70, y + 8);
+  // Course details
+  y -= 35;
+  page.drawText("COURSE DETAILS", { x: 50, y, size: 12, font: boldFont, color: purple });
+  y -= 25;
+  page.drawText(`Course Name: ${data.courseName}`, { x: 50, y, size: 10, font, color: black });
+  y -= 15;
+  page.drawText(`Duration: ${data.courseDuration}`, { x: 50, y, size: 10, font, color: black });
 
-      const footerY = 700;
-      doc.moveTo(50, footerY).lineTo(550, footerY).strokeColor('#ddd').lineWidth(1).stroke();
-      doc.fontSize(9).fillColor('#666')
-        .text('This is a computer-generated invoice and does not require a signature.', 50, footerY + 15, { align: 'center', width: 500 })
-        .text('For queries, contact us at support@neram.co.in or call +91 91761 37043', 50, footerY + 30, { align: 'center', width: 500 })
-        .text('© 2025 neramClasses.com. All rights reserved.', 50, footerY + 45, { align: 'center', width: 500 });
+  // Payment details
+  y -= 35;
+  page.drawText("PAYMENT DETAILS", { x: 50, y, size: 12, font: boldFont, color: purple });
+  y -= 25;
+  page.drawText(`Payment ID: ${data.paymentId}`, { x: 50, y, size: 10, font, color: black });
+  y -= 15;
+  page.drawText(`Order ID: ${data.orderId}`, { x: 50, y, size: 10, font, color: black });
+  y -= 15;
+  page.drawText(`Payment Method: ${data.paymentMethod}`, { x: 50, y, size: 10, font, color: black });
+  y -= 15;
+  page.drawText(`Payment Date: ${formatDate(data.paymentDate)}`, { x: 50, y, size: 10, font, color: black });
+  y -= 15;
+  page.drawText(`Payment Type: ${data.paymentType}`, { x: 50, y, size: 10, font, color: black });
 
-      doc.end();
-    } catch (err) { reject(err as Error); }
+  // Fees breakdown
+  y -= 35;
+  page.drawText("FEES BREAKDOWN", { x: 50, y, size: 12, font: boldFont, color: purple });
+  y -= 25;
+
+  // Table header
+  page.drawRectangle({ x: 50, y: y - 15, width: 495, height: 25, color: rgb(0.48, 0.12, 0.63) });
+  page.drawText("Description", { x: 60, y: y - 7, size: 10, font: boldFont, color: rgb(1, 1, 1) });
+  page.drawText("Amount (₹)", { x: 450, y: y - 7, size: 10, font: boldFont, color: rgb(1, 1, 1) });
+
+  y -= 45;
+  page.drawText("Total Course Fees", { x: 60, y, size: 10, font, color: black });
+  page.drawText(formatCurrency(data.totalCourseFees), { x: 450, y, size: 10, font, color: black });
+
+  if (data.discount > 0) {
+    y -= 20;
+    page.drawText("Discount Applied", { x: 60, y, size: 10, font, color: green });
+    page.drawText(`- ${formatCurrency(data.discount)}`, { x: 450, y, size: 10, font, color: green });
+  }
+
+  y -= 25;
+  page.drawLine({ start: { x: 50, y }, end: { x: 545, y }, thickness: 1, color: gray });
+
+  y -= 20;
+  page.drawText("Amount Paid", { x: 60, y, size: 12, font: boldFont, color: purple });
+  page.drawText(formatCurrency(data.amountPaid), { x: 450, y, size: 12, font: boldFont, color: purple });
+
+  y -= 30;
+  page.drawRectangle({ x: 50, y: y - 15, width: 100, height: 30, color: green });
+  page.drawText("PAID", { x: 75, y: y - 5, size: 12, font: boldFont, color: rgb(1, 1, 1) });
+
+  // Footer
+  const footerY = 100;
+  page.drawLine({ start: { x: 50, y: footerY }, end: { x: 545, y: footerY }, thickness: 1, color: gray });
+  page.drawText("This is a computer-generated invoice and does not require a signature.", {
+    x: 50,
+    y: footerY - 15,
+    size: 9,
+    font,
+    color: gray,
+    maxWidth: 495,
   });
+  page.drawText("For queries, contact us at support@neram.co.in or call +91 91761 37043", {
+    x: 50,
+    y: footerY - 30,
+    size: 9,
+    font,
+    color: gray,
+    maxWidth: 495,
+  });
+  page.drawText("© 2025 neramClasses.com. All rights reserved.", {
+    x: 50,
+    y: footerY - 45,
+    size: 9,
+    font,
+    color: gray,
+    maxWidth: 495,
+  });
+
+  const pdfBytes = await pdfDoc.save();
+  return Buffer.from(pdfBytes);
 }
 
 function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount);
 }
+
 function formatDate(isoDate: string): string {
-  try { const date = new Date(isoDate); return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }); } catch { return isoDate; }
+  try {
+    const date = new Date(isoDate);
+    return date.toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return isoDate;
+  }
+}
 }
 export function generateInvoiceNumber(applicationId: string): string {
   const d = new Date(); const year = d.getFullYear().toString().slice(-2); const month = (d.getMonth() + 1).toString().padStart(2, '0'); const shortId = applicationId.slice(0, 8).toUpperCase();
