@@ -391,12 +391,13 @@ export async function POST(req: Request) {
 
       // Send admin email notification
       await sendAdminPaymentNotification({
+        userEmail,
         studentName,
-        studentEmail: userEmail,
-        amount: paymentDetails.amount || 0,
+        courseName,
+        amountPaid: paymentDetails.amount || 0,
         paymentId,
         orderId,
-        paymentMethod: entity.method,
+        paymentDate: paymentDetails.webhook_received_at,
       });
 
       // Create admin notifications (in-app)
