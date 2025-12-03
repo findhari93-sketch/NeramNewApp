@@ -343,7 +343,7 @@ export async function POST(req: Request) {
     // Send email and notifications for successful payments
     if (newPaymentStatus === "paid") {
       log("💰 Payment successful, preparing email notifications...");
-      
+
       // Extract user details from top-level application object
       const basic = (application.basic as any) || {};
       const contact = (application.contact as any) || {};

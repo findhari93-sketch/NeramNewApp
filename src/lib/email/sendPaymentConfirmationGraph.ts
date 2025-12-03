@@ -469,18 +469,3 @@ export async function sendAdminPaymentNotification(
     // Don't throw - admin email failure shouldn't block the webhook
   }
 }
-        body: JSON.stringify(message),
-      }
-    );
-
-    if (!mailRes.ok) {
-      const error = await mailRes.text();
-      throw new Error(`Failed to send admin email: ${error}`);
-    }
-
-    console.log("[Graph Email] ✅ Admin notification sent successfully");
-  } catch (error: any) {
-    console.error("[Graph Email] Failed to send admin notification:", error);
-    // Don't throw - admin email failure shouldn't block the webhook
-  }
-}
