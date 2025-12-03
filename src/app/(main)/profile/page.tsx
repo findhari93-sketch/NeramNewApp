@@ -21,6 +21,7 @@ import Drawer from "@mui/material/Drawer";
 import Stack from "@mui/material/Stack";
 import Chip from "@mui/material/Chip";
 import MenuItem from "@mui/material/MenuItem";
+import DashboardIcon from "@mui/icons-material/Dashboard";
 import { Controller, useForm } from "react-hook-form";
 import { auth } from "../../../lib/firebase";
 import {
@@ -1183,7 +1184,7 @@ function ProfilePageInner() {
   return (
     <>
       <Container maxWidth="lg" sx={{ mb: 6, overflowX: "clip" }}>
-        {/* Page Header with Title and Join Class Button */}
+        {/* Page Header with Title and Action Buttons */}
         <Box
           sx={{
             display: "flex",
@@ -1203,24 +1204,50 @@ function ProfilePageInner() {
           >
             My Profile
           </Typography>
-          <Button
-            variant="contained"
-            color="primary"
-            size="large"
-            onClick={() => router.push("/applicationform")}
-            sx={{
-              px: 3,
-              py: 1.5,
-              fontWeight: 600,
-              fontSize: "1rem",
-              boxShadow: 2,
-              "&:hover": {
-                boxShadow: 4,
-              },
-            }}
-          >
-            Join Class
-          </Button>
+          <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+            {/* Show Premium Dashboard button for premium users */}
+            {((user as any)?.account?.account_type === "premium" ||
+              (user as any)?.accountType === "premium" ||
+              (user as any)?.payment_status === "paid") && (
+              <Button
+                variant="outlined"
+                color="primary"
+                size="large"
+                startIcon={<DashboardIcon />}
+                onClick={() => router.push("/premium")}
+                sx={{
+                  px: 3,
+                  py: 1.5,
+                  fontWeight: 600,
+                  fontSize: "1rem",
+                }}
+              >
+                Premium Dashboard
+              </Button>
+            )}
+            <Button
+              variant="contained"
+              color="primary"
+              size="large"
+              onClick={() => router.push("/applicationform")}
+              sx={{
+                px: 3,
+                py: 1.5,
+                fontWeight: 600,
+                fontSize: "1rem",
+                boxShadow: 2,
+                "&:hover": {
+                  boxShadow: 4,
+                },
+              }}
+            >
+              {(user as any)?.account?.account_type === "premium" ||
+              (user as any)?.accountType === "premium" ||
+              (user as any)?.payment_status === "paid"
+                ? "Add Course"
+                : "Join Class"}
+            </Button>
+          </Box>
         </Box>
 
         {/* Profile completeness card */}
@@ -1470,13 +1497,19 @@ function ProfilePageInner() {
                         sx={{ display: "flex", alignItems: "center", gap: 1 }}
                       >
                         <Typography variant="body2">
-                          {(user as any)?.accountType ||
-                            (user as any)?.account_type ||
-                            "Free"}
+                          {(user as any)?.account?.account_type === "premium" ||
+                          (user as any)?.accountType === "premium" ||
+                          (user as any)?.accountType === "Premium" ||
+                          (user as any)?.payment_status === "paid"
+                            ? "Premium"
+                            : (user as any)?.accountType ||
+                              (user as any)?.account_type ||
+                              "Free"}
                         </Typography>
-                        {((user as any)?.payment_status === "paid" ||
-                          (user as any)?.accountType ===
-                            "Paid Premium Student") && (
+                        {((user as any)?.account?.account_type === "premium" ||
+                          (user as any)?.payment_status === "paid" ||
+                          (user as any)?.accountType === "Premium" ||
+                          (user as any)?.accountType === "premium") && (
                           <Chip
                             label="Premium"
                             size="small"

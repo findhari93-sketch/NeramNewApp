@@ -29,6 +29,7 @@ import { titleCase } from "../../../lib/stringUtils";
 import { NeramLogo, MobileLogo } from "./NeramLogo/NeramLogo";
 import { signOut } from "firebase/auth";
 import NavLinkText from "./NavLinkText";
+import { useSyncedUser } from "../../../hooks/useSyncedUser";
 
 // Menu items are static; keep at module scope to avoid re-creating on each render
 const MENU_ITEMS: Array<{ label: string; href: string; badge?: string }> = [
@@ -98,6 +99,8 @@ export default function TopNavBar({
   const [moreMenuAnchor, setMoreMenuAnchor] =
     React.useState<null | HTMLElement>(null);
   const [userLabel, setUserLabel] = React.useState<string | null>(null);
+  const [firebaseUid, setFirebaseUid] = React.useState<string | null>(null);
+  const [syncedUser] = useSyncedUser(firebaseUid || "");
   const [avatarUrl, setAvatarUrl] = React.useState<string | null>(() => {
     try {
       if (typeof window === "undefined") return null;
@@ -252,9 +255,13 @@ export default function TopNavBar({
       if (!u) {
         setUserLabel(null);
         setAvatarUrl(null);
+        setFirebaseUid(null);
         return;
       }
       primeFromUser(u);
+      // Set Firebase UID for useSyncedUser
+      const uid = (u as any).uid as string | undefined;
+      if (uid) setFirebaseUid(uid);
 
       (async () => {
         try {
@@ -629,6 +636,9 @@ export default function TopNavBar({
                   name: titleCase(userLabel) ?? userLabel,
                   role: "Visitor",
                   avatarUrl: avatarUrl,
+                  accountType: syncedUser?.accountType || undefined,
+                  account_type: (syncedUser as any)?.account_type || undefined,
+                  payment_status: (syncedUser as any)?.payment_status || undefined,
                 }}
                 showDetails={false}
                 onSignOut={async () => {

@@ -12,7 +12,8 @@
     "format": "prettier --write .",
     "test:webhook": "node scripts/test-webhook.mjs",
     "test:email": "node scripts/test-payment-email.mjs",
-    "debug:sendgrid": "node scripts/debug-sendgrid.mjs"
+    "debug:sendgrid": "node scripts/debug-sendgrid.mjs",
+    "migrate:premium": "node scripts/migrate-paid-users-to-premium.mjs"
   },
   "dependencies": {
     "@emotion/cache": "^11.13.1",

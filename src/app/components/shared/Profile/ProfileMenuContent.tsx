@@ -17,6 +17,7 @@ import SettingsIcon from "@mui/icons-material/Settings";
 import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
 import LogoutIcon from "@mui/icons-material/Logout";
 import DescriptionIcon from "@mui/icons-material/Description";
+import DashboardIcon from "@mui/icons-material/Dashboard";
 import useAvatarColor from "./useAvatarColor";
 import type { User } from "../types";
 
@@ -44,7 +45,18 @@ export default function ProfileMenuContent({
 
   // Memoize small derived values to avoid re-computing across renders
   const displayName = React.useMemo(() => user?.name ?? "Guest User", [user]);
-  const displayRole = React.useMemo(() => user?.accountType ?? "Free", [user]);
+  const displayRole = React.useMemo(() => {
+    const acctType = user?.accountType || (user as any)?.account_type || "Free";
+    return acctType === "premium" ? "Premium" : acctType;
+  }, [user]);
+  const isPremium = React.useMemo(
+    () =>
+      user?.accountType === "premium" ||
+      user?.accountType === "Premium" ||
+      (user as any)?.account_type === "premium" ||
+      (user as any)?.payment_status === "paid",
+    [user]
+  );
 
   const avatar = React.useMemo(
     () =>
@@ -63,9 +75,9 @@ export default function ProfileMenuContent({
   const itemRefs = React.useRef<Array<HTMLButtonElement | null>>([]);
 
   React.useEffect(() => {
-    // ensure refs array length matches static menu size
-    itemRefs.current = itemRefs.current.slice(0, 5);
-  }, []);
+    // ensure refs array length matches static menu size (5 base + 1 optional premium)
+    itemRefs.current = itemRefs.current.slice(0, isPremium ? 6 : 5);
+  }, [isPremium]);
 
   const goProfile = React.useCallback(() => {
     onNavigate("/profile");
@@ -89,6 +101,11 @@ export default function ProfileMenuContent({
 
   const goJoinClass = React.useCallback(() => {
     onNavigate("/applicationform");
+    onClose?.();
+  }, [onNavigate, onClose]);
+
+  const goPremiumDashboard = React.useCallback(() => {
+    onNavigate("/premium");
     onClose?.();
   }, [onNavigate, onClose]);
 
@@ -153,7 +170,7 @@ export default function ProfileMenuContent({
             </Typography>
           </Box>
           <Button variant="contained" onClick={goJoinClass} size="small">
-            Join Class
+            {isPremium ? "Add Course" : "Join Class"}
           </Button>
         </Box>
 
@@ -212,9 +229,24 @@ export default function ProfileMenuContent({
             </ListItemIcon>
             <ListItemText primary="Submitted Applications" />
           </ListItemButton>
+          {isPremium && (
+            <ListItemButton
+              ref={(el) => {
+                itemRefs.current[3] = el as HTMLButtonElement | null;
+              }}
+              role="menuitem"
+              onClick={goPremiumDashboard}
+            >
+              <ListItemIcon>
+                <DashboardIcon aria-hidden="true" />
+              </ListItemIcon>
+              <ListItemText primary="Premium Dashboard" />
+            </ListItemButton>
+          )}
           <ListItemButton
             ref={(el) => {
-              itemRefs.current[3] = el as HTMLButtonElement | null;
+              itemRefs.current[isPremium ? 4 : 3] =
+                el as HTMLButtonElement | null;
             }}
             role="menuitem"
             onClick={goSettings}
@@ -227,7 +259,8 @@ export default function ProfileMenuContent({
           <Divider sx={{ my: 1 }} />
           <ListItemButton
             ref={(el) => {
-              itemRefs.current[4] = el as HTMLButtonElement | null;
+              itemRefs.current[isPremium ? 5 : 4] =
+                el as HTMLButtonElement | null;
             }}
             role="menuitem"
             onClick={handleLogout}

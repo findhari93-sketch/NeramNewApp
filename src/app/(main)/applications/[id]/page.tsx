@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { getAuth } from "firebase/auth";
 import { useRouter } from "next/navigation";
+import apiFetch from "@/lib/apiClient";
 import {
   Box,
   Card,
@@ -481,7 +482,24 @@ export default function ApplicationDetail({ params }: Props) {
                 <Button
                   variant="text"
                   size="small"
-                  onClick={() => window.open("/api/payments/invoice", "_blank")}
+                  onClick={async () => {
+                    try {
+                      const res = await apiFetch('/api/payments/invoice');
+                      if (!res.ok) throw new Error('Failed to download invoice');
+                      const blob = await res.blob();
+                      const url = window.URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `Invoice_${Date.now()}.pdf`;
+                      document.body.appendChild(a);
+                      a.click();
+                      a.remove();
+                      window.URL.revokeObjectURL(url);
+                    } catch (e) {
+                      console.error('Invoice download failed:', e);
+                      alert('Failed to download invoice. Please try again.');
+                    }
+                  }}
                 >
                   Download Invoice
                 </Button>

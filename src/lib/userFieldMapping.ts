@@ -214,12 +214,14 @@ export function mapFromUsersDuplicate(
   const education = dbRow.education || {};
   const applicationDetails = dbRow.application_details || {};
 
-  // Determine account type based on payment status
+  // Determine account type based on payment status or account.account_type
   const paymentStatus = applicationDetails.final_fee_payment?.payment_status;
+  const storedAccountType = account.account_type;
+  
   const computedAccountType =
-    paymentStatus === "paid"
-      ? "Paid Premium Student"
-      : account.account_type || "Free";
+    paymentStatus === "paid" || storedAccountType === "premium"
+      ? "premium"
+      : storedAccountType || "Free";
 
   return {
     // Top-level fields
