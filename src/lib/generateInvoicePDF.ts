@@ -243,7 +243,7 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<Buffer> {
     font: boldFont,
     color: rgb(1, 1, 1),
   });
-  page.drawText("Amount (₹)", {
+  page.drawText("Amount (Rs.)", {
     x: 450,
     y: y - 7,
     size: 10,
@@ -369,12 +369,11 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<Buffer> {
 }
 
 function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
+  const formatted = new Intl.NumberFormat("en-IN", {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(amount);
+  return `Rs. ${formatted}`;
 }
 
 function formatDate(isoDate: string): string {
