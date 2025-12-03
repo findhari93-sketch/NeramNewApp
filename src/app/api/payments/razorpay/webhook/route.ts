@@ -229,7 +229,7 @@ export async function POST(req: Request) {
     // Find application by razorpay_order_id in users_duplicate table
     const { data: applications } = await supabase
       .from("users_duplicate")
-      .select("id, application_details");
+      .select("id, final_fee_payment, application_details, basic, contact, account");
 
     if (!applications || applications.length === 0) {
       log("No applications found in database");
@@ -240,8 +240,7 @@ export async function POST(req: Request) {
     let application: any = null;
 
     for (const app of applications) {
-      const appDetails = app.application_details as any;
-      const finalFee = appDetails?.final_fee_payment || {};
+      const finalFee = (app.final_fee_payment as any) || {};
       if (finalFee.razorpay_order_id === orderId) {
         applicationId = app.id;
         application = app;
@@ -256,9 +255,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, message: "Application not found" });
     }
 
-    // Get current application details
+    // Get current application details and payment info
     const appDetails = (application.application_details as any) || {};
-    const finalFee = appDetails.final_fee_payment || {};
+    const finalFee = (application.final_fee_payment as any) || {};
+    const accountInfo = (application.account as any) || {};
 
     // Check idempotency: if this webhook event was already processed
     const paymentHistory = Array.isArray(finalFee.payment_history)
@@ -368,16 +368,18 @@ export async function POST(req: Request) {
       }),
     };
 
-    const updatedAppDetails = {
-      ...appDetails,
-      final_fee_payment: updatedFinalFee,
-    };
+    // Update account type to Premium for successful payments
+    const updatedAccount =
+      newPaymentStatus === "paid"
+        ? { ...accountInfo, account_type: "premium" }
+        : accountInfo;
 
-    // Update database
+    // Update database - final_fee_payment is a top-level column
     const { error: updateErr } = await supabase
       .from("users_duplicate")
       .update({
-        application_details: updatedAppDetails,
+        final_fee_payment: updatedFinalFee,
+        account: updatedAccount,
         updated_at: new Date().toISOString(),
       })
       .eq("id", applicationId);
@@ -401,14 +403,21 @@ export async function POST(req: Request) {
 
     // Send email and notifications for successful payments
     if (newPaymentStatus === "paid") {
-      // Extract user details from application
-      const basic = appDetails.basic || {};
-      const contact = appDetails.contact || {};
+      // Extract user details from top-level application object
+      const basic = (application.basic as any) || {};
+      const contact = (application.contact as any) || {};
       const studentName = basic.student_name || basic.name || "Student";
       const userEmail = contact.email || entity.email || "";
 
       const courseName =
         appDetails.course_name || appDetails.program || "NATA/JEE Coaching";
+
+      log("📧 Preparing to send emails", {
+        studentName,
+        userEmail,
+        courseName,
+        amount: paymentDetails.amount,
+      });
 
       // Send payment confirmation email with PDF invoice
       if (userEmail) {

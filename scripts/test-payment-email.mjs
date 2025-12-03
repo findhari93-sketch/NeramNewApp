@@ -2,16 +2,40 @@
  * Test Script for Payment Confirmation Email
  * Tests SendGrid integration with invoice PDF attachment
  *
- * Usage: node scripts/test-payment-email.mjs
+ * Usage: node scripts/test-payment-email.mjs [recipient-email]
+ * Example: node scripts/test-payment-email.mjs user@example.com
  */
 
 import { config } from "dotenv";
-import nodemailer from "nodemailer";
+import { createRequire } from "module";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const require = createRequire(import.meta.url);
 
 // Load environment variables
-config({ path: ".env.local" });
+config({ path: join(__dirname, "..", ".env.local") });
 
-console.log("🧪 Testing Payment Confirmation Email Setup\n");
+// Dynamic imports for TypeScript modules
+const { sendPaymentConfirmation, sendAdminPaymentNotification } = await import(
+  "../src/lib/email/sendPaymentConfirmation.ts"
+);
+const { renderInvoicePdf } = await import("../src/lib/invoice.ts");
+
+console.log("🧪 Testing Payment Confirmation Email\n");
+console.log("=====================================\n");
+
+// Get recipient email from command line
+const userEmail = process.argv[2];
+
+if (!userEmail) {
+  console.error("❌ Error: Please provide a recipient email address");
+  console.log("Usage: node scripts/test-payment-email.mjs <recipient-email>");
+  console.log("Example: node scripts/test-payment-email.mjs user@example.com\n");
+  process.exit(1);
+}
 
 // Verify required environment variables
 const requiredEnvVars = {
@@ -22,138 +46,131 @@ const requiredEnvVars = {
   MAIL_FROM: process.env.MAIL_FROM,
 };
 
-console.log("📋 Environment Check:");
-for (const [key, value] of Object.entries(requiredEnvVars)) {
-  if (!value) {
-    console.error(`❌ ${key} is not set`);
-    process.exit(1);
-  }
-  console.log(`✅ ${key}: ${key === "SMTP_PASS" ? "***" : value}`);
-}
+console.log("📋 Environment Configuration:");
+console.log(`  SMTP Host: ${process.env.SMTP_HOST || "❌ Not set"}`);
+console.log(`  SMTP Port: ${process.env.SMTP_PORT || "❌ Not set"}`);
+console.log(`  SMTP User: ${process.env.SMTP_USER || "❌ Not set"}`);
+console.log(
+  `  SMTP Pass: ${process.env.SMTP_PASS ? "✓ Configured" : "❌ Not set"}`
+);
+console.log(`  Mail From: ${process.env.MAIL_FROM || "❌ Not set"}`);
+console.log(
+  `  Help Desk: ${process.env.HELP_DESK_EMAIL || "support@neram.co.in"}`
+);
+console.log(
+  `  Base URL: ${process.env.NEXT_PUBLIC_BASE_URL || "https://neram.co.in"}`
+);
+console.log(
+  `  Admin Emails: ${process.env.ADMIN_EMAILS || "❌ Not configured"}`
+);
 console.log("");
 
-// Create transporter
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: parseInt(process.env.SMTP_PORT || "587"),
-  secure: process.env.SMTP_SECURE === "true",
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-});
+// Check for missing variables
+const missingVars = Object.entries(requiredEnvVars)
+  .filter(([_, value]) => !value)
+  .map(([key, _]) => key);
 
-// Test SMTP connection
-console.log("🔌 Testing SMTP Connection...");
+if (missingVars.length > 0) {
+  console.error("❌ Missing required variables:", missingVars.join(", "));
+  console.log("\nPlease configure these in your .env.local file\n");
+  process.exit(1);
+}
+
+// Test payment data
+const testPayment = {
+  userName: "Test Student",
+  userEmail: userEmail,
+  orderId: "order_TEST" + Date.now(),
+  paymentId: "pay_TEST" + Date.now(),
+  amount: 15000,
+  currency: "INR",
+  paidAt: new Date().toISOString(),
+  courseName: "NATA/JEE Coaching Premium",
+  invoiceNumber: `INV-${new Date().getFullYear()}-TEST${String(Date.now()).slice(-6)}`,
+};
+
+console.log("📝 Test Payment Details:");
+console.log(`  Student Name: ${testPayment.userName}`);
+console.log(`  Email: ${testPayment.userEmail}`);
+console.log(`  Amount: ₹${testPayment.amount.toLocaleString("en-IN")}`);
+console.log(`  Course: ${testPayment.courseName}`);
+console.log(`  Order ID: ${testPayment.orderId}`);
+console.log(`  Payment ID: ${testPayment.paymentId}`);
+console.log(`  Invoice #: ${testPayment.invoiceNumber}`);
+console.log("");
+
 try {
-  await transporter.verify();
-  console.log("✅ SMTP connection verified successfully!\n");
-} catch (error) {
-  console.error("❌ SMTP connection failed:", error.message);
-  process.exit(1);
-}
-
-// Generate test invoice HTML
-function generateTestInvoiceHTML() {
-  const invoiceNumber = "INV-2025-TEST01";
-  const paidAt = new Date().toISOString();
-  const formattedDate = new Date(paidAt).toLocaleString("en-IN", {
-    timeZone: "Asia/Kolkata",
-    dateStyle: "full",
-    timeStyle: "short",
+  // Generate invoice PDF
+  console.log("📄 Generating invoice PDF...");
+  const pdfBytes = await renderInvoicePdf({
+    studentName: testPayment.userName,
+    email: testPayment.userEmail,
+    course: testPayment.courseName,
+    orderId: testPayment.orderId,
+    paymentId: testPayment.paymentId,
+    amount: testPayment.amount,
+    currency: testPayment.currency,
+    issuedAt: testPayment.paidAt,
   });
+  console.log("✅ Invoice PDF generated successfully");
+  console.log(`   Size: ${(pdfBytes.length / 1024).toFixed(2)} KB\n`);
 
-  return `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <style>
-    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; background: #f4f4f4; }
-    .container { max-width: 600px; margin: 20px auto; background: white; border-radius: 8px; overflow: hidden; }
-    .header { background: linear-gradient(135deg, #1976d2, #1565c0); color: white; padding: 30px; text-align: center; }
-    .content { padding: 30px; }
-    .invoice-box { background: #f8f9fa; border-left: 4px solid #1976d2; padding: 20px; margin: 20px 0; }
-    .amount { font-size: 24px; font-weight: bold; color: #1976d2; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1>Payment Confirmation - TEST</h1>
-    </div>
-    <div class="content">
-      <p><strong>Dear Test User,</strong></p>
-      <p>This is a test email for payment confirmation setup.</p>
-      <div class="invoice-box">
-        <h3>Test Invoice Details</h3>
-        <p><strong>Invoice Number:</strong> ${invoiceNumber}</p>
-        <p><strong>Order ID:</strong> order_test_123456</p>
-        <p><strong>Payment ID:</strong> pay_test_abcdef</p>
-        <p><strong>Date:</strong> ${formattedDate}</p>
-        <p class="amount">Amount: INR 1,000.00</p>
-      </div>
-      <p>If you received this email, your SendGrid configuration is working correctly!</p>
-    </div>
-  </div>
-</body>
-</html>
-  `;
-}
+  // Send user payment confirmation email
+  console.log("📧 Sending payment confirmation email to user...");
+  const userResult = await sendPaymentConfirmation(
+    testPayment,
+    Buffer.from(pdfBytes)
+  );
 
-// Send test email to both admin and user email
-console.log("📧 Sending test payment confirmation emails...");
+  if (userResult.success) {
+    console.log("✅ User email sent successfully!");
+    console.log(`   Recipient: ${userEmail}`);
+    console.log(`   Message ID: ${userResult.messageId}`);
+    console.log("");
+  } else {
+    console.error("❌ Failed to send user email");
+    console.error(`   Error: ${userResult.error}\n`);
+  }
 
-// Get admin email
-const adminEmail =
-  process.env.ADMIN_EMAILS?.split(",")[0] || process.env.HELP_DESK_EMAIL;
+  // Send admin notification
+  const adminEmails = process.env.ADMIN_EMAILS?.split(",").map((e) => e.trim());
+  if (adminEmails && adminEmails.length > 0) {
+    console.log("📧 Sending admin notification...");
+    await sendAdminPaymentNotification({
+      studentName: testPayment.userName,
+      studentEmail: testPayment.userEmail,
+      amount: testPayment.amount,
+      paymentId: testPayment.paymentId,
+      orderId: testPayment.orderId,
+      paymentMethod: "test",
+    });
+    console.log("✅ Admin notification sent!");
+    console.log(`   Recipients: ${adminEmails.join(", ")}`);
+    console.log("");
+  } else {
+    console.log("⚠️  No admin emails configured, skipping admin notification\n");
+  }
 
-// Get test user email (you can pass as arg or use default)
-const userEmail = process.argv[2] || "findhari93@gmail.com"; // Replace with your test email
-
-if (!adminEmail) {
-  console.error("❌ No admin email found. Set ADMIN_EMAILS in .env.local");
+  // Success summary
+  console.log("═══════════════════════════════════════");
+  console.log("🎉 Test completed successfully!");
+  console.log("═══════════════════════════════════════");
+  console.log("\n📬 Please check the following:");
+  console.log(`   1. User inbox: ${userEmail}`);
+  if (adminEmails && adminEmails.length > 0) {
+    console.log(`   2. Admin inbox(es): ${adminEmails.join(", ")}`);
+  }
+  console.log("   3. Check spam/junk folders");
+  console.log("   4. SendGrid dashboard for delivery status");
+  console.log("\n✨ The email includes:");
+  console.log("   • Payment confirmation with invoice details");
+  console.log("   • PDF invoice attachment");
+  console.log('   • "Access Your Premium Dashboard" button');
+  console.log("   • Support contact information");
+  console.log("");
+} catch (error) {
+  console.error("❌ Test failed with error:");
+  console.error(error);
+  console.log("");
   process.exit(1);
 }
-
-const recipients = [
-  { email: userEmail, type: "User" },
-  { email: adminEmail, type: "Admin" },
-];
-
-console.log(`\n📨 Sending to ${recipients.length} recipient(s):\n`);
-
-for (const recipient of recipients) {
-  try {
-    const info = await transporter.sendMail({
-      from: {
-        name: "Neram Classes - Test",
-        address: process.env.MAIL_FROM,
-      },
-      to: recipient.email,
-      subject: "Test: Payment Confirmation Email Setup",
-      html: generateTestInvoiceHTML(),
-    });
-
-    console.log(`✅ [${recipient.type}] Email sent to: ${recipient.email}`);
-    console.log(`   Message ID: ${info.messageId}`);
-    console.log(
-      `   Status: ${info.accepted.length > 0 ? "Accepted" : "Rejected"}\n`
-    );
-  } catch (error) {
-    console.error(
-      `❌ [${recipient.type}] Failed to send to ${recipient.email}:`,
-      error.message,
-      "\n"
-    );
-  }
-}
-
-console.log("✨ Check both inboxes to verify emails were delivered!\n");
-console.log("📝 Next Steps:");
-console.log("   1. Check spam folders if not in inbox");
-console.log(
-  "   2. To test with different user email: npm run test:email user@example.com"
-);
-console.log("   3. Run: npm run test:webhook (to test full payment flow)");
-console.log("   4. Monitor SendGrid dashboard for delivery status\n");

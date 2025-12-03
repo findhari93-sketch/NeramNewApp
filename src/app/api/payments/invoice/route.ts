@@ -51,47 +51,68 @@ export async function GET(req: Request) {
     const decoded = await admin.auth().verifyIdToken(idToken);
     const uid = decoded.uid;
 
+    console.log("[Invoice] Looking up user with firebase_uid:", uid);
+
     // Fetch user's latest invoice from users_duplicate table
+    // Note: firebase_uid is stored in account JSONB column
     const { data: userRow, error: fetchErr } = await supabaseServer
       .from("users_duplicate")
-      .select("id, final_fee_payment, email, basic, contact")
+      .select("id, final_fee_payment, application_details, contact, basic")
       .eq("account->>firebase_uid", uid)
       .maybeSingle();
 
+    console.log("[Invoice] Query result:", {
+      found: !!userRow,
+      error: fetchErr?.message,
+      hasFinalFee: userRow ? !!(userRow as any).final_fee_payment : false
+    });
+
     if (fetchErr || !userRow) {
+      console.log("[Invoice] User not found, returning 404");
       return NextResponse.json({ error: "user_not_found" }, { status: 404 });
     }
 
     const finalFee = (userRow as any).final_fee_payment || {};
-    const invoices = finalFee.invoice || [];
+    const appDetails = (userRow as any).application_details || {};
+    const paymentHistory = finalFee.payment_history || [];
 
-    if (!Array.isArray(invoices) || invoices.length === 0) {
-      return NextResponse.json({ error: "no_invoice_found" }, { status: 404 });
+    console.log("[Invoice] Payment status:", finalFee.payment_status);
+
+    // Check if payment was successful
+    if (finalFee.payment_status !== "paid") {
+      console.log("[Invoice] No payment completed, returning 404");
+      return NextResponse.json(
+        { error: "no_payment_completed" },
+        { status: 404 }
+      );
     }
 
-    // Get the latest invoice
-    const latestInvoice = invoices[invoices.length - 1];
+    // Generate invoice on-the-fly from payment details
+    const basic = (userRow as any).basic || {};
+    const contact = (userRow as any).contact || {};
 
-    if (latestInvoice.url) {
-      // Redirect to the invoice URL in storage
-      return NextResponse.redirect(latestInvoice.url);
-    }
+    const invoiceData = {
+      studentName: basic.student_name || basic.name || "Student",
+      email: contact.email || "",
+      course: appDetails.course_name || finalFee.course_name || "NATA/JEE Coaching",
+      orderId: finalFee.razorpay_order_id || "",
+      paymentId: finalFee.razorpay_payment_id || "",
+      amount: finalFee.payable_amount || finalFee.amount || 0,
+      currency: "INR",
+      issuedAt: finalFee.payment_at || new Date().toISOString(),
+    };
 
-    // If no URL, try to fetch from storage using invoice number
-    if (latestInvoice.number) {
-      const bucket = process.env.SUPABASE_INVOICE_BUCKET || "payment-proofs";
-      const storagePath = `invoices/${userRow.id}/${latestInvoice.number}.pdf`;
+    // Generate PDF invoice
+    const pdfBytes = await renderInvoicePdf(invoiceData);
 
-      const { data: publicUrlData } = await (supabaseServer as any).storage
-        .from(bucket)
-        .getPublicUrl(storagePath);
-
-      if (publicUrlData?.publicUrl) {
-        return NextResponse.redirect(publicUrlData.publicUrl);
-      }
-    }
-
-    return NextResponse.json({ error: "invoice_url_not_found" }, { status: 404 });
+    // Return PDF directly
+    return new NextResponse(Buffer.from(pdfBytes), {
+      status: 200,
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename="Invoice_${invoiceData.paymentId}.pdf"`,
+      },
+    });
   } catch (err: any) {
     console.error("GET invoice error", err);
     return NextResponse.json(

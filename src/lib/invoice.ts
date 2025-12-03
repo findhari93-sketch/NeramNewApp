@@ -63,7 +63,7 @@ export async function renderInvoicePdf(data: InvoiceData): Promise<Uint8Array> {
     `Course: ${data.course || "general"}`,
     `Order ID: ${data.orderId}`,
     `Payment ID: ${data.paymentId}`,
-    `Amount: ₹${Number(data.amount).toLocaleString("en-IN")} ${
+    `Amount: Rs. ${Number(data.amount).toLocaleString("en-IN")} ${
       data.currency || "INR"
     }`,
     `Issued: ${new Date(

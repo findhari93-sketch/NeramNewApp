@@ -268,6 +268,19 @@ function generateInvoiceHTML(payment: PaymentDetails): string {
         </div>
       </div>
 
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="${
+          process.env.NEXT_PUBLIC_BASE_URL || "https://neram.co.in"
+        }/premium"
+           style="display: inline-block; background: #1976d2; color: white; padding: 14px 32px;
+                  text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px;">
+          Access Your Premium Dashboard
+        </a>
+        <p style="font-size: 14px; color: #666; margin-top: 12px;">
+          Click the button above to access all premium features
+        </p>
+      </div>
+
       <div class="help-section">
         <p><strong>Need Help?</strong> If you have any questions about this payment or need assistance, please contact us at <strong>${
           process.env.HELP_DESK_EMAIL || "support@neram.co.in"
