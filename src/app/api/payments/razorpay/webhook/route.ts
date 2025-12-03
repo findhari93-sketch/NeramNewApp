@@ -342,6 +342,8 @@ export async function POST(req: Request) {
 
     // Send email and notifications for successful payments
     if (newPaymentStatus === "paid") {
+      log("💰 Payment successful, preparing email notifications...");
+      
       // Extract user details from top-level application object
       const basic = (application.basic as any) || {};
       const contact = (application.contact as any) || {};
@@ -351,16 +353,41 @@ export async function POST(req: Request) {
       const courseName =
         appDetails.course_name || appDetails.program || "NATA/JEE Coaching";
 
-      log("📧 Preparing to send emails", {
+      log("📧 Email details prepared:", {
         studentName,
         userEmail,
         courseName,
         amount: paymentDetails.amount,
+        paymentId,
+        orderId,
+        paymentDate: paymentDetails.webhook_received_at,
       });
 
       // Send payment confirmation email with PDF invoice
       if (userEmail) {
-        await sendPaymentConfirmationEmail({
+        log("📨 Sending user confirmation email to:", userEmail);
+        try {
+          await sendPaymentConfirmationEmail({
+            userEmail,
+            studentName,
+            courseName,
+            amountPaid: paymentDetails.amount || 0,
+            paymentId,
+            orderId,
+            paymentDate: paymentDetails.webhook_received_at,
+          });
+          log("✅ User confirmation email sent successfully");
+        } catch (emailError) {
+          log("❌ Failed to send user confirmation email:", emailError);
+        }
+      } else {
+        log("⚠️ No user email found, skipping user confirmation email");
+      }
+
+      // Send admin email notification
+      log("📨 Sending admin notification emails...");
+      try {
+        await sendAdminPaymentNotification({
           userEmail,
           studentName,
           courseName,
@@ -369,8 +396,12 @@ export async function POST(req: Request) {
           orderId,
           paymentDate: paymentDetails.webhook_received_at,
         });
+        log("✅ Admin notification emails sent successfully");
+      } catch (adminEmailError) {
+        log("❌ Failed to send admin notification:", adminEmailError);
       }
 
+      log("📱 Creating user notification...");
       // Create user notification
       await createNotification({
         userId: applicationId,

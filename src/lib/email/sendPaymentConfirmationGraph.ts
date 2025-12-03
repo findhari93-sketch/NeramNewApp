@@ -293,14 +293,18 @@ export async function sendPaymentConfirmationEmail(
   params: PaymentEmailParams
 ): Promise<void> {
   try {
-    console.log(
-      "[Graph Email] Sending payment confirmation to:",
-      params.userEmail
-    );
-
+    console.log("[Graph Email] === STARTING PAYMENT CONFIRMATION EMAIL ===");
+    console.log("[Graph Email] Parameters:", JSON.stringify(params, null, 2));
+    
+    console.log("[Graph Email] Step 1: Getting Azure AD token...");
     const token = await getGraphToken();
-    const emailHtml = generatePaymentEmailHTML(params);
+    console.log("[Graph Email] ✅ Token acquired");
 
+    console.log("[Graph Email] Step 2: Generating email HTML...");
+    const emailHtml = generatePaymentEmailHTML(params);
+    console.log("[Graph Email] ✅ HTML generated, length:", emailHtml.length);
+
+    console.log("[Graph Email] Step 3: Generating PDF invoice...");
     // Generate PDF invoice
     const invoiceData = {
       studentName: params.studentName,
@@ -314,11 +318,15 @@ export async function sendPaymentConfirmationEmail(
     };
 
     const pdfBytes = await renderInvoicePdf(invoiceData);
+    console.log("[Graph Email] ✅ PDF generated, size:", pdfBytes.length, "bytes");
+    
     const pdfBase64 = Buffer.from(pdfBytes).toString("base64");
+    console.log("[Graph Email] ✅ PDF encoded to base64");
 
     const invoiceNum = `INV-${new Date(
       params.paymentDate
     ).getFullYear()}-${params.paymentId.substring(4, 10).toUpperCase()}`;
+    console.log("[Graph Email] Invoice number:", invoiceNum);
 
     const message = {
       message: {
@@ -346,6 +354,10 @@ export async function sendPaymentConfirmationEmail(
       saveToSentItems: true,
     };
 
+    console.log("[Graph Email] Step 4: Sending via Microsoft Graph API...");
+    console.log("[Graph Email] Sender:", process.env.AZ_SENDER_USER);
+    console.log("[Graph Email] Recipient:", params.userEmail);
+
     const mailRes = await fetch(
       `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(
         process.env.AZ_SENDER_USER!
@@ -360,17 +372,21 @@ export async function sendPaymentConfirmationEmail(
       }
     );
 
+    console.log("[Graph Email] Response status:", mailRes.status, mailRes.statusText);
+
     if (!mailRes.ok) {
       const error = await mailRes.text();
+      console.error("[Graph Email] ❌ Email send FAILED!");
+      console.error("[Graph Email] Error response:", error);
       throw new Error(`Failed to send email: ${error}`);
     }
 
-    console.log(
-      "[Graph Email] ✅ Payment confirmation sent successfully to:",
-      params.userEmail
-    );
+    console.log("[Graph Email] ✅✅✅ Payment confirmation SENT successfully!");
+    console.log("[Graph Email] === EMAIL COMPLETED ===");
   } catch (error: any) {
-    console.error("[Graph Email] Failed to send payment confirmation:", error);
+    console.error("[Graph Email] ❌❌❌ CRITICAL ERROR!");
+    console.error("[Graph Email] Error:", error.message);
+    console.error("[Graph Email] Stack:", error.stack);
     throw error;
   }
 }
@@ -382,10 +398,17 @@ export async function sendAdminPaymentNotification(
   params: PaymentEmailParams
 ): Promise<void> {
   try {
-    console.log("[Graph Email] Sending admin notification");
+    console.log("[Graph Email Admin] === STARTING ADMIN NOTIFICATION ===");
+    console.log("[Graph Email Admin] Student:", params.studentName);
+    console.log("[Graph Email Admin] Amount:", params.amountPaid);
 
+    console.log("[Graph Email Admin] Step 1: Getting token...");
     const token = await getGraphToken();
+    console.log("[Graph Email Admin] ✅ Token acquired");
+
+    console.log("[Graph Email Admin] Step 2: Generating HTML...");
     const emailHtml = generateAdminEmailHTML(params);
+    console.log("[Graph Email Admin] ✅ HTML generated");
 
     const message = {
       message: {
@@ -412,6 +435,9 @@ export async function sendAdminPaymentNotification(
       saveToSentItems: true,
     };
 
+    console.log("[Graph Email Admin] Step 3: Sending to admins...");
+    console.log("[Graph Email Admin] Recipients:", [process.env.ADMIN_EMAIL, "support@neramclasses.com"]);
+
     const mailRes = await fetch(
       `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(
         process.env.AZ_SENDER_USER!
@@ -422,6 +448,27 @@ export async function sendAdminPaymentNotification(
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
+        body: JSON.stringify(message),
+      }
+    );
+
+    console.log("[Graph Email Admin] Response status:", mailRes.status, mailRes.statusText);
+
+    if (!mailRes.ok) {
+      const error = await mailRes.text();
+      console.error("[Graph Email Admin] ❌ Email send FAILED!");
+      console.error("[Graph Email Admin] Error:", error);
+      throw new Error(`Failed to send admin email: ${error}`);
+    }
+
+    console.log("[Graph Email Admin] ✅✅✅ Admin notification SENT!");
+    console.log("[Graph Email Admin] === ADMIN EMAIL COMPLETED ===");
+  } catch (error: any) {
+    console.error("[Graph Email Admin] ❌❌❌ ERROR sending admin notification!");
+    console.error("[Graph Email Admin] Error:", error.message);
+    // Don't throw - admin email failure shouldn't block the webhook
+  }
+}
         body: JSON.stringify(message),
       }
     );
