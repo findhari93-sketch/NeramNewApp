@@ -59,11 +59,33 @@ export default function ExamCentersPage() {
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Available cities based on selected state
+  // Get all cities across all states for search
+  const allCities = useMemo(() => {
+    const cities: string[] = [];
+    Object.values(CITIES_BY_STATE).forEach((stateCities) => {
+      cities.push(...stateCities);
+    });
+    return [...new Set(cities)].sort(); // Remove duplicates and sort
+  }, []);
+
+  // Map city to state for auto-selection
+  const cityToStateMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    Object.entries(CITIES_BY_STATE).forEach(([state, cities]) => {
+      cities.forEach((city) => {
+        if (!map[city]) {
+          map[city] = state;
+        }
+      });
+    });
+    return map;
+  }, []);
+
+  // Available cities based on selected state (or all cities if no state selected)
   const availableCities = useMemo(() => {
-    if (!selectedState) return [];
+    if (!selectedState) return allCities;
     return CITIES_BY_STATE[selectedState as IndianState] || [];
-  }, [selectedState]);
+  }, [selectedState, allCities]);
 
   // Current year for highlighting
   const currentYear = new Date().getFullYear();
@@ -264,15 +286,20 @@ export default function ExamCentersPage() {
               fullWidth
               options={availableCities}
               value={selectedCity || null}
-              onChange={(event, newValue) => setSelectedCity(newValue || "")}
-              disabled={!selectedState}
+              onChange={(event, newValue) => {
+                setSelectedCity(newValue || "");
+                // Auto-select state when city is selected
+                if (newValue && cityToStateMap[newValue]) {
+                  setSelectedState(cityToStateMap[newValue]);
+                }
+              }}
               renderInput={(params) => (
                 <TextField
                   {...params}
                   label="City"
                   variant="outlined"
                   size="medium"
-                  placeholder="Search city..."
+                  placeholder="Search any city..."
                   sx={{
                     "& .MuiOutlinedInput-root": {
                       backgroundColor: "#f5f5f5",
