@@ -4,8 +4,17 @@ import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { createClient } from "@supabase/supabase-js";
 import { verifyPaymentTokenServer } from "@/lib/validatePaymentToken";
-import { generateInvoicePDF, generateInvoiceNumber, InvoiceData } from "@/lib/generateInvoicePDF";
-import { getGraphToken, sendEmailWithAttachment, generateInvoiceEmailHTML, sendAdminPaymentNotification } from "@/lib/emailService";
+import {
+  generateInvoicePDF,
+  generateInvoiceNumber,
+  InvoiceData,
+} from "@/lib/generateInvoicePDF";
+import {
+  getGraphToken,
+  sendEmailWithAttachment,
+  generateInvoiceEmailHTML,
+  sendAdminPaymentNotification,
+} from "@/lib/emailService";
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -57,7 +66,9 @@ export async function POST(req: Request) {
 
     const { data: appsByOrder, error: orderErr } = await supabase
       .from("users_duplicate")
-      .select("id, final_fee_payment, contact, basic, account, application_details");
+      .select(
+        "id, final_fee_payment, contact, basic, account, application_details"
+      );
 
     if (!orderErr && appsByOrder) {
       for (const app of appsByOrder) {
@@ -102,7 +113,9 @@ export async function POST(req: Request) {
     if (!application) {
       const { data: app, error: fetchErr } = await supabase
         .from("users_duplicate")
-        .select("id, final_fee_payment, contact, basic, account, application_details")
+        .select(
+          "id, final_fee_payment, contact, basic, account, application_details"
+        )
         .eq("id", applicationId)
         .single();
 
@@ -145,7 +158,8 @@ export async function POST(req: Request) {
     const calculatedPayableAmount = totalCourseFees - discount;
 
     // Use stored payable_amount if exists, otherwise use calculated amount
-    const payableAmount = finalFee.payable_amount || calculatedPayableAmount || 0;
+    const payableAmount =
+      finalFee.payable_amount || calculatedPayableAmount || 0;
 
     const now = new Date().toISOString();
     const newPaymentHistory = [
@@ -195,26 +209,44 @@ export async function POST(req: Request) {
       console.log("[verify] Generating invoice PDF...");
 
       // Extract student and course details from JSONB fields
-      const contact = application.contact as any || {};
-      const basic = application.basic as any || {};
-      const appDetails = application.application_details as any || {};
-      
-      const studentName = basic.student_name || application.student_name || application.name || "Student";
+      const contact = (application.contact as any) || {};
+      const basic = (application.basic as any) || {};
+      const appDetails = (application.application_details as any) || {};
+
+      const studentName =
+        basic.student_name ||
+        application.student_name ||
+        application.name ||
+        "Student";
       const studentEmail = contact.email || application.email;
       const studentPhone = contact.phone || application.phone;
 
-      console.log("[verify] Student details:", { studentName, studentEmail, studentPhone });
+      console.log("[verify] Student details:", {
+        studentName,
+        studentEmail,
+        studentPhone,
+      });
 
-      const courseName = adminFilled.final_course_Name || appDetails.selected_course || application.selected_course || "N/A";
+      const courseName =
+        adminFilled.final_course_Name ||
+        appDetails.selected_course ||
+        application.selected_course ||
+        "N/A";
       const courseDuration = adminFilled.course_duration || "N/A";
 
       // Use the payableAmount we calculated earlier
       const amountPaid = payableAmount;
 
-      console.log("[verify] Payment details:", { totalCourseFees, discount, amountPaid });
+      console.log("[verify] Payment details:", {
+        totalCourseFees,
+        discount,
+        amountPaid,
+      });
 
       const paymentOptions = adminFilled.payment_options;
-      const paymentTypeRaw = Array.isArray(paymentOptions) ? String(paymentOptions[0] || "partial").toLowerCase() : String(paymentOptions || "partial").toLowerCase();
+      const paymentTypeRaw = Array.isArray(paymentOptions)
+        ? String(paymentOptions[0] || "partial").toLowerCase()
+        : String(paymentOptions || "partial").toLowerCase();
 
       const invoiceNumber = generateInvoiceNumber(applicationId);
       const paymentDate = now;
@@ -235,7 +267,8 @@ export async function POST(req: Request) {
         totalCourseFees,
         discount,
         amountPaid,
-        paymentType: paymentTypeRaw === "full" ? "Full Payment" : "Partial Payment",
+        paymentType:
+          paymentTypeRaw === "full" ? "Full Payment" : "Partial Payment",
       };
 
       const pdfBuffer = await generateInvoicePDF(invoiceData);
@@ -245,7 +278,10 @@ export async function POST(req: Request) {
       const storagePath = `invoices/${applicationId}/${invoiceNumber}.pdf`;
       const uploadRes = await supabase.storage
         .from("payment-proofs")
-        .upload(storagePath, pdfBuffer, { contentType: "application/pdf", upsert: true });
+        .upload(storagePath, pdfBuffer, {
+          contentType: "application/pdf",
+          upsert: true,
+        });
 
       let invoiceUrl: string | null = null;
       if (uploadRes?.data?.path) {
@@ -253,13 +289,18 @@ export async function POST(req: Request) {
           .from("payment-proofs")
           .getPublicUrl(uploadRes.data.path);
         invoiceUrl = publicUrlData?.publicUrl || null;
-        console.log("[verify] Invoice PDF uploaded:", invoiceUrl || uploadRes.data.path);
+        console.log(
+          "[verify] Invoice PDF uploaded:",
+          invoiceUrl || uploadRes.data.path
+        );
       } else if (uploadRes?.error) {
         console.warn("[verify] Failed to upload invoice PDF:", uploadRes.error);
       }
 
       if (studentEmail) {
-        console.log(`[verify] Attempting to send invoice email to ${studentEmail}`);
+        console.log(
+          `[verify] Attempting to send invoice email to ${studentEmail}`
+        );
         try {
           const graphToken = await getGraphToken();
           if (graphToken) {
@@ -283,24 +324,39 @@ export async function POST(req: Request) {
               pdfBuffer,
               attachmentName
             );
-            console.log(`[verify] ✅ Invoice email sent successfully to ${studentEmail}`);
+            console.log(
+              `[verify] ✅ Invoice email sent successfully to ${studentEmail}`
+            );
           } else {
-            console.error("[verify] ❌ Failed to get Graph token - Email credentials not configured");
-            console.error("[verify] Required env vars: AZ_TENANT_ID, AZ_CLIENT_ID, AZ_CLIENT_SECRET, AZ_SENDER_USER");
+            console.error(
+              "[verify] ❌ Failed to get Graph token - Email credentials not configured"
+            );
+            console.error(
+              "[verify] Required env vars: AZ_TENANT_ID, AZ_CLIENT_ID, AZ_CLIENT_SECRET, AZ_SENDER_USER"
+            );
           }
         } catch (emailError) {
-          console.error("[verify] ❌ Failed to send invoice email:", emailError);
+          console.error(
+            "[verify] ❌ Failed to send invoice email:",
+            emailError
+          );
           if (emailError instanceof Error) {
             console.error("[verify] Email error details:", emailError.message);
           }
         }
       } else {
-        console.error("[verify] ❌ No email address found for student - invoice not sent");
-        console.error("[verify] Checked fields: application.email, application.contact?.email");
+        console.error(
+          "[verify] ❌ No email address found for student - invoice not sent"
+        );
+        console.error(
+          "[verify] Checked fields: application.email, application.contact?.email"
+        );
       }
 
       // Persist invoice details under payment details as an array
-      const existingInvoices: any[] = Array.isArray(updatedFinalFee.invoice) ? updatedFinalFee.invoice : [];
+      const existingInvoices: any[] = Array.isArray(updatedFinalFee.invoice)
+        ? updatedFinalFee.invoice
+        : [];
       const newInvoiceEntry = {
         number: invoiceNumber,
         date: paymentDate,
@@ -314,25 +370,33 @@ export async function POST(req: Request) {
         emailed_to: studentEmail || null,
         emailed_at: studentEmail ? paymentDate : null,
       };
-      const updatedFinalFeeWithInvoice = { ...updatedFinalFee, invoice: [...existingInvoices, newInvoiceEntry] };
+      const updatedFinalFeeWithInvoice = {
+        ...updatedFinalFee,
+        invoice: [...existingInvoices, newInvoiceEntry],
+      };
 
       await supabase
         .from("users_duplicate")
-        .update({ final_fee_payment: updatedFinalFeeWithInvoice, updated_at: now })
+        .update({
+          final_fee_payment: updatedFinalFeeWithInvoice,
+          updated_at: now,
+        })
         .eq("id", applicationId);
 
-      console.log("[verify] Invoice details stored under final_fee_payment.invoice[]");
+      console.log(
+        "[verify] Invoice details stored under final_fee_payment.invoice[]"
+      );
 
       // Notify admin via notifications table (optional; does not block)
       try {
-        await supabase
-          .from("notifications")
-          .insert({
-            user_id: applicationId,
-            notification_type: "payment_verified",
-            title: "Payment Verified",
-            message: `Invoice ${invoiceNumber} generated. Amount: ₹${amountPaid.toLocaleString("en-IN")}`,
-          });
+        await supabase.from("notifications").insert({
+          user_id: applicationId,
+          notification_type: "payment_verified",
+          title: "Payment Verified",
+          message: `Invoice ${invoiceNumber} generated. Amount: ₹${amountPaid.toLocaleString(
+            "en-IN"
+          )}`,
+        });
         console.log("[verify] Admin notification inserted");
       } catch (nErr) {
         console.warn("[verify] Failed to insert admin notification:", nErr);
@@ -354,11 +418,16 @@ export async function POST(req: Request) {
         });
         console.log("[verify] ✅ Admin email notification sent successfully");
       } catch (adminEmailErr) {
-        console.error("[verify] ❌ Failed to send admin email notification:", adminEmailErr);
+        console.error(
+          "[verify] ❌ Failed to send admin email notification:",
+          adminEmailErr
+        );
       }
     } catch (invoiceErr) {
       console.error("[verify] Failed to generate/send invoice:", invoiceErr);
-      console.error("[verify] Payment was successful, but invoice could not be sent");
+      console.error(
+        "[verify] Payment was successful, but invoice could not be sent"
+      );
     }
 
     const redirectToken = crypto.randomBytes(32).toString("hex");

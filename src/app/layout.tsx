@@ -60,6 +60,13 @@ const suezOne = Suez_One({
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://example.com";
 
+// SEO: Canonical URLs
+// - Root layout sets canonical to "/" for homepage
+// - Individual pages should use generateCanonicalMetadata() from @/lib/metadataHelpers
+// - Middleware strips query parameters (e.g., ?trk=...) via 301 redirects
+// - Old URLs (e.g., /pudukkottai-url, *.html) redirect to canonical versions
+// - This prevents duplicate content issues in Google Search Console
+
 export const metadata: Metadata = {
   title:
     "Neram Classes - Best NATA & JEE B.Arch Coaching | Microsoft Certified Online Classes",
