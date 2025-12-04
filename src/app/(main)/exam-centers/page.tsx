@@ -52,9 +52,14 @@ export default function ExamCentersPage() {
   const [selectedState, setSelectedState] = useState<string>("");
   const [selectedCity, setSelectedCity] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [centerName, setCenterName] = useState<string>("");
 
   // Data states
   const [centers, setCenters] = useState<ExamCenter[]>([]);
+  const [allCenterNames, setAllCenterNames] = useState<string[]>([]);
+  const [centerNameToLocationMap, setCenterNameToLocationMap] = useState<
+    Record<string, { city: string; state: string }>
+  >({});
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -87,6 +92,44 @@ export default function ExamCentersPage() {
     return CITIES_BY_STATE[selectedState as IndianState] || [];
   }, [selectedState, allCities]);
 
+  // Fetch center names for autocomplete
+  useEffect(() => {
+    const fetchCenterNames = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("exam_centers")
+          .select("center_name, city, state, exam_type")
+          .neq("status", "discontinued");
+
+        if (error) throw error;
+
+        const names: string[] = [];
+        const locationMap: Record<string, { city: string; state: string }> = {};
+
+        data?.forEach((center) => {
+          const name = center.center_name;
+          if (!names.includes(name)) {
+            names.push(name);
+          }
+          // Map center name to its location (use first occurrence)
+          if (!locationMap[name]) {
+            locationMap[name] = {
+              city: center.city,
+              state: center.state,
+            };
+          }
+        });
+
+        setAllCenterNames(names.sort());
+        setCenterNameToLocationMap(locationMap);
+      } catch (err) {
+        console.error("Error fetching center names:", err);
+      }
+    };
+
+    fetchCenterNames();
+  }, []);
+
   // Current year for highlighting
   const currentYear = new Date().getFullYear();
 
@@ -95,10 +138,28 @@ export default function ExamCentersPage() {
     setSelectedCity("");
   }, [selectedState]);
 
-  // Search function
+  // Search function with validation
   const handleSearch = async () => {
     if (!examType) {
       setError("Please select an exam type");
+      return;
+    }
+
+    // If searching by center name, city and state are auto-filled
+    if (centerName && !selectedState) {
+      setError("State should be auto-filled from center name. Please select a valid center name.");
+      return;
+    }
+
+    // If not using center name, city is required
+    if (!centerName && !selectedCity) {
+      setError("Please select a city (state and city are required for center search)");
+      return;
+    }
+
+    // State is always required
+    if (!selectedState) {
+      setError("Please select a state");
       return;
     }
 
@@ -123,7 +184,9 @@ export default function ExamCentersPage() {
         query = query.eq("city", selectedCity);
       }
 
-      if (searchQuery.trim()) {
+      if (centerName) {
+        query = query.eq("center_name", centerName);
+      } else if (searchQuery.trim()) {
         query = query.or(
           `center_name.ilike.%${searchQuery}%,address.ilike.%${searchQuery}%`
         );
@@ -149,6 +212,7 @@ export default function ExamCentersPage() {
     setSelectedState("");
     setSelectedCity("");
     setSearchQuery("");
+    setCenterName("");
     setCenters([]);
     setSearched(false);
     setError(null);
@@ -315,34 +379,74 @@ export default function ExamCentersPage() {
               }}
             />
 
-            {/* Search by Name */}
-            <TextField
+            {/* Search by Center Name - Autocomplete */}
+            <Autocomplete
               fullWidth
-              label="Search Center Name"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-              variant="outlined"
-              size="medium"
-              placeholder="e.g., Delhi Center"
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <SearchIcon sx={{ color: "action.active" }} />
-                  </InputAdornment>
-                ),
+              options={allCenterNames}
+              value={centerName || null}
+              onChange={(event, newValue) => {
+                setCenterName(newValue || "");
+                // Auto-fill city and state when center name is selected
+                if (newValue && centerNameToLocationMap[newValue]) {
+                  const { city, state } = centerNameToLocationMap[newValue];
+                  setSelectedCity(city);
+                  setSelectedState(state);
+                  setSearchQuery(""); // Clear free-text search
+                }
               }}
+              inputValue={centerName}
+              onInputChange={(event, newInputValue) => {
+                setCenterName(newInputValue);
+              }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Search Center Name"
+                  variant="outlined"
+                  size="medium"
+                  placeholder="e.g., Delhi Center"
+                  InputProps={{
+                    ...params.InputProps,
+                    endAdornment: (
+                      <>
+                        {params.InputProps.endAdornment}
+                        <InputAdornment position="end">
+                          <SearchIcon sx={{ color: "action.active" }} />
+                        </InputAdornment>
+                      </>
+                    ),
+                  }}
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      backgroundColor: "#f5f5f5",
+                      "&:hover fieldset": { borderColor: "#1976d2" },
+                    },
+                  }}
+                />
+              )}
               sx={{
                 "& .MuiOutlinedInput-root": {
                   backgroundColor: "#f5f5f5",
-                  "&:hover fieldset": { borderColor: "#1976d2" },
                 },
               }}
             />
           </Box>
 
+          {/* Help Text - Search Requirements */}
+          <Box sx={{ mt: 2, p: 2, backgroundColor: "#e3f2fd", borderRadius: 1 }}>
+            <Typography variant="caption" sx={{ color: "#1565c0", fontWeight: 500 }}>
+              📌 <strong>Search Options:</strong>
+              <br />
+              • <strong>By Center Name:</strong> Select a center name → State & City auto-fill
+              <br />
+              • <strong>By Location:</strong> Select City → State auto-fills (minimum required)
+              <br />
+              • Exam Type is always required. State & City are mandatory for location-based search.
+            </Typography>
+          </Box>
+
           {/* Action Buttons */}
-          <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+          <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", mt: 3 }}>
             <Button
               variant="contained"
               size="large"
