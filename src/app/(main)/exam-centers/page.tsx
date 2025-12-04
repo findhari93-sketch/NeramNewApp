@@ -28,6 +28,7 @@ import {
   InputAdornment,
   Collapse,
   Stack,
+  Autocomplete,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import PlaceIcon from "@mui/icons-material/Place";
@@ -192,90 +193,100 @@ export default function ExamCentersPage() {
             }}
           >
             {/* Exam Type */}
-            <TextField
-              select
+            <Autocomplete
               fullWidth
-              label="Exam Type"
-              value={examType}
-              onChange={(e) => setExamType(e.target.value)}
-              variant="outlined"
-              size="medium"
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <SearchIcon sx={{ color: "action.active" }} />
-                  </InputAdornment>
-                ),
-              }}
+              options={EXAM_TYPES.map((type) => type.value)}
+              value={examType || null}
+              onChange={(event, newValue) => setExamType(newValue || "")}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Exam Type"
+                  variant="outlined"
+                  size="medium"
+                  placeholder="Search exam..."
+                  InputProps={{
+                    ...params.InputProps,
+                    endAdornment: (
+                      <>
+                        {params.InputProps.endAdornment}
+                        <InputAdornment position="end">
+                          <SearchIcon sx={{ color: "action.active" }} />
+                        </InputAdornment>
+                      </>
+                    ),
+                  }}
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      backgroundColor: "#f5f5f5",
+                      "&:hover fieldset": { borderColor: "#1976d2" },
+                    },
+                  }}
+                />
+              )}
               sx={{
                 "& .MuiOutlinedInput-root": {
                   backgroundColor: "#f5f5f5",
-                  "&:hover fieldset": { borderColor: "#1976d2" },
                 },
               }}
-            >
-              <MenuItem value="">
-                <em>Select Exam</em>
-              </MenuItem>
-              {EXAM_TYPES.map((type) => (
-                <MenuItem key={type.value} value={type.value}>
-                  {type.value}
-                </MenuItem>
-              ))}
-            </TextField>
+            />
 
             {/* State */}
-            <TextField
-              select
+            <Autocomplete
               fullWidth
-              label="State"
-              value={selectedState}
-              onChange={(e) => setSelectedState(e.target.value)}
-              variant="outlined"
-              size="medium"
+              options={INDIAN_STATES}
+              value={selectedState || null}
+              onChange={(event, newValue) => setSelectedState(newValue || "")}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="State"
+                  variant="outlined"
+                  size="medium"
+                  placeholder="Search state..."
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      backgroundColor: "#f5f5f5",
+                      "&:hover fieldset": { borderColor: "#1976d2" },
+                    },
+                  }}
+                />
+              )}
               sx={{
                 "& .MuiOutlinedInput-root": {
                   backgroundColor: "#f5f5f5",
-                  "&:hover fieldset": { borderColor: "#1976d2" },
                 },
               }}
-            >
-              <MenuItem value="">
-                <em>All States</em>
-              </MenuItem>
-              {INDIAN_STATES.map((state) => (
-                <MenuItem key={state} value={state}>
-                  {state}
-                </MenuItem>
-              ))}
-            </TextField>
+            />
 
             {/* City */}
-            <TextField
-              select
+            <Autocomplete
               fullWidth
-              label="City"
-              value={selectedCity}
-              onChange={(e) => setSelectedCity(e.target.value)}
+              options={availableCities}
+              value={selectedCity || null}
+              onChange={(event, newValue) => setSelectedCity(newValue || "")}
               disabled={!selectedState}
-              variant="outlined"
-              size="medium"
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="City"
+                  variant="outlined"
+                  size="medium"
+                  placeholder="Search city..."
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      backgroundColor: "#f5f5f5",
+                      "&:hover fieldset": { borderColor: "#1976d2" },
+                    },
+                  }}
+                />
+              )}
               sx={{
                 "& .MuiOutlinedInput-root": {
                   backgroundColor: "#f5f5f5",
-                  "&:hover fieldset": { borderColor: "#1976d2" },
                 },
               }}
-            >
-              <MenuItem value="">
-                <em>All Cities</em>
-              </MenuItem>
-              {availableCities.map((city) => (
-                <MenuItem key={city} value={city}>
-                  {city}
-                </MenuItem>
-              ))}
-            </TextField>
+            />
 
             {/* Search by Name */}
             <TextField
@@ -311,15 +322,10 @@ export default function ExamCentersPage() {
               onClick={handleSearch}
               disabled={loading}
               startIcon={
-                loading ? (
-                  <CircularProgress size={20} />
-                ) : (
-                  <SearchIcon />
-                )
+                loading ? <CircularProgress size={20} /> : <SearchIcon />
               }
               sx={{
-                background:
-                  "linear-gradient(135deg, #1976d2 0%, #1565c0 100%)",
+                background: "linear-gradient(135deg, #1976d2 0%, #1565c0 100%)",
                 textTransform: "none",
                 fontSize: "1rem",
                 fontWeight: 600,
@@ -373,7 +379,9 @@ export default function ExamCentersPage() {
               <Typography variant="h5" sx={{ fontWeight: 600, flex: 1 }}>
                 {loading
                   ? "Searching for exam centers..."
-                  : `${centers.length} Center${centers.length !== 1 ? "s" : ""} Found`}
+                  : `${centers.length} Center${
+                      centers.length !== 1 ? "s" : ""
+                    } Found`}
               </Typography>
             </Box>
 
@@ -686,7 +694,10 @@ function ExamCenterCard({
               {center.center_name}
             </Typography>
             {center.center_code && (
-              <Typography variant="caption" sx={{ color: "#999", display: "block", mt: 0.5 }}>
+              <Typography
+                variant="caption"
+                sx={{ color: "#999", display: "block", mt: 0.5 }}
+              >
                 Center Code: {center.center_code}
               </Typography>
             )}
@@ -697,10 +708,7 @@ function ExamCenterCard({
 
       <CardContent sx={{ flexGrow: 1 }}>
         {center.description && (
-          <Typography
-            variant="body2"
-            sx={{ color: "#666", mb: 2 }}
-          >
+          <Typography variant="body2" sx={{ color: "#666", mb: 2 }}>
             {center.description}
           </Typography>
         )}
@@ -730,7 +738,9 @@ function ExamCenterCard({
 
         {/* Address */}
         <Box sx={{ display: "flex", gap: 1.5, mb: 2 }}>
-          <PlaceIcon sx={{ color: "#666", fontSize: 20, flexShrink: 0, mt: 0.5 }} />
+          <PlaceIcon
+            sx={{ color: "#666", fontSize: 20, flexShrink: 0, mt: 0.5 }}
+          />
           <Box>
             <Typography variant="body2" sx={{ fontWeight: 500 }}>
               {center.address}
@@ -871,7 +881,10 @@ function ExamCenterCard({
             {/* Facilities */}
             {center.facilities && (
               <Box sx={{ mb: 2 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                <Typography
+                  variant="subtitle2"
+                  sx={{ fontWeight: 600, mb: 0.5 }}
+                >
                   Facilities
                 </Typography>
                 <Typography variant="body2" sx={{ color: "#666" }}>
@@ -883,7 +896,10 @@ function ExamCenterCard({
             {/* Instructions */}
             {center.instructions && (
               <Box sx={{ mb: 2 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                <Typography
+                  variant="subtitle2"
+                  sx={{ fontWeight: 600, mb: 0.5 }}
+                >
                   Instructions
                 </Typography>
                 <Typography variant="body2" sx={{ color: "#666" }}>
@@ -895,7 +911,10 @@ function ExamCenterCard({
             {/* Landmarks */}
             {center.landmarks && (
               <Box sx={{ mb: 2 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                <Typography
+                  variant="subtitle2"
+                  sx={{ fontWeight: 600, mb: 0.5 }}
+                >
                   Landmarks
                 </Typography>
                 <Typography variant="body2" sx={{ color: "#666" }}>
