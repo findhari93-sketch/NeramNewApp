@@ -1,44 +1,21 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useMemo } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { useState, useEffect, useMemo } from "react";
+import { supabase } from "@/lib/supabase";
 import {
   INDIAN_STATES,
   CITIES_BY_STATE,
   EXAM_TYPES,
   type IndianState,
-} from '@/data/indian-states-cities';
-import type { ExamCenter } from '@/types/exam-center';
-
-// Icons (using Lucide React)
-import {
-  Search,
-  MapPin,
-  Phone,
-  Mail,
-  User,
-  ExternalLink,
-  Building2,
-  Calendar,
-  CheckCircle2,
-  Clock,
-  Train,
-  Bus,
-  Info,
-  ChevronDown,
-  Filter,
-  X,
-  Loader2,
-} from 'lucide-react';
+} from "@/data/indian-states-cities";
+import type { ExamCenter } from "@/types/exam-center";
 
 export default function ExamCentersPage() {
-  const supabase = createClient();
-
   // Filter states
-  const [examType, setExamType] = useState<string>('');
-  const [selectedState, setSelectedState] = useState<string>('');
-  const [selectedCity, setSelectedCity] = useState<string>('');
-  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [examType, setExamType] = useState<string>("");
+  const [selectedState, setSelectedState] = useState<string>("");
+  const [selectedCity, setSelectedCity] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState<string>("");
 
   // Data states
   const [centers, setCenters] = useState<ExamCenter[]>([]);
@@ -57,13 +34,13 @@ export default function ExamCentersPage() {
 
   // Reset city when state changes
   useEffect(() => {
-    setSelectedCity('');
+    setSelectedCity("");
   }, [selectedState]);
 
   // Search function
   const handleSearch = async () => {
     if (!examType) {
-      setError('Please select an exam type');
+      setError("Please select an exam type");
       return;
     }
 
@@ -73,19 +50,19 @@ export default function ExamCentersPage() {
 
     try {
       let query = supabase
-        .from('exam_centers')
-        .select('*')
-        .eq('exam_type', examType)
-        .neq('status', 'discontinued')
-        .order('is_confirmed_current_year', { ascending: false })
-        .order('center_name', { ascending: true });
+        .from("exam_centers")
+        .select("*")
+        .eq("exam_type", examType)
+        .neq("status", "discontinued")
+        .order("is_confirmed_current_year", { ascending: false })
+        .order("center_name", { ascending: true });
 
       if (selectedState) {
-        query = query.eq('state', selectedState);
+        query = query.eq("state", selectedState);
       }
 
       if (selectedCity) {
-        query = query.eq('city', selectedCity);
+        query = query.eq("city", selectedCity);
       }
 
       if (searchQuery.trim()) {
@@ -100,8 +77,8 @@ export default function ExamCentersPage() {
 
       setCenters(data || []);
     } catch (err) {
-      console.error('Error fetching centers:', err);
-      setError('Failed to fetch exam centers. Please try again.');
+      console.error("Error fetching centers:", err);
+      setError("Failed to fetch exam centers. Please try again.");
       setCenters([]);
     } finally {
       setLoading(false);
@@ -110,10 +87,10 @@ export default function ExamCentersPage() {
 
   // Clear filters
   const clearFilters = () => {
-    setExamType('');
-    setSelectedState('');
-    setSelectedCity('');
-    setSearchQuery('');
+    setExamType("");
+    setSelectedState("");
+    setSelectedCity("");
+    setSearchQuery("");
     setCenters([]);
     setSearched(false);
     setError(null);
@@ -126,7 +103,7 @@ export default function ExamCentersPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center">
             <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl mb-4 shadow-lg shadow-blue-500/30">
-              <Building2 className="w-8 h-8 text-white" />
+              <span className="material-icons text-white text-3xl">apartment</span>
             </div>
             <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-2">
               Find Exam Centers
@@ -144,7 +121,7 @@ export default function ExamCentersPage() {
         <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
           <div className="p-6 sm:p-8">
             <div className="flex items-center gap-2 mb-6">
-              <Filter className="w-5 h-5 text-blue-600" />
+              <span className="material-icons text-blue-600">tune</span>
               <h2 className="text-lg font-semibold text-slate-900">
                 Search Filters
               </h2>
@@ -169,7 +146,7 @@ export default function ExamCentersPage() {
                       </option>
                     ))}
                   </select>
-                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                  <span className="material-icons absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xl">expand_more</span>
                 </div>
               </div>
 
@@ -191,7 +168,7 @@ export default function ExamCentersPage() {
                       </option>
                     ))}
                   </select>
-                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                  <span className="material-icons absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xl">expand_more</span>
                 </div>
               </div>
 
@@ -214,7 +191,7 @@ export default function ExamCentersPage() {
                       </option>
                     ))}
                   </select>
-                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                  <span className="material-icons absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xl">expand_more</span>
                 </div>
               </div>
 
@@ -230,9 +207,9 @@ export default function ExamCentersPage() {
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Center name..."
                     className="w-full px-4 py-3 pl-10 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                   />
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                  <span className="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xl">search</span>
                 </div>
               </div>
             </div>
@@ -245,9 +222,9 @@ export default function ExamCentersPage() {
                 className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all shadow-lg shadow-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span className="material-icons animate-spin text-xl">autorenew</span>
                 ) : (
-                  <Search className="w-5 h-5" />
+                  <span className="material-icons text-xl">search</span>
                 )}
                 Find Exam Centers
               </button>
@@ -257,7 +234,7 @@ export default function ExamCentersPage() {
                   onClick={clearFilters}
                   className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-slate-100 text-slate-700 font-medium rounded-xl hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 transition-all"
                 >
-                  <X className="w-5 h-5" />
+                  <span className="material-icons text-xl">close</span>
                   Clear Filters
                 </button>
               )}
@@ -278,8 +255,10 @@ export default function ExamCentersPage() {
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-semibold text-slate-900">
                 {loading
-                  ? 'Searching...'
-                  : `${centers.length} Center${centers.length !== 1 ? 's' : ''} Found`}
+                  ? "Searching..."
+                  : `${centers.length} Center${
+                      centers.length !== 1 ? "s" : ""
+                    } Found`}
               </h2>
 
               {/* Legend */}
@@ -319,7 +298,7 @@ export default function ExamCentersPage() {
             ) : !loading ? (
               <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-12 text-center">
                 <div className="inline-flex items-center justify-center w-16 h-16 bg-slate-100 rounded-full mb-4">
-                  <Search className="w-8 h-8 text-slate-400" />
+                  <span className="material-icons text-slate-400 text-3xl">search</span>
                 </div>
                 <h3 className="text-lg font-semibold text-slate-900 mb-2">
                   No Centers Found
@@ -337,7 +316,7 @@ export default function ExamCentersPage() {
         {!searched && (
           <div className="mt-12 text-center">
             <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full mb-6">
-              <MapPin className="w-10 h-10 text-blue-600" />
+              <span className="material-icons text-blue-600 text-4xl">location_on</span>
             </div>
             <h3 className="text-xl font-semibold text-slate-900 mb-2">
               Search for Exam Centers
@@ -373,12 +352,12 @@ export default function ExamCentersPage() {
       {/* Footer Note */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
-          <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+          <span className="material-icons text-blue-600 flex-shrink-0 mt-0.5 text-xl">info</span>
           <div className="text-sm text-blue-800">
-            <strong>Note:</strong> Exam center information is updated periodically.
-            Please verify the details with the official exam conducting body before your
-            exam date. Centers marked as "Confirmed" have been verified for the current
-            year's examination.
+            <strong>Note:</strong> Exam center information is updated
+            periodically. Please verify the details with the official exam
+            conducting body before your exam date. Centers marked as &quot;Confirmed&quot;
+            have been verified for the current year&apos;s examination.
           </div>
         </div>
       </div>
@@ -409,18 +388,18 @@ function ExamCenterCard({
               {center.is_confirmed_current_year &&
                 center.active_years.includes(currentYear) && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-medium">
-                    <CheckCircle2 className="w-3 h-3" />
+                    <span className="material-icons text-sm">check_circle</span>
                     Confirmed {currentYear}
                   </span>
                 )}
               {!center.is_confirmed_current_year &&
                 center.active_years.includes(currentYear) && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium">
-                    <Clock className="w-3 h-3" />
+                    <span className="material-icons text-sm">schedule</span>
                     Tentative {currentYear}
                   </span>
                 )}
-              {center.status === 'inactive' && (
+              {center.status === "inactive" && (
                 <span className="inline-flex items-center px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full text-xs font-medium">
                   Inactive
                 </span>
@@ -447,8 +426,10 @@ function ExamCenterCard({
         {/* Years Active */}
         <div className="mb-4">
           <div className="flex items-center gap-2 mb-2">
-            <Calendar className="w-4 h-4 text-slate-400" />
-            <span className="text-sm font-medium text-slate-700">Years Active</span>
+            <span className="material-icons text-slate-400 text-xl">calendar_today</span>
+            <span className="text-sm font-medium text-slate-700">
+              Years Active
+            </span>
           </div>
           <div className="flex flex-wrap gap-1.5">
             {sortedYears.map((year) => (
@@ -467,7 +448,7 @@ function ExamCenterCard({
 
         {/* Address */}
         <div className="flex items-start gap-2">
-          <MapPin className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
+          <span className="material-icons text-slate-400 text-xl mt-0.5 flex-shrink-0">location_on</span>
           <div>
             <p className="text-sm text-slate-700">{center.address}</p>
             <p className="text-sm text-slate-600">
@@ -484,25 +465,23 @@ function ExamCenterCard({
           onClick={() => setExpanded(!expanded)}
           className="w-full px-6 py-3 flex items-center justify-between text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
         >
-          <span>{expanded ? 'Hide Details' : 'Show More Details'}</span>
-          <ChevronDown
-            className={`w-4 h-4 transition-transform ${expanded ? 'rotate-180' : ''}`}
-          />
+          <span>{expanded ? "Hide Details" : "Show More Details"}</span>
+          <span className={`material-icons text-xl transition-transform ${
+              expanded ? "rotate-180" : ""
+            }`}>expand_more</span>
         </button>
 
         {expanded && (
           <div className="px-6 pb-6 space-y-4">
             {/* Contact Info */}
-            {(center.phone_number ||
-              center.email ||
-              center.contact_person) && (
+            {(center.phone_number || center.email || center.contact_person) && (
               <div className="space-y-2">
                 <h4 className="text-sm font-medium text-slate-900">
                   Contact Information
                 </h4>
                 {center.contact_person && (
                   <div className="flex items-center gap-2 text-sm text-slate-600">
-                    <User className="w-4 h-4 text-slate-400" />
+                    <span className="material-icons text-slate-400 text-xl">person</span>
                     <span>{center.contact_person}</span>
                     {center.contact_designation && (
                       <span className="text-slate-400">
@@ -513,7 +492,7 @@ function ExamCenterCard({
                 )}
                 {center.phone_number && (
                   <div className="flex items-center gap-2 text-sm">
-                    <Phone className="w-4 h-4 text-slate-400" />
+                    <span className="material-icons text-slate-400 text-xl">phone</span>
                     <a
                       href={`tel:${center.phone_number}`}
                       className="text-blue-600 hover:underline"
@@ -522,7 +501,7 @@ function ExamCenterCard({
                     </a>
                     {center.alternate_phone && (
                       <span className="text-slate-400">
-                        /{' '}
+                        /{" "}
                         <a
                           href={`tel:${center.alternate_phone}`}
                           className="text-blue-600 hover:underline"
@@ -535,7 +514,7 @@ function ExamCenterCard({
                 )}
                 {center.email && (
                   <div className="flex items-center gap-2 text-sm">
-                    <Mail className="w-4 h-4 text-slate-400" />
+                    <span className="material-icons text-slate-400 text-xl">mail</span>
                     <a
                       href={`mailto:${center.email}`}
                       className="text-blue-600 hover:underline"
@@ -555,13 +534,13 @@ function ExamCenterCard({
                 </h4>
                 {center.nearest_railway && (
                   <div className="flex items-center gap-2 text-sm text-slate-600">
-                    <Train className="w-4 h-4 text-slate-400" />
+                    <span className="material-icons text-slate-400 text-xl">train</span>
                     <span>{center.nearest_railway}</span>
                   </div>
                 )}
                 {center.nearest_bus_stand && (
                   <div className="flex items-center gap-2 text-sm text-slate-600">
-                    <Bus className="w-4 h-4 text-slate-400" />
+                    <span className="material-icons text-slate-400 text-xl">directions_bus</span>
                     <span>{center.nearest_bus_stand}</span>
                   </div>
                 )}
@@ -601,7 +580,7 @@ function ExamCenterCard({
             {/* Capacity */}
             {center.capacity && (
               <div className="flex items-center gap-2 text-sm text-slate-600">
-                <Building2 className="w-4 h-4 text-slate-400" />
+                <span className="material-icons text-slate-400 text-xl">apartment</span>
                 <span>Seating Capacity: {center.capacity}</span>
               </div>
             )}
@@ -614,9 +593,9 @@ function ExamCenterCard({
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-200 transition-colors"
               >
-                <MapPin className="w-4 h-4" />
+                <span className="material-icons text-slate-400 text-xl">location_on</span>
                 View on Google Maps
-                <ExternalLink className="w-3 h-3" />
+                <span className="material-icons text-slate-400 text-sm">open_in_new</span>
               </a>
             )}
           </div>
@@ -631,13 +610,13 @@ function getYearBadgeStyle(year: number, isConfirmed: boolean): string {
   const currentYear = new Date().getFullYear();
 
   if (year === currentYear && isConfirmed) {
-    return 'bg-green-100 text-green-800 border-green-300 ring-2 ring-green-500 ring-offset-1';
+    return "bg-green-100 text-green-800 border-green-300 ring-2 ring-green-500 ring-offset-1";
   }
   if (year === currentYear) {
-    return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+    return "bg-yellow-100 text-yellow-800 border-yellow-300";
   }
   if (year === currentYear - 1) {
-    return 'bg-blue-100 text-blue-700 border-blue-300';
+    return "bg-blue-100 text-blue-700 border-blue-300";
   }
-  return 'bg-gray-100 text-gray-600 border-gray-300';
+  return "bg-gray-100 text-gray-600 border-gray-300";
 }

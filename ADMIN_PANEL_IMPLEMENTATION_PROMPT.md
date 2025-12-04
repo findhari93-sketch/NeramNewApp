@@ -16,7 +16,9 @@ This prompt provides complete specifications for building the admin panel for ex
 ## 🔄 Before You Start
 
 ### ✅ Prerequisites
+
 1. Copy these shared data files to your admin project:
+
    ```bash
    # From neramclasses.com project
    cp ../neram-nextjs-app/src/data/indian-states-cities.ts ./src/data/
@@ -24,6 +26,7 @@ This prompt provides complete specifications for building the admin panel for ex
    ```
 
 2. Ensure Supabase migration is already run in shared database:
+
    - Migration: `supabase_migrations/009_create_exam_centers_table.sql`
    - Should already exist from public site implementation
 
@@ -93,6 +96,7 @@ admin.neramclasses.com/
 ```
 
 **Requirements:**
+
 - Parse CSV with proper encoding (UTF-8)
 - Handle quoted fields with commas
 - Support both comma and semicolon delimiters
@@ -114,6 +118,7 @@ admin.neramclasses.com/
 ```
 
 **Requirements:**
+
 - Validate required fields presence
 - Validate exam_type (must be NATA or JEE Paper 2)
 - Validate state (must match INDIAN_STATES)
@@ -139,6 +144,7 @@ admin.neramclasses.com/
 ```
 
 **Requirements:**
+
 - Generate empty CSV template with all columns
 - Pre-fill exam_type dropdown help in comments
 - Include example rows for reference
@@ -161,6 +167,7 @@ admin.neramclasses.com/
 ```
 
 **GET Parameters:**
+
 - `exam_type` (optional): Filter by NATA or JEE Paper 2
 - `state` (optional): Filter by state
 - `city` (optional): Filter by city
@@ -173,6 +180,7 @@ admin.neramclasses.com/
 - `confirmed_only` (optional): Only confirmed for current year
 
 **GET Response:**
+
 ```json
 {
   "data": [ExamCenter[], ...],
@@ -184,6 +192,7 @@ admin.neramclasses.com/
 ```
 
 **POST Body:**
+
 ```json
 {
   "exam_type": "NATA",
@@ -196,6 +205,7 @@ admin.neramclasses.com/
 ```
 
 **POST Requirements:**
+
 - Validate input against ExamCenterInput schema
 - Check admin authentication
 - Set created_by to current user ID
@@ -213,10 +223,12 @@ admin.neramclasses.com/
 ```
 
 **GET Requirements:**
+
 - Return single ExamCenter by ID
 - Include all details
 
 **PUT Requirements:**
+
 - Validate input (partial update allowed)
 - Check admin authentication
 - Set updated_by to current user ID
@@ -224,6 +236,7 @@ admin.neramclasses.com/
 - Return updated ExamCenter object
 
 **DELETE Requirements:**
+
 - Check admin authentication
 - Soft delete or hard delete (specify approach)
 - Return success message
@@ -240,6 +253,7 @@ admin.neramclasses.com/
 **POST Body:** FormData with file field
 
 **Response:**
+
 ```json
 {
   "success": boolean,
@@ -262,6 +276,7 @@ admin.neramclasses.com/
 ```
 
 **Response:**
+
 ```json
 {
   "totalCenters": number,
@@ -293,9 +308,11 @@ admin.neramclasses.com/
 ```
 
 **Query Parameters:**
+
 - Same as list endpoint
 
 **Response:**
+
 - CSV file with proper Content-Disposition header
 - Filename format: `exam-centers-YYYY-MM-DD.csv`
 
@@ -315,7 +332,9 @@ admin.neramclasses.com/
 ```
 
 **Features Required:**
+
 - **Table View** with columns:
+
   - Center Name
   - Exam Type
   - State/City
@@ -325,12 +344,14 @@ admin.neramclasses.com/
   - Actions (Edit, Delete, View)
 
 - **Filtering Sidebar:**
+
   - Exam Type (checkbox)
   - State (select dropdown)
   - Status (checkbox)
   - Search box (debounced)
 
 - **Sorting:**
+
   - By center name
   - By created date
   - By updated date
@@ -338,30 +359,35 @@ admin.neramclasses.com/
   - Ascending/Descending toggle
 
 - **Pagination:**
+
   - Page navigation
   - Results per page selector (20, 50, 100)
   - Total results count
   - Current page indicator
 
 - **Bulk Actions:**
+
   - Select multiple centers (checkbox)
   - Delete selected button
   - Change status for selected
   - Export selected to CSV
 
 - **Quick Actions:**
+
   - Add New Center button (top right)
   - Edit button (row action)
   - Delete button with confirmation
   - View details button
 
 - **Statistics:**
+
   - Total centers
   - Confirmed for current year
   - By exam type breakdown
   - By status breakdown
 
 - **Import/Export:**
+
   - Import CSV button (opens modal)
   - Download template button
   - Export all button
@@ -387,12 +413,14 @@ admin.neramclasses.com/
 **Form Fields (organized in sections):**
 
 **Basic Info:**
+
 - Exam Type (select, required)
 - Center Name (text, required)
 - Center Code (text, optional)
 - Description (textarea, optional)
 
 **Location:**
+
 - State (select, required)
 - City (select, required, depends on state)
 - Address (textarea, required)
@@ -402,6 +430,7 @@ admin.neramclasses.com/
 - Longitude (number, optional, range: -180 to 180)
 
 **Contact Information:**
+
 - Contact Person (text, optional)
 - Contact Designation (text, optional)
 - Phone Number (text, optional, format: 10-12 digits)
@@ -409,21 +438,25 @@ admin.neramclasses.com/
 - Email (email, optional)
 
 **Transportation:**
+
 - Nearest Railway Station (text, optional)
 - Nearest Bus Stand (text, optional)
 - Landmarks (textarea, optional)
 
 **Facilities & Instructions:**
+
 - Facilities (textarea, optional)
 - Instructions (textarea, optional)
 - Seating Capacity (number, optional)
 
 **Year & Status:**
+
 - Active Years (multi-select, required)
 - Confirmed for Current Year (checkbox)
 - Status (select: active/inactive/discontinued, required)
 
 **Form Features:**
+
 - Field validation with error messages
 - Required field indicators
 - Help text for complex fields
@@ -451,6 +484,7 @@ admin.neramclasses.com/
 ```
 
 **Modal Features:**
+
 - Title: "Import Exam Centers from CSV"
 - File upload input with drag-drop area
 - Show file name when selected
@@ -493,6 +527,7 @@ admin.neramclasses.com/
 ```
 
 **Features:**
+
 - Show selected years as badges
 - Checkboxes for years range (e.g., 2022-2026)
 - Confirm checkbox "Confirmed for {currentYear}"
@@ -512,6 +547,7 @@ admin.neramclasses.com/
 ```
 
 **Features:**
+
 - Collapsible on mobile
 - Clear filters button
 - Apply filters button
@@ -529,6 +565,7 @@ admin.neramclasses.com/
 ```
 
 **Features:**
+
 - Total centers card
 - Confirmed current year card
 - NATA count card
@@ -545,8 +582,8 @@ admin.neramclasses.com/
 
 ```typescript
 export const metadata = {
-  title: 'Exam Centers Management | Admin',
-  description: 'Manage NATA and JEE Paper 2 exam centers'
+  title: "Exam Centers Management | Admin",
+  description: "Manage NATA and JEE Paper 2 exam centers",
 };
 
 export default function ExamCentersPage() {
@@ -560,7 +597,7 @@ export default function ExamCentersPage() {
 
 ```typescript
 export const metadata = {
-  title: 'Add Exam Center | Admin'
+  title: "Add Exam Center | Admin",
 };
 
 export default function AddExamCenterPage() {
@@ -574,10 +611,14 @@ export default function AddExamCenterPage() {
 
 ```typescript
 export const metadata = {
-  title: 'Edit Exam Center | Admin'
+  title: "Edit Exam Center | Admin",
 };
 
-export default function EditExamCenterPage({ params }: { params: { id: string } }) {
+export default function EditExamCenterPage({
+  params,
+}: {
+  params: { id: string };
+}) {
   return <ExamCenterForm mode="edit" centerId={params.id} />;
 }
 ```
@@ -607,6 +648,7 @@ export default function EditExamCenterPage({ params }: { params: { id: string } 
 ```
 
 **Hook should provide:**
+
 - Form state (values, errors, touched, loading)
 - Handlers: handleChange, handleBlur, handleSubmit
 - Validation function
@@ -626,6 +668,7 @@ export default function EditExamCenterPage({ params }: { params: { id: string } 
 ```
 
 **Hook should provide:**
+
 - Centers list with pagination
 - Loading/error states
 - Filters state
@@ -647,6 +690,7 @@ export default function EditExamCenterPage({ params }: { params: { id: string } 
 ```
 
 **Should include:**
+
 ```ts
 export const EXAM_CENTERS_CONFIG = {
   PAGE_SIZE: 20,
@@ -664,12 +708,14 @@ export const EXAM_CENTERS_CONFIG = {
 ## 🔐 Security & Permissions
 
 ### Authentication
+
 - All routes require admin authentication
 - Use Firebase Auth or your existing auth
 - Check admin role on backend
 - Implement auth middleware
 
 ### Authorization
+
 - Only authenticated admins can:
   - View exam center list
   - Create exam centers
@@ -680,6 +726,7 @@ export const EXAM_CENTERS_CONFIG = {
 - Public site can only read non-discontinued centers
 
 ### Data Privacy
+
 - No PII exposed in API responses (except admin)
 - Audit trail: track created_by and updated_by
 - Soft delete recommended (don't hard delete data)
@@ -689,6 +736,7 @@ export const EXAM_CENTERS_CONFIG = {
 ## 🧪 Testing Checklist
 
 ### Component Testing
+
 - [ ] Form validates required fields
 - [ ] CSV upload works with valid file
 - [ ] CSV validation catches errors
@@ -705,6 +753,7 @@ export const EXAM_CENTERS_CONFIG = {
 - [ ] Success messages display
 
 ### API Testing
+
 - [ ] GET /api/exam-centers returns list
 - [ ] GET /api/exam-centers?state=X filters correctly
 - [ ] GET /api/exam-centers?search=X searches
@@ -717,6 +766,7 @@ export const EXAM_CENTERS_CONFIG = {
 - [ ] Not found returns 404
 
 ### Database Testing
+
 - [ ] Data persists to Supabase
 - [ ] RLS policies work correctly
 - [ ] Indexes work for filtering
@@ -725,6 +775,7 @@ export const EXAM_CENTERS_CONFIG = {
 - [ ] Cascading deletes work (if applicable)
 
 ### Integration Testing
+
 - [ ] Public site can read centers
 - [ ] Admin can create and public sees it
 - [ ] CSV import creates centers
@@ -736,26 +787,32 @@ export const EXAM_CENTERS_CONFIG = {
 ## 📊 Database Considerations
 
 ### RLS Policies
+
 The migration already includes policies:
+
 - Public: SELECT non-discontinued only
 - Authenticated: SELECT all
 - Admin: INSERT, UPDATE, DELETE
 
 **If using admin role check:**
+
 ```sql
 -- Check in your user_roles table
-SELECT 1 FROM user_roles 
+SELECT 1 FROM user_roles
 WHERE user_id = auth.uid() AND role = 'admin'
 ```
 
 ### Indexes
+
 Migration creates:
+
 - exam_type, state, city, status (individual)
 - exam_type + state + city (combined)
 - center_name, address (full-text)
 - is_confirmed_current_year
 
 This supports:
+
 - Filter by exam_type
 - Filter by state
 - Filter by city
@@ -763,6 +820,7 @@ This supports:
 - Show confirmed centers
 
 ### Performance Tips
+
 - Use pagination to limit results
 - Filter early in query
 - Use indexed columns
@@ -773,6 +831,7 @@ This supports:
 ## 🎨 UI Design System
 
 ### Colors
+
 - Primary: Blue (#3B82F6)
 - Success: Green (#10B981)
 - Warning: Yellow (#F59E0B)
@@ -780,11 +839,13 @@ This supports:
 - Info: Indigo (#4F46E5)
 
 ### Status Badge Colors
+
 - Active: Green
 - Inactive: Yellow
 - Discontinued: Gray/Red
 
 ### Typography
+
 - Headings: Bold, 24px/18px/16px
 - Body: Regular, 14px
 - Labels: Medium, 12px
@@ -795,6 +856,7 @@ This supports:
 ## 📋 Deliverables Checklist
 
 When implementing, ensure:
+
 - [ ] All API routes working
 - [ ] All components rendering
 - [ ] Form validation working
@@ -838,6 +900,7 @@ When implementing, ensure:
 ---
 
 **Total Implementation Scope:**
+
 - ~8 API routes
 - ~6 components
 - ~3 pages

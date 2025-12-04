@@ -41,7 +41,7 @@ export const INDIAN_STATES = [
   "Puducherry",
 ] as const;
 
-export type IndianState = typeof INDIAN_STATES[number];
+export type IndianState = (typeof INDIAN_STATES)[number];
 
 // Cities organized by state - major cities with likely exam centers
 export const CITIES_BY_STATE: Record<IndianState, string[]> = {
@@ -64,8 +64,16 @@ export const CITIES_BY_STATE: Record<IndianState, string[]> = {
     "Vizianagaram",
   ],
   "Arunachal Pradesh": ["Itanagar", "Naharlagun", "Pasighat", "Tawang", "Ziro"],
-  "Assam": ["Dibrugarh", "Guwahati", "Jorhat", "Nagaon", "Silchar", "Tezpur", "Tinsukia"],
-  "Bihar": [
+  Assam: [
+    "Dibrugarh",
+    "Guwahati",
+    "Jorhat",
+    "Nagaon",
+    "Silchar",
+    "Tezpur",
+    "Tinsukia",
+  ],
+  Bihar: [
     "Arrah",
     "Aurangabad",
     "Begusarai",
@@ -81,9 +89,18 @@ export const CITIES_BY_STATE: Record<IndianState, string[]> = {
     "Purnia",
     "Saharsa",
   ],
-  "Chhattisgarh": ["Bhilai", "Bilaspur", "Durg", "Jagdalpur", "Korba", "Raigarh", "Raipur", "Rajnandgaon"],
-  "Goa": ["Madgaon", "Mapusa", "Panaji", "Ponda", "Vasco da Gama"],
-  "Gujarat": [
+  Chhattisgarh: [
+    "Bhilai",
+    "Bilaspur",
+    "Durg",
+    "Jagdalpur",
+    "Korba",
+    "Raigarh",
+    "Raipur",
+    "Rajnandgaon",
+  ],
+  Goa: ["Madgaon", "Mapusa", "Panaji", "Ponda", "Vasco da Gama"],
+  Gujarat: [
     "Ahmedabad",
     "Anand",
     "Bharuch",
@@ -101,7 +118,7 @@ export const CITIES_BY_STATE: Record<IndianState, string[]> = {
     "Vadodara",
     "Vapi",
   ],
-  "Haryana": [
+  Haryana: [
     "Ambala",
     "Bhiwani",
     "Faridabad",
@@ -116,9 +133,28 @@ export const CITIES_BY_STATE: Record<IndianState, string[]> = {
     "Sonipat",
     "Yamunanagar",
   ],
-  "Himachal Pradesh": ["Baddi", "Dharamshala", "Hamirpur", "Kangra", "Kullu", "Mandi", "Shimla", "Solan", "Una"],
-  "Jharkhand": ["Bokaro", "Deoghar", "Dhanbad", "Dumka", "Giridih", "Hazaribagh", "Jamshedpur", "Ranchi"],
-  "Karnataka": [
+  "Himachal Pradesh": [
+    "Baddi",
+    "Dharamshala",
+    "Hamirpur",
+    "Kangra",
+    "Kullu",
+    "Mandi",
+    "Shimla",
+    "Solan",
+    "Una",
+  ],
+  Jharkhand: [
+    "Bokaro",
+    "Deoghar",
+    "Dhanbad",
+    "Dumka",
+    "Giridih",
+    "Hazaribagh",
+    "Jamshedpur",
+    "Ranchi",
+  ],
+  Karnataka: [
     "Bagalkot",
     "Ballari",
     "Belagavi",
@@ -138,7 +174,7 @@ export const CITIES_BY_STATE: Record<IndianState, string[]> = {
     "Tumkur",
     "Udupi",
   ],
-  "Kerala": [
+  Kerala: [
     "Alappuzha",
     "Ernakulam",
     "Kannur",
@@ -167,7 +203,7 @@ export const CITIES_BY_STATE: Record<IndianState, string[]> = {
     "Ujjain",
     "Vidisha",
   ],
-  "Maharashtra": [
+  Maharashtra: [
     "Ahmednagar",
     "Akola",
     "Amravati",
@@ -192,14 +228,41 @@ export const CITIES_BY_STATE: Record<IndianState, string[]> = {
     "Thane",
     "Wardha",
   ],
-  "Manipur": ["Imphal", "Kakching", "Thoubal"],
-  "Meghalaya": ["Shillong", "Tura"],
-  "Mizoram": ["Aizawl", "Lunglei"],
-  "Nagaland": ["Dimapur", "Kohima", "Mokokchung"],
-  "Odisha": ["Balasore", "Berhampur", "Bhubaneswar", "Cuttack", "Puri", "Rourkela", "Sambalpur"],
-  "Punjab": ["Amritsar", "Bathinda", "Hoshiarpur", "Jalandhar", "Ludhiana", "Mohali", "Patiala", "Pathankot"],
-  "Rajasthan": ["Ajmer", "Alwar", "Bhilwara", "Bikaner", "Jaipur", "Jodhpur", "Kota", "Sikar", "Udaipur"],
-  "Sikkim": ["Gangtok", "Namchi"],
+  Manipur: ["Imphal", "Kakching", "Thoubal"],
+  Meghalaya: ["Shillong", "Tura"],
+  Mizoram: ["Aizawl", "Lunglei"],
+  Nagaland: ["Dimapur", "Kohima", "Mokokchung"],
+  Odisha: [
+    "Balasore",
+    "Berhampur",
+    "Bhubaneswar",
+    "Cuttack",
+    "Puri",
+    "Rourkela",
+    "Sambalpur",
+  ],
+  Punjab: [
+    "Amritsar",
+    "Bathinda",
+    "Hoshiarpur",
+    "Jalandhar",
+    "Ludhiana",
+    "Mohali",
+    "Patiala",
+    "Pathankot",
+  ],
+  Rajasthan: [
+    "Ajmer",
+    "Alwar",
+    "Bhilwara",
+    "Bikaner",
+    "Jaipur",
+    "Jodhpur",
+    "Kota",
+    "Sikar",
+    "Udaipur",
+  ],
+  Sikkim: ["Gangtok", "Namchi"],
   "Tamil Nadu": [
     "Chennai",
     "Coimbatore",
@@ -222,7 +285,7 @@ export const CITIES_BY_STATE: Record<IndianState, string[]> = {
     "Tuticorin",
     "Vellore",
   ],
-  "Telangana": [
+  Telangana: [
     "Hyderabad",
     "Karimnagar",
     "Khammam",
@@ -232,7 +295,7 @@ export const CITIES_BY_STATE: Record<IndianState, string[]> = {
     "Secunderabad",
     "Warangal",
   ],
-  "Tripura": ["Agartala", "Dharmanagar", "Udaipur"],
+  Tripura: ["Agartala", "Dharmanagar", "Udaipur"],
   "Uttar Pradesh": [
     "Agra",
     "Aligarh",
@@ -251,7 +314,7 @@ export const CITIES_BY_STATE: Record<IndianState, string[]> = {
     "Saharanpur",
     "Varanasi",
   ],
-  "Uttarakhand": [
+  Uttarakhand: [
     "Dehradun",
     "Haridwar",
     "Haldwani",
@@ -275,13 +338,20 @@ export const CITIES_BY_STATE: Record<IndianState, string[]> = {
   ],
   // Union Territories
   "Andaman and Nicobar Islands": ["Port Blair"],
-  "Chandigarh": ["Chandigarh"],
+  Chandigarh: ["Chandigarh"],
   "Dadra and Nagar Haveli and Daman and Diu": ["Daman", "Diu", "Silvassa"],
-  "Delhi": ["Central Delhi", "East Delhi", "New Delhi", "North Delhi", "South Delhi", "West Delhi"],
+  Delhi: [
+    "Central Delhi",
+    "East Delhi",
+    "New Delhi",
+    "North Delhi",
+    "South Delhi",
+    "West Delhi",
+  ],
   "Jammu and Kashmir": ["Anantnag", "Jammu", "Srinagar"],
-  "Ladakh": ["Kargil", "Leh"],
-  "Lakshadweep": ["Kavaratti"],
-  "Puducherry": ["Karaikal", "Mahe", "Puducherry", "Yanam"],
+  Ladakh: ["Kargil", "Leh"],
+  Lakshadweep: ["Kavaratti"],
+  Puducherry: ["Karaikal", "Mahe", "Puducherry", "Yanam"],
 };
 
 // Exam types supported
@@ -290,7 +360,7 @@ export const EXAM_TYPES = [
   { value: "JEE Paper 2", label: "JEE Paper 2 (B.Arch/B.Planning)" },
 ] as const;
 
-export type ExamType = typeof EXAM_TYPES[number]["value"];
+export type ExamType = (typeof EXAM_TYPES)[number]["value"];
 
 // Center status options
 export const CENTER_STATUS = [
@@ -299,7 +369,7 @@ export const CENTER_STATUS = [
   { value: "discontinued", label: "Discontinued", color: "red" },
 ] as const;
 
-export type CenterStatus = typeof CENTER_STATUS[number]["value"];
+export type CenterStatus = (typeof CENTER_STATUS)[number]["value"];
 
 /**
  * Get cities for a given state
@@ -318,7 +388,9 @@ export function getStatesWithCities(): IndianState[] {
 /**
  * Search cities across all states
  */
-export function searchCities(query: string): { state: IndianState; city: string }[] {
+export function searchCities(
+  query: string
+): { state: IndianState; city: string }[] {
   const results: { state: IndianState; city: string }[] = [];
   const lowerQuery = query.toLowerCase();
 
@@ -338,7 +410,10 @@ export function searchCities(query: string): { state: IndianState; city: string 
  * Get total number of cities
  */
 export function getTotalCitiesCount(): number {
-  return Object.values(CITIES_BY_STATE).reduce((total, cities) => total + cities.length, 0);
+  return Object.values(CITIES_BY_STATE).reduce(
+    (total, cities) => total + cities.length,
+    0
+  );
 }
 
 /**
