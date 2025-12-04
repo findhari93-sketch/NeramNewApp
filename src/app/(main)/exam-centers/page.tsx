@@ -103,7 +103,9 @@ export default function ExamCentersPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center">
             <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl mb-4 shadow-lg shadow-blue-500/30">
-              <span className="material-icons text-white text-3xl">apartment</span>
+              <span className="material-icons text-white text-3xl">
+                apartment
+              </span>
             </div>
             <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-2">
               Find Exam Centers
@@ -146,7 +148,9 @@ export default function ExamCentersPage() {
                       </option>
                     ))}
                   </select>
-                  <span className="material-icons absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xl">expand_more</span>
+                  <span className="material-icons absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xl">
+                    expand_more
+                  </span>
                 </div>
               </div>
 
@@ -168,7 +172,9 @@ export default function ExamCentersPage() {
                       </option>
                     ))}
                   </select>
-                  <span className="material-icons absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xl">expand_more</span>
+                  <span className="material-icons absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xl">
+                    expand_more
+                  </span>
                 </div>
               </div>
 
@@ -191,7 +197,9 @@ export default function ExamCentersPage() {
                       </option>
                     ))}
                   </select>
-                  <span className="material-icons absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xl">expand_more</span>
+                  <span className="material-icons absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xl">
+                    expand_more
+                  </span>
                 </div>
               </div>
 
@@ -209,7 +217,9 @@ export default function ExamCentersPage() {
                     className="w-full px-4 py-3 pl-10 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                     onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                   />
-                  <span className="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xl">search</span>
+                  <span className="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xl">
+                    search
+                  </span>
                 </div>
               </div>
             </div>
@@ -222,7 +232,9 @@ export default function ExamCentersPage() {
                 className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all shadow-lg shadow-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? (
-                  <span className="material-icons animate-spin text-xl">autorenew</span>
+                  <span className="material-icons animate-spin text-xl">
+                    autorenew
+                  </span>
                 ) : (
                   <span className="material-icons text-xl">search</span>
                 )}
@@ -298,7 +310,9 @@ export default function ExamCentersPage() {
             ) : !loading ? (
               <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-12 text-center">
                 <div className="inline-flex items-center justify-center w-16 h-16 bg-slate-100 rounded-full mb-4">
-                  <span className="material-icons text-slate-400 text-3xl">search</span>
+                  <span className="material-icons text-slate-400 text-3xl">
+                    search
+                  </span>
                 </div>
                 <h3 className="text-lg font-semibold text-slate-900 mb-2">
                   No Centers Found
@@ -316,7 +330,9 @@ export default function ExamCentersPage() {
         {!searched && (
           <div className="mt-12 text-center">
             <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full mb-6">
-              <span className="material-icons text-blue-600 text-4xl">location_on</span>
+              <span className="material-icons text-blue-600 text-4xl">
+                location_on
+              </span>
             </div>
             <h3 className="text-xl font-semibold text-slate-900 mb-2">
               Search for Exam Centers
@@ -352,12 +368,15 @@ export default function ExamCentersPage() {
       {/* Footer Note */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
-          <span className="material-icons text-blue-600 flex-shrink-0 mt-0.5 text-xl">info</span>
+          <span className="material-icons text-blue-600 flex-shrink-0 mt-0.5 text-xl">
+            info
+          </span>
           <div className="text-sm text-blue-800">
             <strong>Note:</strong> Exam center information is updated
             periodically. Please verify the details with the official exam
-            conducting body before your exam date. Centers marked as &quot;Confirmed&quot;
-            have been verified for the current year&apos;s examination.
+            conducting body before your exam date. Centers marked as
+            &quot;Confirmed&quot; have been verified for the current year&apos;s
+            examination.
           </div>
         </div>
       </div>
@@ -426,7 +445,9 @@ function ExamCenterCard({
         {/* Years Active */}
         <div className="mb-4">
           <div className="flex items-center gap-2 mb-2">
-            <span className="material-icons text-slate-400 text-xl">calendar_today</span>
+            <span className="material-icons text-slate-400 text-xl">
+              calendar_today
+            </span>
             <span className="text-sm font-medium text-slate-700">
               Years Active
             </span>
@@ -448,7 +469,9 @@ function ExamCenterCard({
 
         {/* Address */}
         <div className="flex items-start gap-2">
-          <span className="material-icons text-slate-400 text-xl mt-0.5 flex-shrink-0">location_on</span>
+          <span className="material-icons text-slate-400 text-xl mt-0.5 flex-shrink-0">
+            location_on
+          </span>
           <div>
             <p className="text-sm text-slate-700">{center.address}</p>
             <p className="text-sm text-slate-600">
@@ -466,9 +489,13 @@ function ExamCenterCard({
           className="w-full px-6 py-3 flex items-center justify-between text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
         >
           <span>{expanded ? "Hide Details" : "Show More Details"}</span>
-          <span className={`material-icons text-xl transition-transform ${
+          <span
+            className={`material-icons text-xl transition-transform ${
               expanded ? "rotate-180" : ""
-            }`}>expand_more</span>
+            }`}
+          >
+            expand_more
+          </span>
         </button>
 
         {expanded && (
@@ -481,7 +508,9 @@ function ExamCenterCard({
                 </h4>
                 {center.contact_person && (
                   <div className="flex items-center gap-2 text-sm text-slate-600">
-                    <span className="material-icons text-slate-400 text-xl">person</span>
+                    <span className="material-icons text-slate-400 text-xl">
+                      person
+                    </span>
                     <span>{center.contact_person}</span>
                     {center.contact_designation && (
                       <span className="text-slate-400">
@@ -492,7 +521,9 @@ function ExamCenterCard({
                 )}
                 {center.phone_number && (
                   <div className="flex items-center gap-2 text-sm">
-                    <span className="material-icons text-slate-400 text-xl">phone</span>
+                    <span className="material-icons text-slate-400 text-xl">
+                      phone
+                    </span>
                     <a
                       href={`tel:${center.phone_number}`}
                       className="text-blue-600 hover:underline"
@@ -514,7 +545,9 @@ function ExamCenterCard({
                 )}
                 {center.email && (
                   <div className="flex items-center gap-2 text-sm">
-                    <span className="material-icons text-slate-400 text-xl">mail</span>
+                    <span className="material-icons text-slate-400 text-xl">
+                      mail
+                    </span>
                     <a
                       href={`mailto:${center.email}`}
                       className="text-blue-600 hover:underline"
@@ -534,13 +567,17 @@ function ExamCenterCard({
                 </h4>
                 {center.nearest_railway && (
                   <div className="flex items-center gap-2 text-sm text-slate-600">
-                    <span className="material-icons text-slate-400 text-xl">train</span>
+                    <span className="material-icons text-slate-400 text-xl">
+                      train
+                    </span>
                     <span>{center.nearest_railway}</span>
                   </div>
                 )}
                 {center.nearest_bus_stand && (
                   <div className="flex items-center gap-2 text-sm text-slate-600">
-                    <span className="material-icons text-slate-400 text-xl">directions_bus</span>
+                    <span className="material-icons text-slate-400 text-xl">
+                      directions_bus
+                    </span>
                     <span>{center.nearest_bus_stand}</span>
                   </div>
                 )}
@@ -580,7 +617,9 @@ function ExamCenterCard({
             {/* Capacity */}
             {center.capacity && (
               <div className="flex items-center gap-2 text-sm text-slate-600">
-                <span className="material-icons text-slate-400 text-xl">apartment</span>
+                <span className="material-icons text-slate-400 text-xl">
+                  apartment
+                </span>
                 <span>Seating Capacity: {center.capacity}</span>
               </div>
             )}
@@ -593,9 +632,13 @@ function ExamCenterCard({
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-200 transition-colors"
               >
-                <span className="material-icons text-slate-400 text-xl">location_on</span>
+                <span className="material-icons text-slate-400 text-xl">
+                  location_on
+                </span>
                 View on Google Maps
-                <span className="material-icons text-slate-400 text-sm">open_in_new</span>
+                <span className="material-icons text-slate-400 text-sm">
+                  open_in_new
+                </span>
               </a>
             )}
           </div>
