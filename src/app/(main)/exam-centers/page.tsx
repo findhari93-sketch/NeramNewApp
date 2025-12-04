@@ -9,6 +9,41 @@ import {
   type IndianState,
 } from "@/data/indian-states-cities";
 import type { ExamCenter } from "@/types/exam-center";
+import {
+  Container,
+  Paper,
+  TextField,
+  MenuItem,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  Typography,
+  Box,
+  Chip,
+  Divider,
+  Link as MuiLink,
+  CircularProgress,
+  Alert,
+  InputAdornment,
+  Collapse,
+  Stack,
+} from "@mui/material";
+import SearchIcon from "@mui/icons-material/Search";
+import PlaceIcon from "@mui/icons-material/Place";
+import PhoneIcon from "@mui/icons-material/Phone";
+import EmailIcon from "@mui/icons-material/Email";
+import PersonIcon from "@mui/icons-material/Person";
+import TrainIcon from "@mui/icons-material/Train";
+import DirectionsBusIcon from "@mui/icons-material/DirectionsBus";
+import ApartmentIcon from "@mui/icons-material/Apartment";
+import InfoIcon from "@mui/icons-material/Info";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import ScheduleIcon from "@mui/icons-material/Schedule";
+import EventIcon from "@mui/icons-material/Event";
+import OpenInNewIcon from "@mui/icons-material/OpenInNew";
+import ClearIcon from "@mui/icons-material/Clear";
 
 export default function ExamCentersPage() {
   // Filter states
@@ -97,208 +132,300 @@ export default function ExamCentersPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      {/* Header */}
-      <div className="bg-white border-b border-slate-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl mb-4 shadow-lg shadow-blue-500/30">
-              <span className="material-icons text-white text-3xl">
-                apartment
-              </span>
-            </div>
-            <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-2">
+    <Box sx={{ bgcolor: "#f8f9fa", minHeight: "100vh", py: 4 }}>
+      <Container maxWidth="lg">
+        {/* Header Section */}
+        <Box sx={{ mb: 4, textAlign: "center" }}>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              mb: 2,
+              gap: 1,
+            }}
+          >
+            <ApartmentIcon sx={{ fontSize: 40, color: "primary.main" }} />
+            <Typography
+              variant="h3"
+              component="h1"
+              sx={{
+                fontWeight: 700,
+                background: "linear-gradient(135deg, #1976d2 0%, #1565c0 100%)",
+                backgroundClip: "text",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+              }}
+            >
               Find Exam Centers
-            </h1>
-            <p className="text-lg text-slate-600 max-w-2xl mx-auto">
-              Search for NATA and JEE Paper 2 exam centers across India. Find
-              confirmed centers, addresses, and contact details.
-            </p>
-          </div>
-        </div>
-      </div>
+            </Typography>
+          </Box>
+          <Typography
+            variant="body1"
+            sx={{ color: "#666", maxWidth: "600px", mx: "auto" }}
+          >
+            Search for NATA and JEE Paper 2 exam centers across India. Find
+            confirmed centers with addresses and contact details.
+          </Typography>
+        </Box>
 
-      {/* Search Section */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
-          <div className="p-6 sm:p-8">
-            <div className="flex items-center gap-2 mb-6">
-              <span className="material-icons text-blue-600">tune</span>
-              <h2 className="text-lg font-semibold text-slate-900">
-                Search Filters
-              </h2>
-            </div>
+        {/* Search Card - Google Style */}
+        <Paper
+          elevation={2}
+          sx={{
+            p: 3,
+            mb: 4,
+            borderRadius: 2,
+            backgroundColor: "#ffffff",
+          }}
+        >
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: {
+                xs: "1fr",
+                sm: "repeat(2, 1fr)",
+                md: "repeat(4, 1fr)",
+              },
+              gap: 2,
+              mb: 3,
+            }}
+          >
+            {/* Exam Type */}
+            <TextField
+              select
+              fullWidth
+              label="Exam Type"
+              value={examType}
+              onChange={(e) => setExamType(e.target.value)}
+              variant="outlined"
+              size="medium"
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <SearchIcon sx={{ color: "action.active" }} />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  backgroundColor: "#f5f5f5",
+                  "&:hover fieldset": { borderColor: "#1976d2" },
+                },
+              }}
+            >
+              <MenuItem value="">
+                <em>Select Exam</em>
+              </MenuItem>
+              {EXAM_TYPES.map((type) => (
+                <MenuItem key={type.value} value={type.value}>
+                  {type.value}
+                </MenuItem>
+              ))}
+            </TextField>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-              {/* Exam Type */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Exam Type <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <select
-                    value={examType}
-                    onChange={(e) => setExamType(e.target.value)}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                  >
-                    <option value="">Select Exam</option>
-                    {EXAM_TYPES.map((type) => (
-                      <option key={type.value} value={type.value}>
-                        {type.value}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="material-icons absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xl">
-                    expand_more
-                  </span>
-                </div>
-              </div>
+            {/* State */}
+            <TextField
+              select
+              fullWidth
+              label="State"
+              value={selectedState}
+              onChange={(e) => setSelectedState(e.target.value)}
+              variant="outlined"
+              size="medium"
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  backgroundColor: "#f5f5f5",
+                  "&:hover fieldset": { borderColor: "#1976d2" },
+                },
+              }}
+            >
+              <MenuItem value="">
+                <em>All States</em>
+              </MenuItem>
+              {INDIAN_STATES.map((state) => (
+                <MenuItem key={state} value={state}>
+                  {state}
+                </MenuItem>
+              ))}
+            </TextField>
 
-              {/* State */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  State
-                </label>
-                <div className="relative">
-                  <select
-                    value={selectedState}
-                    onChange={(e) => setSelectedState(e.target.value)}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                  >
-                    <option value="">All States</option>
-                    {INDIAN_STATES.map((state) => (
-                      <option key={state} value={state}>
-                        {state}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="material-icons absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xl">
-                    expand_more
-                  </span>
-                </div>
-              </div>
+            {/* City */}
+            <TextField
+              select
+              fullWidth
+              label="City"
+              value={selectedCity}
+              onChange={(e) => setSelectedCity(e.target.value)}
+              disabled={!selectedState}
+              variant="outlined"
+              size="medium"
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  backgroundColor: "#f5f5f5",
+                  "&:hover fieldset": { borderColor: "#1976d2" },
+                },
+              }}
+            >
+              <MenuItem value="">
+                <em>All Cities</em>
+              </MenuItem>
+              {availableCities.map((city) => (
+                <MenuItem key={city} value={city}>
+                  {city}
+                </MenuItem>
+              ))}
+            </TextField>
 
-              {/* City */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  City
-                </label>
-                <div className="relative">
-                  <select
-                    value={selectedCity}
-                    onChange={(e) => setSelectedCity(e.target.value)}
-                    disabled={!selectedState}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <option value="">All Cities</option>
-                    {availableCities.map((city) => (
-                      <option key={city} value={city}>
-                        {city}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="material-icons absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xl">
-                    expand_more
-                  </span>
-                </div>
-              </div>
+            {/* Search by Name */}
+            <TextField
+              fullWidth
+              label="Search Center Name"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              variant="outlined"
+              size="medium"
+              placeholder="e.g., Delhi Center"
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <SearchIcon sx={{ color: "action.active" }} />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  backgroundColor: "#f5f5f5",
+                  "&:hover fieldset": { borderColor: "#1976d2" },
+                },
+              }}
+            />
+          </Box>
 
-              {/* Search by name */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Search by Name
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Center name..."
-                    className="w-full px-4 py-3 pl-10 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                  />
-                  <span className="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xl">
-                    search
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row gap-3">
-              <button
-                onClick={handleSearch}
-                disabled={loading}
-                className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all shadow-lg shadow-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading ? (
-                  <span className="material-icons animate-spin text-xl">
-                    autorenew
-                  </span>
+          {/* Action Buttons */}
+          <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+            <Button
+              variant="contained"
+              size="large"
+              onClick={handleSearch}
+              disabled={loading}
+              startIcon={
+                loading ? (
+                  <CircularProgress size={20} />
                 ) : (
-                  <span className="material-icons text-xl">search</span>
-                )}
-                Find Exam Centers
-              </button>
+                  <SearchIcon />
+                )
+              }
+              sx={{
+                background:
+                  "linear-gradient(135deg, #1976d2 0%, #1565c0 100%)",
+                textTransform: "none",
+                fontSize: "1rem",
+                fontWeight: 600,
+                px: 4,
+                py: 1.5,
+                borderRadius: 1,
+              }}
+            >
+              {loading ? "Searching..." : "Search Centers"}
+            </Button>
 
-              {(examType || selectedState || selectedCity || searchQuery) && (
-                <button
-                  onClick={clearFilters}
-                  className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-slate-100 text-slate-700 font-medium rounded-xl hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 transition-all"
-                >
-                  <span className="material-icons text-xl">close</span>
-                  Clear Filters
-                </button>
-              )}
-            </div>
-
-            {error && (
-              <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
-                {error}
-              </div>
+            {(examType || selectedState || selectedCity || searchQuery) && (
+              <Button
+                variant="outlined"
+                size="large"
+                onClick={clearFilters}
+                startIcon={<ClearIcon />}
+                sx={{
+                  textTransform: "none",
+                  fontSize: "1rem",
+                  fontWeight: 600,
+                  px: 3,
+                  py: 1.5,
+                  borderColor: "#e0e0e0",
+                  color: "#333",
+                  "&:hover": { borderColor: "#999" },
+                }}
+              >
+                Clear Filters
+              </Button>
             )}
-          </div>
-        </div>
+          </Box>
+
+          {/* Error Alert */}
+          {error && (
+            <Alert
+              severity="error"
+              onClose={() => setError(null)}
+              sx={{ mt: 2 }}
+            >
+              {error}
+            </Alert>
+          )}
+        </Paper>
 
         {/* Results Section */}
         {searched && (
-          <div className="mt-8">
+          <Box>
             {/* Results Header */}
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold text-slate-900">
+            <Box sx={{ mb: 3, display: "flex", alignItems: "center", gap: 2 }}>
+              <Typography variant="h5" sx={{ fontWeight: 600, flex: 1 }}>
                 {loading
-                  ? "Searching..."
-                  : `${centers.length} Center${
-                      centers.length !== 1 ? "s" : ""
-                    } Found`}
-              </h2>
+                  ? "Searching for exam centers..."
+                  : `${centers.length} Center${centers.length !== 1 ? "s" : ""} Found`}
+              </Typography>
+            </Box>
 
-              {/* Legend */}
-              <div className="hidden sm:flex items-center gap-4 text-sm">
-                <div className="flex items-center gap-1.5">
-                  <span className="inline-flex items-center px-2 py-0.5 bg-green-100 text-green-800 border border-green-300 rounded-full text-xs font-medium ring-2 ring-green-500 ring-offset-1">
-                    {currentYear}
-                  </span>
-                  <span className="text-slate-600">Confirmed</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="inline-flex items-center px-2 py-0.5 bg-yellow-100 text-yellow-800 border border-yellow-300 rounded-full text-xs font-medium">
-                    {currentYear}
-                  </span>
-                  <span className="text-slate-600">Tentative</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="inline-flex items-center px-2 py-0.5 bg-blue-100 text-blue-700 border border-blue-300 rounded-full text-xs font-medium">
-                    {currentYear - 1}
-                  </span>
-                  <span className="text-slate-600">Previous Year</span>
-                </div>
-              </div>
-            </div>
+            {/* Legend */}
+            <Box
+              sx={{
+                mb: 3,
+                display: "flex",
+                gap: 2,
+                flexWrap: "wrap",
+              }}
+            >
+              <Chip
+                icon={<CheckCircleIcon />}
+                label={`Confirmed ${currentYear}`}
+                sx={{
+                  backgroundColor: "#e8f5e9",
+                  color: "#2e7d32",
+                  fontWeight: 600,
+                }}
+              />
+              <Chip
+                icon={<ScheduleIcon />}
+                label={`Tentative ${currentYear}`}
+                sx={{
+                  backgroundColor: "#fff3e0",
+                  color: "#e65100",
+                  fontWeight: 600,
+                }}
+              />
+              <Chip
+                label={`Previous Year (${currentYear - 1})`}
+                sx={{
+                  backgroundColor: "#e3f2fd",
+                  color: "#1565c0",
+                  fontWeight: 600,
+                }}
+              />
+            </Box>
 
             {/* Results Grid */}
             {centers.length > 0 ? (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: {
+                    xs: "1fr",
+                    md: "repeat(2, 1fr)",
+                  },
+                  gap: 3,
+                }}
+              >
                 {centers.map((center) => (
                   <ExamCenterCard
                     key={center.id}
@@ -306,81 +433,173 @@ export default function ExamCentersPage() {
                     currentYear={currentYear}
                   />
                 ))}
-              </div>
+              </Box>
             ) : !loading ? (
-              <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-12 text-center">
-                <div className="inline-flex items-center justify-center w-16 h-16 bg-slate-100 rounded-full mb-4">
-                  <span className="material-icons text-slate-400 text-3xl">
-                    search
-                  </span>
-                </div>
-                <h3 className="text-lg font-semibold text-slate-900 mb-2">
-                  No Centers Found
-                </h3>
-                <p className="text-slate-600 max-w-md mx-auto">
-                  No exam centers match your search criteria. Try adjusting your
-                  filters or searching for a different location.
-                </p>
-              </div>
-            ) : null}
-          </div>
+              <Card sx={{ textAlign: "center", py: 6 }}>
+                <CardContent>
+                  <SearchIcon
+                    sx={{
+                      fontSize: 60,
+                      color: "#bdbdbd",
+                      mb: 2,
+                    }}
+                  />
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
+                    No Centers Found
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: "#666" }}>
+                    No exam centers match your search criteria. Try adjusting
+                    your filters or searching for a different location.
+                  </Typography>
+                </CardContent>
+              </Card>
+            ) : (
+              <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+                <CircularProgress />
+              </Box>
+            )}
+          </Box>
         )}
 
-        {/* Initial State */}
+        {/* Initial State - Quick Tips */}
         {!searched && (
-          <div className="mt-12 text-center">
-            <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full mb-6">
-              <span className="material-icons text-blue-600 text-4xl">
-                location_on
-              </span>
-            </div>
-            <h3 className="text-xl font-semibold text-slate-900 mb-2">
-              Search for Exam Centers
-            </h3>
-            <p className="text-slate-600 max-w-lg mx-auto mb-8">
-              Select your exam type and location to find nearby exam centers.
-              View confirmed centers for {currentYear} and historical data.
-            </p>
+          <Box sx={{ textAlign: "center", py: 4 }}>
+            <PlaceIcon
+              sx={{
+                fontSize: 80,
+                color: "#1976d2",
+                mb: 2,
+                opacity: 0.7,
+              }}
+            />
+            <Typography variant="h5" sx={{ fontWeight: 600, mb: 1 }}>
+              Start Your Search
+            </Typography>
+            <Typography variant="body1" sx={{ color: "#666", mb: 4 }}>
+              Select your exam type and location to find nearby exam centers
+            </Typography>
 
             {/* Quick Stats */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-2xl mx-auto">
-              <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-                <div className="text-2xl font-bold text-blue-600">NATA</div>
-                <div className="text-sm text-slate-600">Architecture Exam</div>
-              </div>
-              <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-                <div className="text-2xl font-bold text-indigo-600">JEE</div>
-                <div className="text-sm text-slate-600">Paper 2 B.Arch</div>
-              </div>
-              <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-                <div className="text-2xl font-bold text-emerald-600">36</div>
-                <div className="text-sm text-slate-600">States & UTs</div>
-              </div>
-              <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-                <div className="text-2xl font-bold text-amber-600">500+</div>
-                <div className="text-sm text-slate-600">Cities</div>
-              </div>
-            </div>
-          </div>
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: {
+                  xs: "repeat(2, 1fr)",
+                  sm: "repeat(4, 1fr)",
+                },
+                gap: 2,
+                maxWidth: "800px",
+                mx: "auto",
+              }}
+            >
+              <Card
+                sx={{
+                  textAlign: "center",
+                  py: 2,
+                  backgroundColor: "#f5f5f5",
+                  border: "1px solid #e0e0e0",
+                }}
+              >
+                <CardContent>
+                  <Typography
+                    variant="h5"
+                    sx={{ fontWeight: 700, color: "#1976d2" }}
+                  >
+                    NATA
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "#666", mt: 0.5 }}>
+                    Architecture
+                  </Typography>
+                </CardContent>
+              </Card>
+              <Card
+                sx={{
+                  textAlign: "center",
+                  py: 2,
+                  backgroundColor: "#f5f5f5",
+                  border: "1px solid #e0e0e0",
+                }}
+              >
+                <CardContent>
+                  <Typography
+                    variant="h5"
+                    sx={{ fontWeight: 700, color: "#1565c0" }}
+                  >
+                    JEE
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "#666", mt: 0.5 }}>
+                    Paper 2 B.Arch
+                  </Typography>
+                </CardContent>
+              </Card>
+              <Card
+                sx={{
+                  textAlign: "center",
+                  py: 2,
+                  backgroundColor: "#f5f5f5",
+                  border: "1px solid #e0e0e0",
+                }}
+              >
+                <CardContent>
+                  <Typography
+                    variant="h5"
+                    sx={{ fontWeight: 700, color: "#0d47a1" }}
+                  >
+                    36
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "#666", mt: 0.5 }}>
+                    States & UTs
+                  </Typography>
+                </CardContent>
+              </Card>
+              <Card
+                sx={{
+                  textAlign: "center",
+                  py: 2,
+                  backgroundColor: "#f5f5f5",
+                  border: "1px solid #e0e0e0",
+                }}
+              >
+                <CardContent>
+                  <Typography
+                    variant="h5"
+                    sx={{ fontWeight: 700, color: "#0d47a1" }}
+                  >
+                    500+
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "#666", mt: 0.5 }}>
+                    Cities
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Box>
+          </Box>
         )}
-      </div>
+      </Container>
 
-      {/* Footer Note */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
-          <span className="material-icons text-blue-600 flex-shrink-0 mt-0.5 text-xl">
-            info
-          </span>
-          <div className="text-sm text-blue-800">
-            <strong>Note:</strong> Exam center information is updated
-            periodically. Please verify the details with the official exam
-            conducting body before your exam date. Centers marked as
-            &quot;Confirmed&quot; have been verified for the current year&apos;s
-            examination.
-          </div>
-        </div>
-      </div>
-    </div>
+      {/* Footer Info */}
+      <Container maxWidth="lg" sx={{ mt: 6 }}>
+        <Alert
+          icon={<InfoIcon />}
+          severity="info"
+          sx={{
+            backgroundColor: "#e3f2fd",
+            color: "#1565c0",
+            border: "1px solid #90caf9",
+          }}
+        >
+          <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+            Important Note:
+          </Typography>
+          <Typography variant="body2">
+            Exam center information is updated periodically. Please verify the
+            details with the official exam conducting body before your exam
+            date. Centers marked as &quot;Confirmed&quot; have been verified for
+            the current year&apos;s examination.
+          </Typography>
+        </Alert>
+      </Container>
+    </Box>
   );
 }
 
@@ -398,268 +617,349 @@ function ExamCenterCard({
   const sortedYears = [...center.active_years].sort((a, b) => b - a);
 
   return (
-    <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden hover:shadow-xl transition-shadow duration-300">
+    <Card
+      sx={{
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+        "&:hover": {
+          boxShadow: 6,
+          transform: "translateY(-4px)",
+        },
+        border: "1px solid #e0e0e0",
+      }}
+    >
       {/* Header */}
-      <div className="p-6 pb-4">
-        <div className="flex items-start justify-between gap-4 mb-3">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1">
+      <CardHeader
+        title={
+          <Box>
+            <Box sx={{ display: "flex", gap: 1, mb: 1, flexWrap: "wrap" }}>
               {center.is_confirmed_current_year &&
                 center.active_years.includes(currentYear) && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-medium">
-                    <span className="material-icons text-sm">check_circle</span>
-                    Confirmed {currentYear}
-                  </span>
+                  <Chip
+                    icon={<CheckCircleIcon />}
+                    label={`Confirmed ${currentYear}`}
+                    size="small"
+                    sx={{
+                      backgroundColor: "#e8f5e9",
+                      color: "#2e7d32",
+                      fontWeight: 600,
+                    }}
+                  />
                 )}
               {!center.is_confirmed_current_year &&
                 center.active_years.includes(currentYear) && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium">
-                    <span className="material-icons text-sm">schedule</span>
-                    Tentative {currentYear}
-                  </span>
+                  <Chip
+                    icon={<ScheduleIcon />}
+                    label={`Tentative ${currentYear}`}
+                    size="small"
+                    sx={{
+                      backgroundColor: "#fff3e0",
+                      color: "#e65100",
+                      fontWeight: 600,
+                    }}
+                  />
                 )}
               {center.status === "inactive" && (
-                <span className="inline-flex items-center px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full text-xs font-medium">
-                  Inactive
-                </span>
+                <Chip
+                  label="Inactive"
+                  size="small"
+                  sx={{
+                    backgroundColor: "#f5f5f5",
+                    color: "#666",
+                  }}
+                />
               )}
-            </div>
-            <h3 className="text-lg font-semibold text-slate-900 leading-tight">
+              <Chip
+                label={center.exam_type}
+                size="small"
+                sx={{
+                  backgroundColor: "#e3f2fd",
+                  color: "#1565c0",
+                  fontWeight: 600,
+                  marginLeft: "auto",
+                }}
+              />
+            </Box>
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>
               {center.center_name}
-            </h3>
+            </Typography>
             {center.center_code && (
-              <p className="text-sm text-slate-500 mt-0.5">
-                Code: {center.center_code}
-              </p>
+              <Typography variant="caption" sx={{ color: "#999", display: "block", mt: 0.5 }}>
+                Center Code: {center.center_code}
+              </Typography>
             )}
-          </div>
-          <span className="inline-flex items-center px-2.5 py-1 bg-blue-100 text-blue-700 rounded-lg text-xs font-medium">
-            {center.exam_type}
-          </span>
-        </div>
+          </Box>
+        }
+        sx={{ pb: 1 }}
+      />
 
+      <CardContent sx={{ flexGrow: 1 }}>
         {center.description && (
-          <p className="text-sm text-slate-600 mb-4">{center.description}</p>
+          <Typography
+            variant="body2"
+            sx={{ color: "#666", mb: 2 }}
+          >
+            {center.description}
+          </Typography>
         )}
 
         {/* Years Active */}
-        <div className="mb-4">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="material-icons text-slate-400 text-xl">
-              calendar_today
-            </span>
-            <span className="text-sm font-medium text-slate-700">
+        <Box sx={{ mb: 2 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
+            <EventIcon sx={{ fontSize: 20, color: "#666" }} />
+            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
               Years Active
-            </span>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
+            </Typography>
+          </Box>
+          <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
             {sortedYears.map((year) => (
-              <span
+              <Chip
                 key={year}
-                className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${getYearBadgeStyle(
-                  year,
-                  center.is_confirmed_current_year
-                )}`}
-              >
-                {year}
-              </span>
+                label={year.toString()}
+                size="small"
+                sx={{
+                  ...getYearChipStyle(year),
+                  fontWeight: 600,
+                }}
+              />
             ))}
-          </div>
-        </div>
+          </Box>
+        </Box>
 
         {/* Address */}
-        <div className="flex items-start gap-2">
-          <span className="material-icons text-slate-400 text-xl mt-0.5 flex-shrink-0">
-            location_on
-          </span>
-          <div>
-            <p className="text-sm text-slate-700">{center.address}</p>
-            <p className="text-sm text-slate-600">
+        <Box sx={{ display: "flex", gap: 1.5, mb: 2 }}>
+          <PlaceIcon sx={{ color: "#666", fontSize: 20, flexShrink: 0, mt: 0.5 }} />
+          <Box>
+            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+              {center.address}
+            </Typography>
+            <Typography variant="caption" sx={{ color: "#999" }}>
               {center.city}, {center.state}
               {center.pincode && ` - ${center.pincode}`}
-            </p>
-          </div>
-        </div>
-      </div>
+            </Typography>
+          </Box>
+        </Box>
 
-      {/* Expandable Details */}
-      <div className="border-t border-slate-100">
-        <button
+        <Divider sx={{ my: 2 }} />
+
+        {/* Expandable Details Button */}
+        <Button
+          fullWidth
           onClick={() => setExpanded(!expanded)}
-          className="w-full px-6 py-3 flex items-center justify-between text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+          endIcon={
+            <ExpandMoreIcon
+              sx={{
+                transition: "transform 0.3s",
+                transform: expanded ? "rotate(180deg)" : "rotate(0deg)",
+              }}
+            />
+          }
+          sx={{
+            textTransform: "none",
+            fontSize: "1rem",
+            color: "#1976d2",
+            fontWeight: 600,
+            justifyContent: "space-between",
+            "&:hover": { backgroundColor: "#f5f5f5" },
+          }}
         >
-          <span>{expanded ? "Hide Details" : "Show More Details"}</span>
-          <span
-            className={`material-icons text-xl transition-transform ${
-              expanded ? "rotate-180" : ""
-            }`}
-          >
-            expand_more
-          </span>
-        </button>
+          {expanded ? "Hide Details" : "Show Details"}
+        </Button>
 
-        {expanded && (
-          <div className="px-6 pb-6 space-y-4">
+        {/* Expandable Details */}
+        <Collapse in={expanded} timeout="auto" unmountOnExit>
+          <Box sx={{ mt: 2, pt: 2, borderTop: "1px solid #e0e0e0" }}>
             {/* Contact Info */}
             {(center.phone_number || center.email || center.contact_person) && (
-              <div className="space-y-2">
-                <h4 className="text-sm font-medium text-slate-900">
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
                   Contact Information
-                </h4>
+                </Typography>
                 {center.contact_person && (
-                  <div className="flex items-center gap-2 text-sm text-slate-600">
-                    <span className="material-icons text-slate-400 text-xl">
-                      person
-                    </span>
-                    <span>{center.contact_person}</span>
-                    {center.contact_designation && (
-                      <span className="text-slate-400">
-                        ({center.contact_designation})
-                      </span>
-                    )}
-                  </div>
+                  <Box sx={{ display: "flex", gap: 1.5, mb: 1 }}>
+                    <PersonIcon sx={{ fontSize: 20, color: "#666" }} />
+                    <Box>
+                      <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                        {center.contact_person}
+                      </Typography>
+                      {center.contact_designation && (
+                        <Typography variant="caption" sx={{ color: "#999" }}>
+                          {center.contact_designation}
+                        </Typography>
+                      )}
+                    </Box>
+                  </Box>
                 )}
                 {center.phone_number && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="material-icons text-slate-400 text-xl">
-                      phone
-                    </span>
-                    <a
-                      href={`tel:${center.phone_number}`}
-                      className="text-blue-600 hover:underline"
-                    >
-                      {center.phone_number}
-                    </a>
-                    {center.alternate_phone && (
-                      <span className="text-slate-400">
-                        /{" "}
-                        <a
-                          href={`tel:${center.alternate_phone}`}
-                          className="text-blue-600 hover:underline"
-                        >
-                          {center.alternate_phone}
-                        </a>
-                      </span>
-                    )}
-                  </div>
+                  <Box sx={{ display: "flex", gap: 1.5, mb: 1 }}>
+                    <PhoneIcon sx={{ fontSize: 20, color: "#666" }} />
+                    <Box>
+                      <MuiLink
+                        href={`tel:${center.phone_number}`}
+                        sx={{
+                          color: "#1976d2",
+                          textDecoration: "none",
+                          fontWeight: 500,
+                          display: "block",
+                        }}
+                      >
+                        {center.phone_number}
+                      </MuiLink>
+                      {center.alternate_phone && (
+                        <Typography variant="caption" sx={{ color: "#999" }}>
+                          Alt:{" "}
+                          <MuiLink
+                            href={`tel:${center.alternate_phone}`}
+                            sx={{
+                              color: "#1976d2",
+                              textDecoration: "none",
+                            }}
+                          >
+                            {center.alternate_phone}
+                          </MuiLink>
+                        </Typography>
+                      )}
+                    </Box>
+                  </Box>
                 )}
                 {center.email && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="material-icons text-slate-400 text-xl">
-                      mail
-                    </span>
-                    <a
+                  <Box sx={{ display: "flex", gap: 1.5 }}>
+                    <EmailIcon sx={{ fontSize: 20, color: "#666" }} />
+                    <MuiLink
                       href={`mailto:${center.email}`}
-                      className="text-blue-600 hover:underline"
+                      sx={{
+                        color: "#1976d2",
+                        textDecoration: "none",
+                        fontWeight: 500,
+                        wordBreak: "break-all",
+                      }}
                     >
                       {center.email}
-                    </a>
-                  </div>
+                    </MuiLink>
+                  </Box>
                 )}
-              </div>
+              </Box>
             )}
 
-            {/* Nearby Transport */}
+            {/* Transport */}
             {(center.nearest_railway || center.nearest_bus_stand) && (
-              <div className="space-y-2">
-                <h4 className="text-sm font-medium text-slate-900">
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
                   Nearby Transport
-                </h4>
+                </Typography>
                 {center.nearest_railway && (
-                  <div className="flex items-center gap-2 text-sm text-slate-600">
-                    <span className="material-icons text-slate-400 text-xl">
-                      train
-                    </span>
-                    <span>{center.nearest_railway}</span>
-                  </div>
+                  <Box sx={{ display: "flex", gap: 1.5, mb: 1 }}>
+                    <TrainIcon sx={{ fontSize: 20, color: "#666" }} />
+                    <Typography variant="body2">
+                      {center.nearest_railway}
+                    </Typography>
+                  </Box>
                 )}
                 {center.nearest_bus_stand && (
-                  <div className="flex items-center gap-2 text-sm text-slate-600">
-                    <span className="material-icons text-slate-400 text-xl">
-                      directions_bus
-                    </span>
-                    <span>{center.nearest_bus_stand}</span>
-                  </div>
+                  <Box sx={{ display: "flex", gap: 1.5 }}>
+                    <DirectionsBusIcon sx={{ fontSize: 20, color: "#666" }} />
+                    <Typography variant="body2">
+                      {center.nearest_bus_stand}
+                    </Typography>
+                  </Box>
                 )}
-              </div>
+              </Box>
             )}
 
             {/* Facilities */}
             {center.facilities && (
-              <div>
-                <h4 className="text-sm font-medium text-slate-900 mb-1">
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
                   Facilities
-                </h4>
-                <p className="text-sm text-slate-600">{center.facilities}</p>
-              </div>
+                </Typography>
+                <Typography variant="body2" sx={{ color: "#666" }}>
+                  {center.facilities}
+                </Typography>
+              </Box>
             )}
 
             {/* Instructions */}
             {center.instructions && (
-              <div>
-                <h4 className="text-sm font-medium text-slate-900 mb-1">
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
                   Instructions
-                </h4>
-                <p className="text-sm text-slate-600">{center.instructions}</p>
-              </div>
+                </Typography>
+                <Typography variant="body2" sx={{ color: "#666" }}>
+                  {center.instructions}
+                </Typography>
+              </Box>
             )}
 
             {/* Landmarks */}
             {center.landmarks && (
-              <div>
-                <h4 className="text-sm font-medium text-slate-900 mb-1">
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
                   Landmarks
-                </h4>
-                <p className="text-sm text-slate-600">{center.landmarks}</p>
-              </div>
+                </Typography>
+                <Typography variant="body2" sx={{ color: "#666" }}>
+                  {center.landmarks}
+                </Typography>
+              </Box>
             )}
 
             {/* Capacity */}
             {center.capacity && (
-              <div className="flex items-center gap-2 text-sm text-slate-600">
-                <span className="material-icons text-slate-400 text-xl">
-                  apartment
-                </span>
-                <span>Seating Capacity: {center.capacity}</span>
-              </div>
+              <Box sx={{ display: "flex", gap: 1.5, mb: 2 }}>
+                <ApartmentIcon sx={{ fontSize: 20, color: "#666" }} />
+                <Typography variant="body2">
+                  Seating Capacity: {center.capacity}
+                </Typography>
+              </Box>
             )}
 
             {/* Google Maps Link */}
             {center.google_maps_link && (
-              <a
+              <Button
+                fullWidth
+                variant="outlined"
+                endIcon={<OpenInNewIcon />}
                 href={center.google_maps_link}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-200 transition-colors"
+                sx={{
+                  textTransform: "none",
+                  fontSize: "0.95rem",
+                  fontWeight: 600,
+                  color: "#1976d2",
+                  borderColor: "#90caf9",
+                  "&:hover": { backgroundColor: "#e3f2fd" },
+                }}
               >
-                <span className="material-icons text-slate-400 text-xl">
-                  location_on
-                </span>
                 View on Google Maps
-                <span className="material-icons text-slate-400 text-sm">
-                  open_in_new
-                </span>
-              </a>
+              </Button>
             )}
-          </div>
-        )}
-      </div>
-    </div>
+          </Box>
+        </Collapse>
+      </CardContent>
+    </Card>
   );
 }
 
 // Helper function for year badge styles
-function getYearBadgeStyle(year: number, isConfirmed: boolean): string {
+function getYearChipStyle(year: number) {
   const currentYear = new Date().getFullYear();
 
-  if (year === currentYear && isConfirmed) {
-    return "bg-green-100 text-green-800 border-green-300 ring-2 ring-green-500 ring-offset-1";
-  }
   if (year === currentYear) {
-    return "bg-yellow-100 text-yellow-800 border-yellow-300";
+    return {
+      backgroundColor: "#e8f5e9",
+      color: "#2e7d32",
+    };
   }
   if (year === currentYear - 1) {
-    return "bg-blue-100 text-blue-700 border-blue-300";
+    return {
+      backgroundColor: "#e3f2fd",
+      color: "#1565c0",
+    };
   }
-  return "bg-gray-100 text-gray-600 border-gray-300";
+  return {
+    backgroundColor: "#f5f5f5",
+    color: "#666",
+  };
 }
