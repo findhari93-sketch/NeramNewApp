@@ -92,11 +92,15 @@ const LinksGrid = styled.div`
   grid-template-columns: repeat(2, minmax(140px, 1fr));
 
   @media (min-width: 768px) {
-    grid-template-columns: repeat(3, minmax(140px, 1fr));
+    grid-template-columns: repeat(4, minmax(140px, 1fr));
   }
 
   @media (min-width: 992px) {
-    grid-template-columns: repeat(5, minmax(140px, 1fr));
+    grid-template-columns: repeat(6, minmax(130px, 1fr));
+  }
+
+  @media (min-width: 1200px) {
+    grid-template-columns: repeat(7, minmax(120px, 1fr));
   }
 `;
 
@@ -208,54 +212,168 @@ const LinksColumns: React.FC = () => {
     ],
     [
       {
-        Title: "Tamil Nadu Cities",
+        Title: "Tamil Nadu (A-C)",
         set1: [
-          { text: "NATA Coaching Chennai", url: "/coaching/chennai" },
-          { text: "NATA Coaching Madurai", url: "/coaching/madurai" },
-          {
-            text: "NATA Coaching Coimbatore",
-            url: "/coaching/coimbatore",
-          },
-          { text: "NATA Coaching Trichy", url: "/coaching/trichy" },
-          { text: "NATA Coaching Salem", url: "/coaching/salem" },
-          { text: "NATA Coaching Erode", url: "/coaching/erode" },
-          { text: "NATA Coaching Tiruppur", url: "/coaching/tiruppur" },
-          { text: "NATA Coaching Vellore", url: "/coaching/vellore" },
-          {
-            text: "Architecture Coaching Pondicherry",
-            url: "/coaching/pondicherry",
-          },
+          { text: "Ariyalur", url: "/coaching/ariyalur" },
+          { text: "Chengalpattu", url: "/coaching/chengalpattu" },
+          { text: "Chennai", url: "/coaching/chennai" },
+          { text: "Coimbatore", url: "/coaching/coimbatore" },
+          { text: "Cuddalore", url: "/coaching/cuddalore" },
+          { text: "Dharmapuri", url: "/coaching/dharmapuri" },
+          { text: "Dindigul", url: "/coaching/dindigul" },
+          { text: "Erode", url: "/coaching/erode" },
+        ],
+      },
+      {
+        Title: "Tamil Nadu (K-O)",
+        set1: [
+          { text: "Kallakurichi", url: "/coaching/kallakurichi" },
+          { text: "Kancheepuram", url: "/coaching/kancheepuram" },
+          { text: "Karur", url: "/coaching/karur" },
+          { text: "Krishnagiri", url: "/coaching/krishnagiri" },
+          { text: "Madurai", url: "/coaching/madurai" },
+          { text: "Mayiladuthurai", url: "/coaching/mayiladuthurai" },
+          { text: "Nagapattinam", url: "/coaching/nagapattinam" },
+          { text: "Nagercoil", url: "/coaching/nagercoil" },
+          { text: "Namakkal", url: "/coaching/namakkal" },
+          { text: "Ooty", url: "/coaching/ooty" },
         ],
       },
     ],
     [
       {
-        Title: "Major Cities",
+        Title: "Tamil Nadu (P-T)",
         set1: [
-          { text: "NATA Coaching Mumbai", url: "/coaching/mumbai" },
-          { text: "NATA Coaching Bangalore", url: "/coaching/bangalore" },
-          { text: "NATA Coaching Hyderabad", url: "/coaching/hyderabad" },
-          { text: "NATA Coaching Delhi", url: "/coaching/delhi" },
-          { text: "NATA Coaching Kochi", url: "/coaching/kochi" },
-          {
-            text: "NATA Coaching Trivandrum",
-            url: "/coaching/trivandrum",
-          },
-          { text: "JEE Coaching Vizag", url: "/coaching/vizag" },
-          { text: "Architecture Coaching Pune", url: "/coaching/pune" },
+          { text: "Perambalur", url: "/coaching/perambalur" },
+          { text: "Pudukkottai", url: "/coaching/pudukkottai" },
+          { text: "Ramanathapuram", url: "/coaching/ramanathapuram" },
+          { text: "Ranipet", url: "/coaching/ranipet" },
+          { text: "Salem", url: "/coaching/salem" },
+          { text: "Sivaganga", url: "/coaching/sivaganga" },
+          { text: "Tenkasi", url: "/coaching/tenkasi" },
+          { text: "Thanjavur", url: "/coaching/thanjavur" },
+          { text: "Theni", url: "/coaching/theni" },
+          { text: "Thiruvallur", url: "/coaching/thiruvallur" },
         ],
       },
       {
-        Title: "More Locations",
+        Title: "Tamil Nadu (T-V)",
         set1: [
-          { text: "Dindigul", url: "/coaching/dindigul" },
-          { text: "Kanyakumari", url: "/coaching/kanyakumari" },
-          { text: "Namakkal", url: "/coaching/namakkal" },
-          { text: "Thanjavur", url: "/coaching/thanjavur" },
+          { text: "Thiruvarur", url: "/coaching/thiruvarur" },
+          { text: "Thoothukudi", url: "/coaching/thoothukudi" },
           { text: "Tirunelveli", url: "/coaching/tirunelveli" },
-          { text: "Karaikudi", url: "/coaching/karaikudi" },
-          { text: "Kanchipuram", url: "/coaching/kanchipuram" },
-          { text: "All Locations", url: "/coaching" },
+          { text: "Tirupathur", url: "/coaching/tirupathur" },
+          { text: "Tiruppur", url: "/coaching/tiruppur" },
+          { text: "Tiruvannamalai", url: "/coaching/tiruvannamalai" },
+          { text: "Trichy", url: "/coaching/trichy" },
+          { text: "Vellore", url: "/coaching/vellore" },
+          { text: "Viluppuram", url: "/coaching/viluppuram" },
+          { text: "Virudhunagar", url: "/coaching/virudhunagar" },
+        ],
+      },
+    ],
+    [
+      {
+        Title: "Karnataka (A-D)",
+        set1: [
+          { text: "Bagalkote", url: "/coaching/bagalkote" },
+          { text: "Bangalore", url: "/coaching/bangalore" },
+          { text: "Belgaum", url: "/coaching/belgaum" },
+          { text: "Bellary", url: "/coaching/bellary" },
+          { text: "Bengaluru Rural", url: "/coaching/bengaluru-rural" },
+          { text: "Bidar", url: "/coaching/bidar" },
+          { text: "Bijapur", url: "/coaching/bijapur" },
+          { text: "Chamarajanagar", url: "/coaching/chamarajanagar" },
+          { text: "Chikkaballapura", url: "/coaching/chikkaballapura" },
+          { text: "Chikkamagaluru", url: "/coaching/chikkamagaluru" },
+          { text: "Chitradurga", url: "/coaching/chitradurga" },
+          { text: "Davanagere", url: "/coaching/davanagere" },
+          { text: "Dharwad", url: "/coaching/dharwad" },
+        ],
+      },
+      {
+        Title: "Karnataka (G-Y)",
+        set1: [
+          { text: "Gadag", url: "/coaching/gadag" },
+          { text: "Gulbarga", url: "/coaching/gulbarga" },
+          { text: "Hassan", url: "/coaching/hassan" },
+          { text: "Haveri", url: "/coaching/haveri" },
+          { text: "Hubli", url: "/coaching/hubli" },
+          { text: "Karwar", url: "/coaching/karwar" },
+          { text: "Kodagu", url: "/coaching/kodagu" },
+          { text: "Kolar", url: "/coaching/kolar" },
+          { text: "Koppal", url: "/coaching/koppal" },
+          { text: "Mandya", url: "/coaching/mandya" },
+          { text: "Mangalore", url: "/coaching/mangalore" },
+          { text: "Mysore", url: "/coaching/mysore" },
+          { text: "Raichur", url: "/coaching/raichur" },
+          { text: "Ramanagara", url: "/coaching/ramanagara" },
+          { text: "Shimoga", url: "/coaching/shimoga" },
+          { text: "Tumkur", url: "/coaching/tumkur" },
+          { text: "Udupi", url: "/coaching/udupi" },
+          { text: "Vijayanagara", url: "/coaching/vijayanagara" },
+          { text: "Yadgir", url: "/coaching/yadgir" },
+        ],
+      },
+    ],
+    [
+      {
+        Title: "UAE & Qatar",
+        set1: [
+          { text: "Abu Dhabi", url: "/coaching/abu-dhabi" },
+          { text: "Ajman", url: "/coaching/ajman" },
+          { text: "Al Khor", url: "/coaching/al-khor" },
+          { text: "Al Wakrah", url: "/coaching/al-wakrah" },
+          { text: "Doha", url: "/coaching/doha" },
+          { text: "Dubai", url: "/coaching/dubai" },
+          { text: "Dukhan", url: "/coaching/dukhan" },
+          { text: "Fujairah", url: "/coaching/fujairah" },
+          { text: "Lusail", url: "/coaching/lusail" },
+          { text: "Mesaieed", url: "/coaching/mesaieed" },
+          { text: "Ras Al Khaimah", url: "/coaching/ras-al-khaimah" },
+          { text: "Sharjah", url: "/coaching/sharjah" },
+          { text: "Umm Salal", url: "/coaching/umm-salal" },
+        ],
+      },
+      {
+        Title: "Oman & Saudi",
+        set1: [
+          { text: "Al Ahsa", url: "/coaching/al-ahsa" },
+          { text: "Al Khobar", url: "/coaching/al-khobar" },
+          { text: "Dammam", url: "/coaching/dammam" },
+          { text: "Ibri", url: "/coaching/ibri" },
+          { text: "Jeddah", url: "/coaching/jeddah" },
+          { text: "Jubail", url: "/coaching/jubail" },
+          { text: "Madinah", url: "/coaching/madinah" },
+          { text: "Makkah", url: "/coaching/makkah" },
+          { text: "Muscat", url: "/coaching/muscat" },
+          { text: "Nizwa", url: "/coaching/nizwa" },
+          { text: "Riyadh", url: "/coaching/riyadh" },
+          { text: "Ruwi", url: "/coaching/ruwi" },
+          { text: "Salalah", url: "/coaching/salalah" },
+          { text: "Seeb", url: "/coaching/seeb" },
+          { text: "Sohar", url: "/coaching/sohar" },
+          { text: "Sur", url: "/coaching/sur" },
+          { text: "Yanbu", url: "/coaching/yanbu" },
+        ],
+      },
+    ],
+    [
+      {
+        Title: "Kuwait & Bahrain",
+        set1: [
+          { text: "Ahmadi", url: "/coaching/ahmadi" },
+          { text: "Fahaheel", url: "/coaching/fahaheel" },
+          { text: "Farwaniya", url: "/coaching/farwaniya" },
+          { text: "Hawally", url: "/coaching/hawally" },
+          { text: "Isa Town", url: "/coaching/isa-town" },
+          { text: "Kuwait City", url: "/coaching/kuwait-city" },
+          { text: "Manama", url: "/coaching/manama" },
+          { text: "Mangaf", url: "/coaching/mangaf" },
+          { text: "Muharraq", url: "/coaching/muharraq" },
+          { text: "Riffa", url: "/coaching/riffa" },
+          { text: "Salmiya", url: "/coaching/salmiya" },
+          { text: "Sitra", url: "/coaching/sitra" },
         ],
       },
     ],
