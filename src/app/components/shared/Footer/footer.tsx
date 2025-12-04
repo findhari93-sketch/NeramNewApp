@@ -45,6 +45,9 @@ const FooterSection = styled.footer`
   color: #fff;
   font-size: 11px;
   width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+  box-sizing: border-box;
   /* outer padding guards */
   padding-right: 16px;
   padding-left: 16px;
@@ -52,9 +55,11 @@ const FooterSection = styled.footer`
 
 // Centered max-width container
 const Wrapper = styled.div`
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
   padding-top: 40px;
+  width: 100%;
+  box-sizing: border-box;
 `;
 
 const FooterInfo = styled.div`
@@ -80,27 +85,33 @@ const FooterLayout = styled.div`
   gap: 24px;
 
   @media (min-width: 992px) {
-    grid-template-columns: 380px 1fr;
+    grid-template-columns: 1fr;
     align-items: start;
   }
 `;
 
-// Links grid: responsive number of columns
+// Links grid: responsive number of columns with proper spacing
 const LinksGrid = styled.div`
   display: grid;
-  gap: 24px;
-  grid-template-columns: repeat(2, minmax(140px, 1fr));
+  gap: 20px 16px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  max-width: 100%;
+  overflow-x: hidden;
+
+  @media (min-width: 480px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
 
   @media (min-width: 768px) {
-    grid-template-columns: repeat(4, minmax(140px, 1fr));
+    grid-template-columns: repeat(3, 1fr);
   }
 
   @media (min-width: 992px) {
-    grid-template-columns: repeat(6, minmax(130px, 1fr));
+    grid-template-columns: repeat(4, 1fr);
   }
 
   @media (min-width: 1200px) {
-    grid-template-columns: repeat(7, minmax(120px, 1fr));
+    grid-template-columns: repeat(5, 1fr);
   }
 `;
 
@@ -108,6 +119,8 @@ const ColumnContainer = styled.div`
   display: flex;
   flex-direction: column;
   text-transform: uppercase;
+  min-width: 0;
+  word-wrap: break-word;
 `;
 
 const LinkDiv = styled.div``;
