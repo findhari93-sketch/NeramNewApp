@@ -3076,24 +3076,23 @@ export default async function BlogPostPage({ params }: PageProps) {
       <ListItem
         sx={{
           display: "flex",
-          alignItems: "flex-start",
-          py: 0.75,
+          alignItems: "center",
+          py: 0.5,
           px: 0,
         }}
       >
         <ListItemIcon
           sx={{
-            minWidth: 28,
-            mt: 0.5,
-            color: "primary.main",
+            minWidth: 32,
+            color: "#e91e63",
           }}
         >
-          <CheckCircleIcon sx={{ fontSize: 18 }} />
+          <CheckCircleIcon sx={{ fontSize: 20 }} />
         </ListItemIcon>
         <ListItemText
           primary={children}
           primaryTypographyProps={{
-            sx: { fontSize: "1rem", lineHeight: 1.7, color: "text.secondary" },
+            sx: { fontSize: "1rem", lineHeight: 1.6, color: "text.primary" },
           }}
         />
       </ListItem>
@@ -3400,16 +3399,16 @@ export default async function BlogPostPage({ params }: PageProps) {
           <Card
             elevation={0}
             sx={{
-              background: "linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)",
+              background: "linear-gradient(135deg, #880e4f 0%, #e91e63 100%)",
               borderRadius: 3,
               overflow: "hidden",
             }}
           >
             <CardContent sx={{ p: { xs: 3, md: 4 }, textAlign: "center" }}>
-              <StarIcon sx={{ fontSize: 48, color: "primary.main", mb: 2 }} />
+              <StarIcon sx={{ fontSize: 48, color: "#fff", mb: 2 }} />
               <Typography
                 variant="h5"
-                sx={{ mb: 2, fontWeight: 700, color: "primary.dark" }}
+                sx={{ mb: 2, fontWeight: 700, color: "#fff" }}
               >
                 Ready to Ace NATA 2025?
               </Typography>
@@ -3417,7 +3416,7 @@ export default async function BlogPostPage({ params }: PageProps) {
                 variant="body1"
                 sx={{
                   mb: 3,
-                  color: "text.secondary",
+                  color: "rgba(255,255,255,0.9)",
                   maxWidth: 500,
                   mx: "auto",
                 }}
@@ -3445,11 +3444,10 @@ export default async function BlogPostPage({ params }: PageProps) {
                     fontWeight: 600,
                     textTransform: "none",
                     fontSize: "1rem",
-                    background:
-                      "linear-gradient(135deg, #1976d2 0%, #1565c0 100%)",
+                    bgcolor: "#fff",
+                    color: "#e91e63",
                     "&:hover": {
-                      background:
-                        "linear-gradient(135deg, #1565c0 0%, #0d47a1 100%)",
+                      bgcolor: "rgba(255,255,255,0.9)",
                     },
                   }}
                 >
@@ -3466,6 +3464,12 @@ export default async function BlogPostPage({ params }: PageProps) {
                     fontWeight: 600,
                     textTransform: "none",
                     fontSize: "1rem",
+                    borderColor: "#fff",
+                    color: "#fff",
+                    "&:hover": {
+                      borderColor: "#fff",
+                      bgcolor: "rgba(255,255,255,0.1)",
+                    },
                   }}
                 >
                   Free Study Material
