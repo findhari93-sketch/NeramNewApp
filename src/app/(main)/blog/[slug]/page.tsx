@@ -7,11 +7,24 @@ import Box from "@mui/material/Box";
 import Chip from "@mui/material/Chip";
 import Paper from "@mui/material/Paper";
 import Divider from "@mui/material/Divider";
+import Card from "@mui/material/Card";
+import CardContent from "@mui/material/CardContent";
+import List from "@mui/material/List";
+import ListItem from "@mui/material/ListItem";
+import ListItemIcon from "@mui/material/ListItemIcon";
+import ListItemText from "@mui/material/ListItemText";
 import Link from "next/link";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import PersonIcon from "@mui/icons-material/Person";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import SchoolIcon from "@mui/icons-material/School";
+import StarIcon from "@mui/icons-material/Star";
+import PhoneIcon from "@mui/icons-material/Phone";
 import Button from "@mui/material/Button";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 // Blog post data - In production, this would come from a CMS or database
 const blogPosts: Record<
@@ -2977,59 +2990,330 @@ export default async function BlogPostPage({ params }: PageProps) {
     notFound();
   }
 
+  // Custom components for ReactMarkdown with Material UI styling
+  const markdownComponents = {
+    h1: ({ children }: { children?: React.ReactNode }) => (
+      <Typography
+        variant="h3"
+        component="h1"
+        sx={{
+          mt: 5,
+          mb: 3,
+          fontWeight: 700,
+          color: "primary.main",
+          borderBottom: "2px solid",
+          borderColor: "primary.light",
+          pb: 1,
+        }}
+      >
+        {children}
+      </Typography>
+    ),
+    h2: ({ children }: { children?: React.ReactNode }) => (
+      <Typography
+        variant="h4"
+        component="h2"
+        sx={{
+          mt: 4,
+          mb: 2,
+          fontWeight: 600,
+          color: "text.primary",
+        }}
+      >
+        {children}
+      </Typography>
+    ),
+    h3: ({ children }: { children?: React.ReactNode }) => (
+      <Typography
+        variant="h5"
+        component="h3"
+        sx={{
+          mt: 3,
+          mb: 2,
+          fontWeight: 600,
+          color: "text.primary",
+        }}
+      >
+        {children}
+      </Typography>
+    ),
+    h4: ({ children }: { children?: React.ReactNode }) => (
+      <Typography
+        variant="h6"
+        component="h4"
+        sx={{
+          mt: 2,
+          mb: 1.5,
+          fontWeight: 600,
+          color: "text.secondary",
+        }}
+      >
+        {children}
+      </Typography>
+    ),
+    p: ({ children }: { children?: React.ReactNode }) => (
+      <Typography
+        variant="body1"
+        sx={{
+          mb: 2,
+          lineHeight: 1.8,
+          fontSize: "1.1rem",
+          color: "text.secondary",
+        }}
+      >
+        {children}
+      </Typography>
+    ),
+    ul: ({ children }: { children?: React.ReactNode }) => (
+      <List sx={{ mb: 2, pl: 2 }}>{children}</List>
+    ),
+    ol: ({ children }: { children?: React.ReactNode }) => (
+      <List component="ol" sx={{ mb: 2, pl: 2, listStyleType: "decimal" }}>
+        {children}
+      </List>
+    ),
+    li: ({ children }: { children?: React.ReactNode }) => (
+      <ListItem
+        sx={{
+          display: "list-item",
+          py: 0.5,
+          pl: 0,
+          "&::marker": {
+            color: "primary.main",
+          },
+        }}
+      >
+        <ListItemIcon sx={{ minWidth: 32, color: "primary.main" }}>
+          <CheckCircleIcon fontSize="small" />
+        </ListItemIcon>
+        <ListItemText
+          primary={children}
+          primaryTypographyProps={{
+            sx: { fontSize: "1rem", lineHeight: 1.7, color: "text.secondary" },
+          }}
+        />
+      </ListItem>
+    ),
+    strong: ({ children }: { children?: React.ReactNode }) => (
+      <Box
+        component="strong"
+        sx={{ fontWeight: 700, color: "text.primary" }}
+      >
+        {children}
+      </Box>
+    ),
+    em: ({ children }: { children?: React.ReactNode }) => (
+      <Box component="em" sx={{ fontStyle: "italic", color: "text.secondary" }}>
+        {children}
+      </Box>
+    ),
+    blockquote: ({ children }: { children?: React.ReactNode }) => (
+      <Paper
+        elevation={0}
+        sx={{
+          my: 3,
+          p: 3,
+          borderLeft: "4px solid",
+          borderColor: "primary.main",
+          bgcolor: "grey.50",
+          "& p": { mb: 0, fontStyle: "italic" },
+        }}
+      >
+        {children}
+      </Paper>
+    ),
+    code: ({ children, className }: { children?: React.ReactNode; className?: string }) => {
+      const isInline = !className;
+      if (isInline) {
+        return (
+          <Box
+            component="code"
+            sx={{
+              px: 1,
+              py: 0.5,
+              bgcolor: "grey.100",
+              borderRadius: 1,
+              fontFamily: "monospace",
+              fontSize: "0.9rem",
+              color: "primary.dark",
+            }}
+          >
+            {children}
+          </Box>
+        );
+      }
+      return (
+        <Paper
+          elevation={0}
+          sx={{
+            p: 2,
+            my: 2,
+            bgcolor: "grey.900",
+            borderRadius: 2,
+            overflow: "auto",
+          }}
+        >
+          <Box
+            component="code"
+            sx={{
+              fontFamily: "monospace",
+              fontSize: "0.9rem",
+              color: "grey.100",
+              whiteSpace: "pre-wrap",
+            }}
+          >
+            {children}
+          </Box>
+        </Paper>
+      );
+    },
+    pre: ({ children }: { children?: React.ReactNode }) => (
+      <Paper
+        elevation={0}
+        sx={{
+          p: 3,
+          my: 3,
+          bgcolor: "grey.900",
+          borderRadius: 2,
+          overflow: "auto",
+        }}
+      >
+        {children}
+      </Paper>
+    ),
+    hr: () => <Divider sx={{ my: 4 }} />,
+    a: ({ href, children }: { href?: string; children?: React.ReactNode }) => (
+      <Box
+        component="a"
+        href={href}
+        sx={{
+          color: "primary.main",
+          textDecoration: "none",
+          fontWeight: 500,
+          "&:hover": {
+            textDecoration: "underline",
+          },
+        }}
+      >
+        {children}
+      </Box>
+    ),
+    table: ({ children }: { children?: React.ReactNode }) => (
+      <Box sx={{ overflowX: "auto", my: 3 }}>
+        <Box
+          component="table"
+          sx={{
+            width: "100%",
+            borderCollapse: "collapse",
+            "& th, & td": {
+              border: "1px solid",
+              borderColor: "grey.300",
+              p: 2,
+              textAlign: "left",
+            },
+            "& th": {
+              bgcolor: "primary.main",
+              color: "white",
+              fontWeight: 600,
+            },
+            "& tr:nth-of-type(even)": {
+              bgcolor: "grey.50",
+            },
+          }}
+        >
+          {children}
+        </Box>
+      </Box>
+    ),
+  };
+
   return (
-    <>
+    <Box sx={{ bgcolor: "#f8f9fa", minHeight: "100vh" }}>
       {/* Back Button */}
-      <Container maxWidth="lg" sx={{ mt: 4, mb: 2 }}>
+      <Container maxWidth="lg" sx={{ pt: 4, pb: 2 }}>
         <Link href="/blog" style={{ textDecoration: "none" }}>
-          <Button startIcon={<ArrowBackIcon />} variant="text">
-            Back to Blog
+          <Button
+            startIcon={<ArrowBackIcon />}
+            variant="text"
+            sx={{
+              color: "text.secondary",
+              "&:hover": { bgcolor: "grey.100" },
+            }}
+          >
+            Back to All Articles
           </Button>
         </Link>
       </Container>
 
-      {/* Article Header */}
+      {/* Article Header - Hero Section */}
       <Box
         sx={{
-          background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+          background: "linear-gradient(135deg, #1976d2 0%, #1565c0 50%, #0d47a1 100%)",
           color: "white",
-          py: 8,
-          mb: 6,
+          py: { xs: 6, md: 8 },
+          mb: 4,
+          position: "relative",
+          overflow: "hidden",
+          "&::before": {
+            content: '""',
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "url('/images/pattern.svg')",
+            opacity: 0.1,
+          },
         }}
       >
-        <Container maxWidth="md">
+        <Container maxWidth="md" sx={{ position: "relative", zIndex: 1 }}>
           <Chip
+            icon={<SchoolIcon />}
             label={post.category}
             sx={{
-              mb: 2,
-              bgcolor: "white",
-              color: "primary.main",
+              mb: 3,
+              bgcolor: "rgba(255,255,255,0.2)",
+              color: "white",
               fontWeight: 600,
+              fontSize: "0.9rem",
+              "& .MuiChip-icon": { color: "white" },
             }}
           />
           <Typography
             variant="h1"
             component="h1"
             sx={{
-              fontSize: { xs: "2rem", md: "2.5rem" },
-              fontWeight: 700,
-              mb: 2,
+              fontSize: { xs: "1.75rem", sm: "2.25rem", md: "2.75rem" },
+              fontWeight: 800,
+              mb: 3,
+              lineHeight: 1.2,
             }}
           >
             {post.title}
+          </Typography>
+          <Typography
+            variant="subtitle1"
+            sx={{
+              mb: 3,
+              opacity: 0.9,
+              fontSize: { xs: "1rem", md: "1.1rem" },
+              maxWidth: "600px",
+            }}
+          >
+            {post.excerpt}
           </Typography>
           <Box
             sx={{
               display: "flex",
               alignItems: "center",
-              gap: 3,
+              gap: { xs: 2, md: 4 },
               flexWrap: "wrap",
-              opacity: 0.95,
+              opacity: 0.9,
             }}
           >
             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
               <CalendarTodayIcon fontSize="small" />
-              <Typography variant="body2">
+              <Typography variant="body2" sx={{ fontWeight: 500 }}>
                 {new Date(post.date).toLocaleDateString("en-US", {
                   month: "long",
                   day: "numeric",
@@ -3039,154 +3323,152 @@ export default async function BlogPostPage({ params }: PageProps) {
             </Box>
             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
               <AccessTimeIcon fontSize="small" />
-              <Typography variant="body2">{post.readTime}</Typography>
+              <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                {post.readTime}
+              </Typography>
             </Box>
-            <Typography variant="body2">By {post.author}</Typography>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <PersonIcon fontSize="small" />
+              <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                {post.author}
+              </Typography>
+            </Box>
           </Box>
         </Container>
       </Box>
 
       {/* Article Content */}
-      <Container maxWidth="md" sx={{ mb: 8 }}>
+      <Container maxWidth="md" sx={{ pb: 8 }}>
         <Paper
-          elevation={0}
-          sx={{ p: { xs: 3, md: 5 }, bgcolor: "background.paper" }}
+          elevation={2}
+          sx={{
+            p: { xs: 3, sm: 4, md: 5 },
+            borderRadius: 3,
+            bgcolor: "background.paper",
+          }}
         >
+          {/* Markdown Content */}
           <Box
             sx={{
-              "& h1": { fontSize: "2rem", fontWeight: 700, mt: 4, mb: 2 },
-              "& h2": { fontSize: "1.5rem", fontWeight: 600, mt: 3, mb: 2 },
-              "& h3": { fontSize: "1.25rem", fontWeight: 600, mt: 2, mb: 1.5 },
-              "& p": {
-                fontSize: "1.1rem",
-                lineHeight: 1.8,
-                mb: 2,
-                color: "text.secondary",
-              },
-              "& ul, & ol": { mb: 3, pl: 3 },
-              "& li": {
-                fontSize: "1.1rem",
-                lineHeight: 1.8,
-                mb: 1,
-                color: "text.secondary",
-              },
-              "& strong": { fontWeight: 600, color: "text.primary" },
+              "& > *:first-of-type": { mt: 0 },
             }}
           >
-            {post.content.split("\n").map((paragraph, index) => {
-              if (paragraph.startsWith("# ")) {
-                return (
-                  <Typography
-                    key={index}
-                    variant="h2"
-                    component="h2"
-                    sx={{ mt: 4, mb: 2 }}
-                  >
-                    {paragraph.replace("# ", "")}
-                  </Typography>
-                );
-              } else if (paragraph.startsWith("## ")) {
-                return (
-                  <Typography
-                    key={index}
-                    variant="h3"
-                    component="h3"
-                    sx={{ mt: 3, mb: 2 }}
-                  >
-                    {paragraph.replace("## ", "")}
-                  </Typography>
-                );
-              } else if (paragraph.startsWith("### ")) {
-                return (
-                  <Typography
-                    key={index}
-                    variant="h4"
-                    component="h4"
-                    sx={{ mt: 2, mb: 1.5 }}
-                  >
-                    {paragraph.replace("### ", "")}
-                  </Typography>
-                );
-              } else if (paragraph.startsWith("- ")) {
-                return (
-                  <Box component="li" key={index} sx={{ ml: 3, mb: 1 }}>
-                    <Typography variant="body1">
-                      {paragraph.replace("- ", "")}
-                    </Typography>
-                  </Box>
-                );
-              } else if (
-                paragraph.startsWith("**") &&
-                paragraph.endsWith("**")
-              ) {
-                return (
-                  <Typography
-                    key={index}
-                    variant="body1"
-                    sx={{ fontWeight: 600, mt: 2, mb: 1 }}
-                  >
-                    {paragraph.replace(/\*\*/g, "")}
-                  </Typography>
-                );
-              } else if (paragraph.trim()) {
-                return (
-                  <Typography key={index} variant="body1" paragraph>
-                    {paragraph}
-                  </Typography>
-                );
-              }
-              return null;
-            })}
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={markdownComponents as any}
+            >
+              {post.content}
+            </ReactMarkdown>
           </Box>
 
-          <Divider sx={{ my: 4 }} />
+          <Divider sx={{ my: 5 }} />
 
-          {/* CTA Section */}
-          <Box
-            sx={{
-              textAlign: "center",
-              py: 4,
-              bgcolor: "primary.light",
-              borderRadius: 2,
-              px: 3,
-            }}
-          >
-            <Typography variant="h5" sx={{ mb: 2, fontWeight: 600 }}>
-              Ready to Ace NATA 2025?
-            </Typography>
-            <Typography variant="body1" sx={{ mb: 3, color: "text.secondary" }}>
-              Join thousands of successful students who chose Neram Classes for
-              their architecture entrance exam preparation.
-            </Typography>
-            <Box
-              sx={{
-                display: "flex",
-                gap: 2,
-                justifyContent: "center",
-                flexWrap: "wrap",
-              }}
+          {/* Keywords Tags */}
+          <Box sx={{ mb: 4 }}>
+            <Typography
+              variant="subtitle2"
+              sx={{ mb: 2, fontWeight: 600, color: "text.secondary" }}
             >
-              <Button
-                variant="contained"
-                size="large"
-                component={Link}
-                href="/premium"
-              >
-                Enroll Now
-              </Button>
-              <Button
-                variant="outlined"
-                size="large"
-                component={Link}
-                href="/freebooks"
-              >
-                Free Study Material
-              </Button>
+              Related Topics
+            </Typography>
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+              {post.keywords.slice(0, 8).map((keyword) => (
+                <Chip
+                  key={keyword}
+                  label={keyword}
+                  size="small"
+                  variant="outlined"
+                  sx={{
+                    borderColor: "primary.light",
+                    color: "primary.main",
+                    "&:hover": { bgcolor: "primary.50" },
+                  }}
+                />
+              ))}
             </Box>
           </Box>
+
+          {/* CTA Section */}
+          <Card
+            elevation={0}
+            sx={{
+              background: "linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)",
+              borderRadius: 3,
+              overflow: "hidden",
+            }}
+          >
+            <CardContent sx={{ p: { xs: 3, md: 4 }, textAlign: "center" }}>
+              <StarIcon
+                sx={{ fontSize: 48, color: "primary.main", mb: 2 }}
+              />
+              <Typography
+                variant="h5"
+                sx={{ mb: 2, fontWeight: 700, color: "primary.dark" }}
+              >
+                Ready to Ace NATA 2025?
+              </Typography>
+              <Typography
+                variant="body1"
+                sx={{ mb: 3, color: "text.secondary", maxWidth: 500, mx: "auto" }}
+              >
+                Join thousands of successful students who chose Neram Classes for
+                their architecture entrance exam preparation.
+              </Typography>
+              <Box
+                sx={{
+                  display: "flex",
+                  gap: 2,
+                  justifyContent: "center",
+                  flexWrap: "wrap",
+                }}
+              >
+                <Button
+                  variant="contained"
+                  size="large"
+                  component={Link}
+                  href="/premium"
+                  startIcon={<SchoolIcon />}
+                  sx={{
+                    px: 4,
+                    py: 1.5,
+                    fontWeight: 600,
+                    textTransform: "none",
+                    fontSize: "1rem",
+                    background: "linear-gradient(135deg, #1976d2 0%, #1565c0 100%)",
+                    "&:hover": {
+                      background: "linear-gradient(135deg, #1565c0 0%, #0d47a1 100%)",
+                    },
+                  }}
+                >
+                  Enroll Now
+                </Button>
+                <Button
+                  variant="outlined"
+                  size="large"
+                  component={Link}
+                  href="/freebooks"
+                  sx={{
+                    px: 4,
+                    py: 1.5,
+                    fontWeight: 600,
+                    textTransform: "none",
+                    fontSize: "1rem",
+                  }}
+                >
+                  Free Study Material
+                </Button>
+              </Box>
+              <Box sx={{ mt: 3, display: "flex", justifyContent: "center", gap: 1 }}>
+                <PhoneIcon sx={{ fontSize: 20, color: "text.secondary" }} />
+                <Typography variant="body2" color="text.secondary">
+                  Call us: +91 9876543210
+                </Typography>
+              </Box>
+            </CardContent>
+          </Card>
         </Paper>
       </Container>
-    </>
+    </Box>
   );
 }
 

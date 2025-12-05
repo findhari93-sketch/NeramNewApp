@@ -90,7 +90,9 @@ function PremiumContent({
         }}
       >
         <CircularProgress />
-        <Typography>{authChecking ? "Verifying login..." : "Verifying..."}</Typography>
+        <Typography>
+          {authChecking ? "Verifying login..." : "Verifying..."}
+        </Typography>
       </Box>
     );
   }
