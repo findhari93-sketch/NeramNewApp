@@ -3065,26 +3065,30 @@ export default async function BlogPostPage({ params }: PageProps) {
       </Typography>
     ),
     ul: ({ children }: { children?: React.ReactNode }) => (
-      <List sx={{ mb: 2, pl: 2 }}>{children}</List>
+      <List sx={{ mb: 2, pl: 0 }}>{children}</List>
     ),
     ol: ({ children }: { children?: React.ReactNode }) => (
-      <List component="ol" sx={{ mb: 2, pl: 2, listStyleType: "decimal" }}>
+      <List component="ol" sx={{ mb: 2, pl: 0 }}>
         {children}
       </List>
     ),
     li: ({ children }: { children?: React.ReactNode }) => (
       <ListItem
         sx={{
-          display: "list-item",
-          py: 0.5,
-          pl: 0,
-          "&::marker": {
-            color: "primary.main",
-          },
+          display: "flex",
+          alignItems: "flex-start",
+          py: 0.75,
+          px: 0,
         }}
       >
-        <ListItemIcon sx={{ minWidth: 32, color: "primary.main" }}>
-          <CheckCircleIcon fontSize="small" />
+        <ListItemIcon
+          sx={{
+            minWidth: 28,
+            mt: 0.5,
+            color: "primary.main",
+          }}
+        >
+          <CheckCircleIcon sx={{ fontSize: 18 }} />
         </ListItemIcon>
         <ListItemText
           primary={children}
@@ -3095,10 +3099,7 @@ export default async function BlogPostPage({ params }: PageProps) {
       </ListItem>
     ),
     strong: ({ children }: { children?: React.ReactNode }) => (
-      <Box
-        component="strong"
-        sx={{ fontWeight: 700, color: "text.primary" }}
-      >
+      <Box component="strong" sx={{ fontWeight: 700, color: "text.primary" }}>
         {children}
       </Box>
     ),
@@ -3122,7 +3123,13 @@ export default async function BlogPostPage({ params }: PageProps) {
         {children}
       </Paper>
     ),
-    code: ({ children, className }: { children?: React.ReactNode; className?: string }) => {
+    code: ({
+      children,
+      className,
+    }: {
+      children?: React.ReactNode;
+      className?: string;
+    }) => {
       const isInline = !className;
       if (isInline) {
         return (
@@ -3248,7 +3255,8 @@ export default async function BlogPostPage({ params }: PageProps) {
       {/* Article Header - Hero Section */}
       <Box
         sx={{
-          background: "linear-gradient(135deg, #1976d2 0%, #1565c0 50%, #0d47a1 100%)",
+          background:
+            "linear-gradient(135deg, #1976d2 0%, #1565c0 50%, #0d47a1 100%)",
           color: "white",
           py: { xs: 6, md: 8 },
           mb: 4,
@@ -3398,9 +3406,7 @@ export default async function BlogPostPage({ params }: PageProps) {
             }}
           >
             <CardContent sx={{ p: { xs: 3, md: 4 }, textAlign: "center" }}>
-              <StarIcon
-                sx={{ fontSize: 48, color: "primary.main", mb: 2 }}
-              />
+              <StarIcon sx={{ fontSize: 48, color: "primary.main", mb: 2 }} />
               <Typography
                 variant="h5"
                 sx={{ mb: 2, fontWeight: 700, color: "primary.dark" }}
@@ -3409,10 +3415,15 @@ export default async function BlogPostPage({ params }: PageProps) {
               </Typography>
               <Typography
                 variant="body1"
-                sx={{ mb: 3, color: "text.secondary", maxWidth: 500, mx: "auto" }}
+                sx={{
+                  mb: 3,
+                  color: "text.secondary",
+                  maxWidth: 500,
+                  mx: "auto",
+                }}
               >
-                Join thousands of successful students who chose Neram Classes for
-                their architecture entrance exam preparation.
+                Join thousands of successful students who chose Neram Classes
+                for their architecture entrance exam preparation.
               </Typography>
               <Box
                 sx={{
@@ -3434,9 +3445,11 @@ export default async function BlogPostPage({ params }: PageProps) {
                     fontWeight: 600,
                     textTransform: "none",
                     fontSize: "1rem",
-                    background: "linear-gradient(135deg, #1976d2 0%, #1565c0 100%)",
+                    background:
+                      "linear-gradient(135deg, #1976d2 0%, #1565c0 100%)",
                     "&:hover": {
-                      background: "linear-gradient(135deg, #1565c0 0%, #0d47a1 100%)",
+                      background:
+                        "linear-gradient(135deg, #1565c0 0%, #0d47a1 100%)",
                     },
                   }}
                 >
@@ -3458,10 +3471,17 @@ export default async function BlogPostPage({ params }: PageProps) {
                   Free Study Material
                 </Button>
               </Box>
-              <Box sx={{ mt: 3, display: "flex", justifyContent: "center", gap: 1 }}>
+              <Box
+                sx={{
+                  mt: 3,
+                  display: "flex",
+                  justifyContent: "center",
+                  gap: 1,
+                }}
+              >
                 <PhoneIcon sx={{ fontSize: 20, color: "text.secondary" }} />
                 <Typography variant="body2" color="text.secondary">
-                  Call us: +91 9876543210
+                  Call us: +91 9176137043
                 </Typography>
               </Box>
             </CardContent>

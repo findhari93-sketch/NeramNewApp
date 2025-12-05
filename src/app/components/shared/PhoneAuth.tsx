@@ -789,7 +789,7 @@ export default function PhoneAuth({
             <TextField
               fullWidth
               inputRef={phoneInputRef}
-              placeholder="9876543210"
+              placeholder="9176137043"
               value={nationalNumber}
               onChange={(event) => {
                 const raw = event.target.value;
