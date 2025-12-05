@@ -147,13 +147,17 @@ export default function ExamCentersPage() {
 
     // If searching by center name, city and state are auto-filled
     if (centerName && !selectedState) {
-      setError("State should be auto-filled from center name. Please select a valid center name.");
+      setError(
+        "State should be auto-filled from center name. Please select a valid center name."
+      );
       return;
     }
 
     // If not using center name, city is required
     if (!centerName && !selectedCity) {
-      setError("Please select a city (state and city are required for center search)");
+      setError(
+        "Please select a city (state and city are required for center search)"
+      );
       return;
     }
 
@@ -433,15 +437,20 @@ export default function ExamCentersPage() {
           </Box>
 
           {/* Help Text - Search Requirements */}
-          <Box sx={{ mt: 2, p: 2, backgroundColor: "#e3f2fd", borderRadius: 1 }}>
-            <Typography variant="caption" sx={{ color: "#1565c0", fontWeight: 500 }}>
+          <Box
+            sx={{ mt: 2, p: 2, backgroundColor: "#e3f2fd", borderRadius: 1 }}
+          >
+            <Typography
+              variant="caption"
+              sx={{ color: "#1565c0", fontWeight: 500 }}
+            >
               📌 <strong>Search Options:</strong>
-              <br />
-              • <strong>By Center Name:</strong> Select a center name → State & City auto-fill
-              <br />
-              • <strong>By Location:</strong> Select City → State auto-fills (minimum required)
-              <br />
-              • Exam Type is always required. State & City are mandatory for location-based search.
+              <br />• <strong>By Center Name:</strong> Select a center name →
+              State & City auto-fill
+              <br />• <strong>By Location:</strong> Select City → State
+              auto-fills (minimum required)
+              <br />• Exam Type is always required. State & City are mandatory
+              for location-based search.
             </Typography>
           </Box>
 

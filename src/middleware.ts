@@ -46,7 +46,7 @@ export function middleware(req: NextRequest) {
   }
 
   // Protected paths check
-  const protectedPaths = ["/dashboard"];
+  const protectedPaths = ["/dashboard", "/premium"];
   if (protectedPaths.some((p) => pathname.startsWith(p))) {
     const ok = validateSessionCookie(req);
     if (!ok) {

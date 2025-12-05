@@ -2,6 +2,8 @@
 
 import React from "react";
 import { useRouter } from "next/navigation";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 import SafeSearchParams from "@/components/SafeSearchParams";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
@@ -28,6 +30,29 @@ function PremiumContent({
   const token = searchParams?.get("token") || null;
   const [validating, setValidating] = React.useState(!!token);
   const [tokenValid, setTokenValid] = React.useState(false);
+  const [authChecking, setAuthChecking] = React.useState(true);
+  const [isLoggedIn, setIsLoggedIn] = React.useState(false);
+
+  // Check if user is logged in
+  React.useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user && user.emailVerified) {
+        setIsLoggedIn(true);
+      } else {
+        setIsLoggedIn(false);
+      }
+      setAuthChecking(false);
+    });
+
+    return () => unsubscribe();
+  }, [router]);
+
+  // Redirect to login if not authenticated
+  React.useEffect(() => {
+    if (!authChecking && !isLoggedIn) {
+      router.push("/auth/login?next=/premium");
+    }
+  }, [authChecking, isLoggedIn, router]);
 
   React.useEffect(() => {
     if (!token) {
@@ -52,7 +77,7 @@ function PremiumContent({
     })();
   }, [token]);
 
-  if (validating) {
+  if (authChecking || validating) {
     return (
       <Box
         sx={{
@@ -65,9 +90,14 @@ function PremiumContent({
         }}
       >
         <CircularProgress />
-        <Typography>Verifying...</Typography>
+        <Typography>{authChecking ? "Verifying login..." : "Verifying..."}</Typography>
       </Box>
     );
+  }
+
+  // Additional check: if not logged in, don't render content
+  if (!isLoggedIn) {
+    return null;
   }
 
   return (
