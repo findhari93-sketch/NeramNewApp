@@ -220,6 +220,8 @@ const LinksColumns: React.FC = () => {
           { text: "Student Reviews", url: "/#testimonials" },
           { text: "Privacy Policy", url: "/privacy" },
           { text: "Terms & Conditions", url: "/terms" },
+          { text: "Refund Policy", url: "/refund-policy" },
+          { text: "Contact Us", url: "/contact" },
         ],
       },
     ],
