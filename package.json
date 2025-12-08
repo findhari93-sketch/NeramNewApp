@@ -34,7 +34,7 @@
     "jsonwebtoken": "^9.0.2",
     "libphonenumber-js": "^1.12.29",
     "material-react-table": "^3.2.1",
-    "next": "15.5.2",
+    "next": "^15.5.7",
     "next-auth": "^4.24.11",
     "nodemailer": "^6.10.1",
     "pdf-lib": "^1.17.1",
